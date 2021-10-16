@@ -11,7 +11,7 @@
 #include "walker.h"
 #include "pseudo_walker.h"
 #include "gurobi_lattice_solver.h"
-#include "lattice_solver.h"
+#include "cplex_lattice_solver.h"
 #include "fmt/core.h"
 
 #include <boost/random/mersenne_twister.hpp>

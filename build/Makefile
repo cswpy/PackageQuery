@@ -123,32 +123,32 @@ main/fast:
 	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/build
 .PHONY : main/fast
 
-main_simplex.o: main_simplex.cpp.o
+main_lattice_solver.o: main_lattice_solver.cpp.o
 
-.PHONY : main_simplex.o
+.PHONY : main_lattice_solver.o
 
 # target to build an object file
-main_simplex.cpp.o:
-	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main_simplex.cpp.o
-.PHONY : main_simplex.cpp.o
+main_lattice_solver.cpp.o:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main_lattice_solver.cpp.o
+.PHONY : main_lattice_solver.cpp.o
 
-main_simplex.i: main_simplex.cpp.i
+main_lattice_solver.i: main_lattice_solver.cpp.i
 
-.PHONY : main_simplex.i
+.PHONY : main_lattice_solver.i
 
 # target to preprocess a source file
-main_simplex.cpp.i:
-	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main_simplex.cpp.i
-.PHONY : main_simplex.cpp.i
+main_lattice_solver.cpp.i:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main_lattice_solver.cpp.i
+.PHONY : main_lattice_solver.cpp.i
 
-main_simplex.s: main_simplex.cpp.s
+main_lattice_solver.s: main_lattice_solver.cpp.s
 
-.PHONY : main_simplex.s
+.PHONY : main_lattice_solver.s
 
 # target to generate assembly for a file
-main_simplex.cpp.s:
-	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main_simplex.cpp.s
-.PHONY : main_simplex.cpp.s
+main_lattice_solver.cpp.s:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main_lattice_solver.cpp.s
+.PHONY : main_lattice_solver.cpp.s
 
 src/coo_sparse.o: src/coo_sparse.cpp.o
 
@@ -176,6 +176,60 @@ src/coo_sparse.s: src/coo_sparse.cpp.s
 src/coo_sparse.cpp.s:
 	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/coo_sparse.cpp.s
 .PHONY : src/coo_sparse.cpp.s
+
+src/cplex_lattice_solver.o: src/cplex_lattice_solver.cpp.o
+
+.PHONY : src/cplex_lattice_solver.o
+
+# target to build an object file
+src/cplex_lattice_solver.cpp.o:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/cplex_lattice_solver.cpp.o
+.PHONY : src/cplex_lattice_solver.cpp.o
+
+src/cplex_lattice_solver.i: src/cplex_lattice_solver.cpp.i
+
+.PHONY : src/cplex_lattice_solver.i
+
+# target to preprocess a source file
+src/cplex_lattice_solver.cpp.i:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/cplex_lattice_solver.cpp.i
+.PHONY : src/cplex_lattice_solver.cpp.i
+
+src/cplex_lattice_solver.s: src/cplex_lattice_solver.cpp.s
+
+.PHONY : src/cplex_lattice_solver.s
+
+# target to generate assembly for a file
+src/cplex_lattice_solver.cpp.s:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/cplex_lattice_solver.cpp.s
+.PHONY : src/cplex_lattice_solver.cpp.s
+
+src/fast_cv.o: src/fast_cv.cpp.o
+
+.PHONY : src/fast_cv.o
+
+# target to build an object file
+src/fast_cv.cpp.o:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/fast_cv.cpp.o
+.PHONY : src/fast_cv.cpp.o
+
+src/fast_cv.i: src/fast_cv.cpp.i
+
+.PHONY : src/fast_cv.i
+
+# target to preprocess a source file
+src/fast_cv.cpp.i:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/fast_cv.cpp.i
+.PHONY : src/fast_cv.cpp.i
+
+src/fast_cv.s: src/fast_cv.cpp.s
+
+.PHONY : src/fast_cv.s
+
+# target to generate assembly for a file
+src/fast_cv.cpp.s:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/fast_cv.cpp.s
+.PHONY : src/fast_cv.cpp.s
 
 src/gurobi_lattice_solver.o: src/gurobi_lattice_solver.cpp.o
 
@@ -348,12 +402,18 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
 	@echo "... main"
-	@echo "... main_simplex.o"
-	@echo "... main_simplex.i"
-	@echo "... main_simplex.s"
+	@echo "... main_lattice_solver.o"
+	@echo "... main_lattice_solver.i"
+	@echo "... main_lattice_solver.s"
 	@echo "... src/coo_sparse.o"
 	@echo "... src/coo_sparse.i"
 	@echo "... src/coo_sparse.s"
+	@echo "... src/cplex_lattice_solver.o"
+	@echo "... src/cplex_lattice_solver.i"
+	@echo "... src/cplex_lattice_solver.s"
+	@echo "... src/fast_cv.o"
+	@echo "... src/fast_cv.i"
+	@echo "... src/fast_cv.s"
 	@echo "... src/gurobi_lattice_solver.o"
 	@echo "... src/gurobi_lattice_solver.i"
 	@echo "... src/gurobi_lattice_solver.s"

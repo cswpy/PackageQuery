@@ -9,7 +9,7 @@ using namespace Eigen;
 class CooSparse{
 
 public:
-  int n;
+  int n, m;
   vector<vector<pair<int,double>>> rows;
 
 public:
@@ -17,5 +17,7 @@ public:
   CooSparse(int n, int m);
   int getSize();
   void addEntry(int r, int c, double v);
-  VectorXd vectorProduct(VectorXd x);
+  VectorXd vectorProduct(const VectorXd& x);
+  void inplaceVectorProduct(const VectorXd& x, VectorXd& res);
+  void print();
 };

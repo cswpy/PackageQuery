@@ -104,14 +104,14 @@ void GurobiLatticeSolver::solveRelaxed() {
   assert(!GRBupdatemodel(model));
   exe_init = chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - start).count() / 1000000000.0;
   GRBmodel* relaxed;
-  cout << "Start relaxed" << endl;
+  //cout << "Start relaxed" << endl;
   assert(!GRBrelaxmodel(model, &relaxed));
   exe_relaxed = exeTime([](GRBmodel* relaxed) {
     assert(!GRBoptimize(relaxed));
     }, relaxed);
   r0.resize(n);
   assert(!GRBgetdblattrarray(relaxed, GRB_DBL_ATTR_X, 0, n, &r0(0)));
-  cout << "Finished relaxed" << endl;
+  //cout << "Finished relaxed" << endl;
 
   // Process relaxed solution
   floor_r0.resize(n);
@@ -125,15 +125,14 @@ void GurobiLatticeSolver::solveRelaxed() {
   start = chrono::high_resolution_clock::now();
   // Process simplex tableau
   int npm = n + m;
-  int* bhead = new int[m]; 
-  assert(!GRBgetBasisHead(relaxed, bhead));
+  bhead.resize(m);
+  assert(!GRBgetBasisHead(relaxed, &bhead[0]));
   vector<int> column_index (npm, -1);
   for (int i = 0; i < m; i ++){
     if (bhead[i] >= 0 && bhead[i] < npm){
       column_index[bhead[i]] = i;
     }
   }
-  delete bhead;
   int dir_count = 0;
   for (int i = 0; i < npm; i ++){
     if (column_index[i] == -1){
@@ -143,6 +142,24 @@ void GurobiLatticeSolver::solveRelaxed() {
   }
   lattice_dirs = CooSparse(n, m);
   degenerate_count = 0;
+  //////////////////////////
+  tableau.resize(m, m+n); tableau.fill(0);
+  for (int i = 0; i < m; i ++){
+    GRBsvec v = {npm, new int[npm], new double[npm]};
+    assert(!GRBBinvRowi(relaxed, i, &v));
+    for (int j = 0; j < v.len; j++){
+      tableau(i, v.ind[j]) = v.val[j];
+    }
+    delete v.ind;
+    delete v.val;
+  }
+  // print(r0);
+  // cout << "---------------------------------" << endl;
+  // cout << tableau << endl;
+  // cout << "---------------------------------" << endl;
+  // for (int i = 0; i < m; i ++) cout << bhead[i] << " ";
+  // cout << endl;
+  //////////////////////////
   if (kIgnoreDegenerate){
     #pragma omp parallel for schedule(dynamic) num_threads(CORE_COUNT)
     for (int i = 0; i < n; i ++){
@@ -413,6 +430,8 @@ void GurobiLatticeSolver::solve(double time_budget) {
     }
   }
   avg_step_count /= try_count;
+  status = LS_NOT_FOUND;
+  if (best_c_score != -DBL_MAX) status = LS_FOUND;
 }
 
 void GurobiLatticeSolver::milpSolve(){

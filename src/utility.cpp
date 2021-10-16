@@ -14,24 +14,24 @@
 
 namespace fs = filesystem;
 
-bool isEqual(double x, double y){
-  return fabs(x-y) < kFloatEps;
+bool isEqual(double x, double y, double eps){
+  return fabs(x-y) < eps;
 }
 
-bool isLessEqual(double x, double y){
-  return x-y < kFloatEps;
+bool isLessEqual(double x, double y, double eps){
+  return x-y < eps;
 }
 
-bool isGreaterEqual(double x, double y){
-  return x-y > -kFloatEps;
+bool isGreaterEqual(double x, double y, double eps){
+  return x-y > -eps;
 }
 
-bool isLess(double x, double y){
-  return x-y < -kFloatEps;
+bool isLess(double x, double y, double eps){
+  return x-y < -eps;
 }
 
-bool isGreater(double x, double y){
-  return x-y > kFloatEps;
+bool isGreater(double x, double y, double eps){
+  return x-y > eps;
 }
 
 vector<string> sol_messages = {
@@ -44,6 +44,16 @@ vector<string> sol_messages = {
 
 string solMessage(int sol_status){
   return sol_messages[sol_status];
+}
+
+string solCombination(VectorXd sol){
+  string combs = "";
+  for (int i = 0; i < sol.size(); i ++){
+    int count = sol(i);
+    if (count == 1) combs += to_string(i) + " ";
+    else if (count > 1) combs += fmt::format("{}x{} ", to_string(i), count);
+  }
+  return combs;
 }
 
 const char* space = " \t\n\r\f\v";

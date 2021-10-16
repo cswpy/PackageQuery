@@ -10,11 +10,12 @@ using namespace std;
 class GurobiLatticeSolver {
 public:
   VectorXd b, bq, c, ub, lb, r0, floor_r0, e_score, i_score, best_x, x0;
-  MatrixXd A, Aq;
+  MatrixXd A, Aq, tableau;
   CooSparse lattice_dirs;
+  vector<int> bhead;
   double c_score, best_c_score, avg_step_count, milp_score;
   double exe_relaxed, exe_tableau, exe_init, exe_milp;
-  int n, m, try_count, degenerate_count;
+  int n, m, try_count, degenerate_count, status;
   // List of variable violations for each direction
   vector<vector<int>> degenerate_violation;
   GRBenv* env;

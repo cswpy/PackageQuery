@@ -18,6 +18,7 @@ constexpr double kFloatEps = 1e-10;
 constexpr double kFeasTolerance = 1e-6;
 constexpr double kStubbornMultiplier = 2;
 constexpr double kSizeTol = 1e5;
+constexpr int kFastCV = 1000000;
 constexpr int kRetargetUB = 1 << 10;
 constexpr int kLatticeUB = 1 << 6;
 constexpr int kBoundTol = 1;
@@ -30,22 +31,29 @@ constexpr bool kIgnoreDegenerate = true;
 constexpr bool kDoPresolve = false;
 const string kProjectHome = "/home/alm818/package_query";
 
-bool isEqual(double x, double y);
-bool isLess(double x, double y);
-bool isGreater(double x, double y);
-bool isLessEqual(double x, double y);
-bool isGreaterEqual(double x, double y);
+bool isEqual(double x, double y, double eps=kFloatEps);
+bool isLess(double x, double y, double eps=kFloatEps);
+bool isGreater(double x, double y, double eps=kFloatEps);
+bool isLessEqual(double x, double y, double eps=kFloatEps);
+bool isGreaterEqual(double x, double y, double eps=kFloatEps);
 
 VectorXd readSolution(string problem);
 unordered_map<string, int> getProblemSizes();
 VectorXd bucketSort(vector<double> array);
 string solMessage(int sol_status);
+string solCombination(VectorXd sol);
 
 template <typename T>
 double sign(T value) {
   if (value < 0) return -1.0;
   if (value > 0) return 1.0;
   return 0.0;
+}
+
+template <typename T>
+double nonNegativeSign(T value) {
+  if (value < 0) return -1.0;
+  return 1.0;
 }
 
 template <typename T>

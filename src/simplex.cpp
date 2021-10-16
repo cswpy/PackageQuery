@@ -16,7 +16,7 @@ void draw(double* tableau, int m, int n){
   cout << "--------------------------------" << endl;
   for (int i = 0; i < m; i ++){
     for (int j = 0; j < n; j ++){
-      fmt::print("{: 8.2Lf} ", tableau[i*n+j]);
+      fmt::print("{: 8.3Lf} ", tableau[i*n+j]);
     }
     cout << endl;
   }
@@ -227,7 +227,7 @@ Simplex::Simplex(int core, const MatrixXd& A, const VectorXd& b, const VectorXd&
       for (int j = m+1; j >= 0; j --){
         if (j > 1){
           int index = j - 2;
-          double s = sign(b(index));
+          double s = nonNegativeSign(b(index));
           if (i < n) tableau[at(j, i)] = A(index, i) * s;
           else if (i < npm){
             if (i-n == index) tableau[at(j, i)] = s;
@@ -257,6 +257,8 @@ Simplex::Simplex(int core, const MatrixXd& A, const VectorXd& b, const VectorXd&
     }
     // #pragma omp single
     // draw(tableau, m+2, numcols);
+    // #pragma omp single
+    // draw(tableau, m+2, numcols);
     // for (int p = 0; p < 25; p ++){
     //   selectEnteringColumn(numcols, u, ent_value, ent_col);
     //   #pragma omp single
@@ -282,6 +284,8 @@ Simplex::Simplex(int core, const MatrixXd& A, const VectorXd& b, const VectorXd&
     }
 
     if (status == LS_FEASIBLE){
+      // #pragma omp single
+      // draw(tableau, m+2, numcols);
       // Phase-II: Initialization
       #pragma omp master
       {
@@ -329,6 +333,8 @@ Simplex::Simplex(int core, const MatrixXd& A, const VectorXd& b, const VectorXd&
       //   }
       //   cout << endl;
       // }
+      // #pragma omp single
+      // draw(tableau, m+2, numcols);
 
       // Phase-II
       while (true){

@@ -1,5 +1,4 @@
 #include <iostream>
-#include <boost/math/constants/constants.hpp>
 
 #include "pseudo_walker.h"
 #include "utility.h"
@@ -12,11 +11,19 @@ PseudoWalker::~PseudoWalker(){
 PseudoWalker::PseudoWalker(VectorXd p, bool enable_correction){
   int dim = (int) p.size();
   assert(dim > 1);
-  this->p = p / p.norm();
-  double S = this->p.cwiseAbs().sum();
+  double norm = 0;
+  double S = 0;
+  for (int i = 0; i < dim; i ++){
+    norm += p(i)*p(i);
+    S += fabs(p(i));
+  }
+  norm = sqrt(norm);
+  S /= norm;
+  this->p.resize(dim);
   vector<pair<double, int>> init(dim);
   steps.resize(dim);
   for (int i = 0; i < dim; i++) {
+    this->p(i) = p(i) / norm;
     double abs_pi = abs(this->p(i));
     if (abs_pi > kFloatEps) {
       steps[i] = 2 - 2 * abs_pi * (abs_pi - (S - abs_pi) / (dim - 1.0));

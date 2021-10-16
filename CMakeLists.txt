@@ -19,8 +19,9 @@ set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR})
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 set(EXECUTABLE_NAME "main")
 
-set(MAIN_NAME "main_simplex")
-#set(MAIN_NAME "main_lattice_solver")
+#set(MAIN_NAME "main_simplex")
+#set(MAIN_NAME "main_mc_matrix")
+set(MAIN_NAME "main_lattice_solver")
 #set(MAIN_NAME "test_accuracy_lattice_walk")
 #set(MAIN_NAME "test_speed_lattice_walk")
 
