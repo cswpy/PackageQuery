@@ -126,17 +126,17 @@ void generateProlem(int n, MatrixXd& A, VectorXd& b, VectorXd& c){
   b(2) = n_dist(gen) + tol2;
   b(3) = tol2 - b(2);
   b(4) = 20;
-  b(5) = 5;
+  b(5) = -5;
 }
 
 int main(){
   MatrixXd A; VectorXd b, c;
-  int n = 8000000;
+  int n = 1000000;
   generateProlem(n, A, b, c);
   // GurobiLatticeSolver ls = GurobiLatticeSolver(A, b, c, 0, 1);
   // fmt::print("n:{} m:{} nnz:{}\n", ls.n, ls.m, ls.lattice_dirs.getSize());
   // cout << ls.degenerate_count << " degenerate direction out of " << ls.n << endl;
-  reportGurobi(A, b, c, 0, 1, 2, false);
+  reportGurobi(A, b, c, 0, 1, 2, true);
   // LatticeSolver ls = LatticeSolver(A, b, c, 0, 1);
   // fmt::print("n:{} m:{} nnz:{}\n", ls.n, ls.m, ls.lattice_dirs.getSize());
   // ls.solve(2);

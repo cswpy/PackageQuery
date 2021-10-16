@@ -25,9 +25,16 @@ constexpr int LS_NOT_FOUND = 0;
 constexpr int LS_FOUND = 1;
 constexpr int LS_INFEASIBLE = 2;
 constexpr int LS_UNBOUNDED = 3;
+constexpr int LS_FEASIBLE = 4;
 constexpr bool kIgnoreDegenerate = true;
 constexpr bool kDoPresolve = false;
 const string kProjectHome = "/home/alm818/package_query";
+
+bool isEqual(double x, double y);
+bool isLess(double x, double y);
+bool isGreater(double x, double y);
+bool isLessEqual(double x, double y);
+bool isGreaterEqual(double x, double y);
 
 VectorXd readSolution(string problem);
 unordered_map<string, int> getProblemSizes();
@@ -61,3 +68,4 @@ double exeTime(F func, Args&&... args) {
   func(forward<Args>(args)...);
   return chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - t1).count() / 1000000.0;
 }
+

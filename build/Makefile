@@ -123,32 +123,32 @@ main/fast:
 	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/build
 .PHONY : main/fast
 
-main.o: main.cpp.o
+main_simplex.o: main_simplex.cpp.o
 
-.PHONY : main.o
+.PHONY : main_simplex.o
 
 # target to build an object file
-main.cpp.o:
-	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main.cpp.o
-.PHONY : main.cpp.o
+main_simplex.cpp.o:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main_simplex.cpp.o
+.PHONY : main_simplex.cpp.o
 
-main.i: main.cpp.i
+main_simplex.i: main_simplex.cpp.i
 
-.PHONY : main.i
+.PHONY : main_simplex.i
 
 # target to preprocess a source file
-main.cpp.i:
-	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main.cpp.i
-.PHONY : main.cpp.i
+main_simplex.cpp.i:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main_simplex.cpp.i
+.PHONY : main_simplex.cpp.i
 
-main.s: main.cpp.s
+main_simplex.s: main_simplex.cpp.s
 
-.PHONY : main.s
+.PHONY : main_simplex.s
 
 # target to generate assembly for a file
-main.cpp.s:
-	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main.cpp.s
-.PHONY : main.cpp.s
+main_simplex.cpp.s:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main_simplex.cpp.s
+.PHONY : main_simplex.cpp.s
 
 src/coo_sparse.o: src/coo_sparse.cpp.o
 
@@ -258,6 +258,33 @@ src/pseudo_walker.cpp.s:
 	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/pseudo_walker.cpp.s
 .PHONY : src/pseudo_walker.cpp.s
 
+src/simplex.o: src/simplex.cpp.o
+
+.PHONY : src/simplex.o
+
+# target to build an object file
+src/simplex.cpp.o:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/simplex.cpp.o
+.PHONY : src/simplex.cpp.o
+
+src/simplex.i: src/simplex.cpp.i
+
+.PHONY : src/simplex.i
+
+# target to preprocess a source file
+src/simplex.cpp.i:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/simplex.cpp.i
+.PHONY : src/simplex.cpp.i
+
+src/simplex.s: src/simplex.cpp.s
+
+.PHONY : src/simplex.s
+
+# target to generate assembly for a file
+src/simplex.cpp.s:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/simplex.cpp.s
+.PHONY : src/simplex.cpp.s
+
 src/utility.o: src/utility.cpp.o
 
 .PHONY : src/utility.o
@@ -321,9 +348,9 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
 	@echo "... main"
-	@echo "... main.o"
-	@echo "... main.i"
-	@echo "... main.s"
+	@echo "... main_simplex.o"
+	@echo "... main_simplex.i"
+	@echo "... main_simplex.s"
 	@echo "... src/coo_sparse.o"
 	@echo "... src/coo_sparse.i"
 	@echo "... src/coo_sparse.s"
@@ -336,6 +363,9 @@ help:
 	@echo "... src/pseudo_walker.o"
 	@echo "... src/pseudo_walker.i"
 	@echo "... src/pseudo_walker.s"
+	@echo "... src/simplex.o"
+	@echo "... src/simplex.i"
+	@echo "... src/simplex.s"
 	@echo "... src/utility.o"
 	@echo "... src/utility.i"
 	@echo "... src/utility.s"

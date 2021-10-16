@@ -14,11 +14,32 @@
 
 namespace fs = filesystem;
 
+bool isEqual(double x, double y){
+  return fabs(x-y) < kFloatEps;
+}
+
+bool isLessEqual(double x, double y){
+  return x-y < kFloatEps;
+}
+
+bool isGreaterEqual(double x, double y){
+  return x-y > -kFloatEps;
+}
+
+bool isLess(double x, double y){
+  return x-y < -kFloatEps;
+}
+
+bool isGreater(double x, double y){
+  return x-y > kFloatEps;
+}
+
 vector<string> sol_messages = {
   "NOT FOUND",
   "FOUND",
   "INFEASIBLE",
-  "UNBOUNDED"
+  "UNBOUNDED",
+  "FEASIBLE"
 };
 
 string solMessage(int sol_status){
