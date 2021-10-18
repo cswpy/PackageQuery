@@ -79,7 +79,7 @@ LatticeSolver::LatticeSolver(int core, const MatrixXd& A, const VectorXd& b, con
           for (int j = 0; j < m; j ++){
             if (i > bhead[j]) index --;
           }
-          double dir = 1.0;
+          double dir = -1.0;
           if (isEqual(tab(1, i), 0)) dir = 1.0;
           if (i < n) nbasic[index] = (i+1)*dir;
           for (int j = 2; j <= m+1; j ++){
@@ -204,7 +204,6 @@ void LatticeSolver::solve(double time_budget){
         }
         step_count ++;
         stubborn_scale *= kStubbornMultiplier;
-        if (step_count > kSizeTol) break;
       }
       delete walker;
       local_step_count += step_count;
@@ -248,6 +247,8 @@ void LatticeSolver::report(){
     fmt::print("Relaxed objective: {:.8Lf}\n", relaxed_cscore);
     double relaxed_gap = (relaxed_cscore - best_cscore) / fabs(relaxed_cscore) * 100;
     fmt::print("Objective gap to relaxed solution: {:.2Lf}%\n", relaxed_gap);
+    double ar = relaxed_cscore / best_cscore;
+    fmt::print("Approximation ratio to relaxed objective: {:.5Lf}\n", ar);
   } else {
     fmt::print("Relaxed objective: {:.8Lf}\n", relaxed_cscore);
   }
@@ -263,6 +264,8 @@ void LatticeSolver::compareReport(VectorXd sol, double solved_time){
     double lp_gap = (relaxed_cscore - comparing_score) / fabs(relaxed_cscore) * 100;
     fmt::print("Objective gap to comparing solution: {:.2Lf}%\n", comparing_gap);
     fmt::print("Comparing gap to relaxed solution: {:.2Lf}%\n", lp_gap);
+    double ar = comparing_score / best_cscore;
+    fmt::print("Approximation ratio to comparing objective: {:.5Lf}\n", ar);
     if (solved_time > 0) fmt::print("Comparing solution found in: {:.2Lf}ms\n", solved_time);
   }
 }

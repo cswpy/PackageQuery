@@ -103,7 +103,7 @@ void GurobiLatticeSolver::solveRelaxed() {
   }
   assert(!GRBsetintparam(env, GRB_INT_PAR_PRESOLVE, GRB_PRESOLVE_OFF));
   assert(!GRBupdatemodel(model));
-  exe_init = chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - start).count() / 1000000000.0;
+  exe_init = chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - start).count() / 1000000.0;
   GRBmodel* relaxed;
   //cout << "Start relaxed" << endl;
   assert(!GRBrelaxmodel(model, &relaxed));
@@ -157,8 +157,8 @@ void GurobiLatticeSolver::solveRelaxed() {
   // cout << "---------------------------------" << endl;
   // cout << tableau << endl;
   // cout << "---------------------------------" << endl;
-  for (int i = 0; i < m; i ++) cout << bhead[i] << " ";
-  cout << endl;
+  // for (int i = 0; i < m; i ++) cout << bhead[i] << " ";
+  // cout << endl;
   // for (int i = 0; i < npm; i ++) cout << column_index[i] << " ";
   // cout << endl;
   //////////////////////////
@@ -234,7 +234,7 @@ void GurobiLatticeSolver::solveRelaxed() {
       if (degenerate_violation[i].size() > 0) degenerate_count ++;
     }
   }
-  exe_tableau = chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - start).count() / 1000000000.0;
+  exe_tableau = chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - start).count() / 1000000.0;
 }
 
 GurobiLatticeSolver::GurobiLatticeSolver(string problem) {
@@ -458,8 +458,8 @@ void GurobiLatticeSolver::solve(double time_budget) {
     }
   }
   ts /= try_count;
-  cout << "GLSTIME ";
-  print(ts);
+  // cout << "GLSTIME ";
+  // print(ts);
   avg_step_count /= try_count;
   status = LS_NOT_FOUND;
   if (best_c_score != -DBL_MAX) status = LS_FOUND;

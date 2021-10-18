@@ -9,6 +9,7 @@
 #include "utility.h"
 #include "lattice_solver.h"
 #include "gurobi_lattice_solver.h"
+#include "gurobi_solver.h"
 #include "fmt/core.h"
 
 using namespace std;
@@ -47,8 +48,8 @@ void generateProlem(int n, MatrixXd& A, VectorXd& b, VectorXd& c){
   b(5) = -5;
 }
 
-int main(){
-  int n = 1000000;
+void test(){
+  int n = 100000;
   int m = 6;
   MatrixXd A (m, n);
   VectorXd b (m);
@@ -67,7 +68,8 @@ int main(){
   // }
   // print(histo);
   LatticeSolver ls2 = LatticeSolver(80, A, b, c, u);
-  ls2.solve(10);
+  ls2.solve(0.5);
+  ls2.report();
   // ls2.report();
   // cout << "--------------------------------------------" << endl;
   // LatticeSolver ls2 = LatticeSolver(80, A, b, c, u);
@@ -88,7 +90,7 @@ int main(){
   // LatticeSolver ls = LatticeSolver(80, A, b, c, u);
   // ls.lattice_dirs.print();
   // cout << "GLS" << endl;
-  GurobiLatticeSolver gls = GurobiLatticeSolver(A, b, c, 0, 1);
+  // GurobiLatticeSolver gls = GurobiLatticeSolver(A, b, c, 0, 1);
   // VectorXd rr = gls.r0 - ls.r0;
   // cout << "WTF " << rr.norm() << endl;
   // cout << "OBJ " << c.dot(gls.r0) << " " << c.dot(ls.r0) << endl;
@@ -149,14 +151,26 @@ int main(){
   // }
   // error /= (cnt*(m+n));
   // cout << error << endl;
-  gls.solve(10);
+  // gls.solve(2);
   // gls.milpSolve();
   // if (gls.status == LS_FOUND) ls.compareReport(gls.x0);
   // else ls.report();
-  if (gls.status == LS_FOUND) ls2.compareReport(gls.best_x);
-  else ls2.report();
-  fmt::print("{:.8Lf} {:.8Lf} {:.8Lf} {:.8Lf} {:.8Lf} {}\n", c.dot(ls2.r0), c.dot(gls.r0), gls.getObjValue(gls.r0), ls2.getObjValue(gls.r0), gls.best_c_score, solMessage(gls.status));
-  fmt::print("{} {} {}\n", gls.try_count, gls.avg_step_count, gls.exe_relaxed);
+  // if (gls.status == LS_FOUND) ls2.compareReport(gls.best_x);
+  // else ls2.report();
+  // fmt::print("{:.8Lf} {:.8Lf} {:.8Lf} {:.8Lf} {:.8Lf} {}\n", c.dot(ls2.r0), c.dot(gls.r0), gls.getObjValue(gls.r0), ls2.getObjValue(gls.r0), gls.best_c_score, solMessage(gls.status));
+  // fmt::print("{} {} {}\n", gls.try_count, gls.avg_step_count, gls.exe_relaxed);
   // cout << "HERE " << c.dot(gls.x0) << endl;
+}
 
+int main(){
+  int n = 1000000;
+  int m = 6;
+  MatrixXd A (m, n);
+  VectorXd b (m);
+  VectorXd c (n);
+  generateProlem(n, A, b, c);
+  VectorXd u (n); u.fill(1);
+  GurobiSolver gs = GurobiSolver(A, b, c, u);
+  gs.solveRelaxed();
+  cout << gs.relaxed_cscore << " " << gs.exe_relaxed << endl;
 }
