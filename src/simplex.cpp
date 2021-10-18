@@ -53,13 +53,10 @@ void Simplex::pivot(int horizon, const VectorXd& u, int ent_col){
         lea_row = 1;
       }
     }
-    // cout << min_ratio << " HERE" << endl;
     for (int j = 2; j <= m+1; j ++){
       int basic_col = bhead[j-2];
-      //cout << "HERE " << j << " " << basic_col << endl;
       double step = sign(col_obj)*tableau[at(j, ent_col)];
       double cur = tableau[at(1, basic_col)];
-      // cout << "STEP " << step << " "  << cur << " JENT " << tableau[at(j, ent_col)] << " " << sign(col_obj) << endl;
       double ratio = -1;
       if (basic_col < n){
         if (isGreater(step, 0) && u(basic_col) >= 0) ratio = (u(basic_col) - cur) / step;
@@ -67,11 +64,6 @@ void Simplex::pivot(int horizon, const VectorXd& u, int ent_col){
       } else{
         if (isLess(step,0)) ratio = -cur / step;
       }
-      // if (ratio > 0){
-      //   cout << j << " " << ratio << endl;
-      // } else if (ratio == 0){
-      //   cout << "CAUTION " << j << " " << ratio << endl;
-      // }
       if (isGreaterEqual(ratio,0) && min_ratio > ratio){
         min_ratio = ratio;
         lea_row = j;
@@ -79,12 +71,9 @@ void Simplex::pivot(int horizon, const VectorXd& u, int ent_col){
     }
   }
   #pragma omp barrier
-  // #pragma omp single
-  // cout << "LEA " << lea_row << " " << min_ratio << " " << endl;
   if (lea_row == 1){
     #pragma omp master
     {
-      // cout << "HERE " << ent_col << endl;
       double col_obj = tableau[at(0, ent_col)];
       double step = min_ratio * sign(col_obj);
       tableau[at(1, ent_col)] -= step;
@@ -94,12 +83,7 @@ void Simplex::pivot(int horizon, const VectorXd& u, int ent_col){
         int basic_col = bhead[j-2];
         double tmp = step*tableau[at(j, ent_col)];
         tableau[at(1, basic_col)] += tmp;
-        // if (abs(tableau[at(1, basic_col)]) < kFloatEps) tableau[at(1, basic_col)] = 0;
-        // if (tableau[at(1, basic_col)] < 0){
-        //   cout << "REALLY BAD "<< tableau[at(1, basic_col)] << " " << j << " " << basic_col << " " << lea_row << " " << min_ratio << " " << endl;
-        // }
-        // Update rhs
-        // tableau[at(j, npm)] += tmp;
+        if (isEqual(tableau[at(1, basic_col)], 0)) tableau[at(1, basic_col)] = 0;
       }
     }
   } else if (lea_row == -1){
@@ -118,15 +102,12 @@ void Simplex::pivot(int horizon, const VectorXd& u, int ent_col){
         // Update cur
         int basic_col = bhead[j-2];
         tableau[at(1, basic_col)] += step*tableau[at(j, ent_col)];
-        // if (abs(tableau[at(1, basic_col)]) < kFloatEps) tableau[at(1, basic_col)] = 0;
-        // if (tableau[at(1, basic_col)] < 0){
-        //   cout << "REALLY BAD 2| " << tableau[at(j, ent_col)] << " " << step << " HOLD " << (tableau[at(1, basic_col)]-step*tableau[at(j, ent_col)]) << "+" << step*tableau[at(j, ent_col)] << "=" << tableau[at(1, basic_col)] << " " << j << " " << basic_col << " " << lea_row << " " << min_ratio << " " << endl;
-        // }
+        if (isEqual(tableau[at(1, basic_col)], 0)) tableau[at(1, basic_col)] = 0;
       }
       bhead[lea_row-2] = ent_col;
       d_cache = tableau[at(lea_row, ent_col)];
       v_cache.resize(m+2);
-      for (int j = 0; j <= m+1; j ++) v_cache[j] = tableau[at(j, ent_col)];
+      for (int j = 0; j <= m+1; j ++) v_cache(j) = tableau[at(j, ent_col)];
     }
     #pragma omp barrier
     #pragma omp for
@@ -137,30 +118,11 @@ void Simplex::pivot(int horizon, const VectorXd& u, int ent_col){
     for (int i = 0; i < horizon; i ++){
       for (int j = m+1; j >= 0; j --){
         if (j != 1 && j != lea_row) 
-          tableau[at(j, i)] -= tableau[at(lea_row, i)] * v_cache[j];
+          tableau[at(j, i)] -= tableau[at(lea_row, i)] * v_cache(j);
       }
     }
-    // #pragma omp for
-    // for (int i = 0; i < horizon; i ++){
-    //   if (i != ent_col){
-    //     for (int j = m+1; j >= 0; j --){
-    //       if (j != 1 && j != lea_row) 
-    //         tableau[at(j, i)] -= tableau[at(lea_row, i)] * tableau[at(j, ent_col)];
-    //     }
-    //   }
-    // }
-    // #pragma omp master
-    // {
-    //   for (int j = m+1; j >= 0; j --){
-    //     if (j != 1 && j != lea_row) tableau[at(j, ent_col)] = 0;
-    //   }
-    // }
   }
   #pragma omp barrier
-  // #pragma omp single
-  // draw(tableau, m+2, numcols);
-  //cout << ent_col << endl;
-  //cout << min_ratio << " " << lea_row << endl;
 }
 
 void Simplex::selectEnteringColumn(int horizon, const VectorXd& u, double& ent_value, int& ent_col){
@@ -251,28 +213,14 @@ Simplex::Simplex(int core, const MatrixXd& A, const VectorXd& b, const VectorXd&
             } else tableau[at(j, i)] = 0;
           }
         }
-        //#pragma omp critical
-        //cout << j << " " << i << "=" << tableau[at(j, i)] << " " << omp_get_thread_num() << endl;
       }
     }
-    // #pragma omp single
-    // draw(tableau, m+2, numcols);
-    // #pragma omp single
-    // draw(tableau, m+2, numcols);
-    // for (int p = 0; p < 25; p ++){
-    //   selectEnteringColumn(numcols, u, ent_value, ent_col);
-    //   #pragma omp single
-    //   cout << p << " ENT " << ent_col << " " << ent_value << endl;
-    //   pivot(numcols, u, ent_col);
-    // }
     // Phase-I
     while (true){
       selectEnteringColumn(numcols, u, ent_value, ent_col);
       #pragma omp master
       {
-        //cout << "ENT " << ent_value << " " << ent_col << endl;
         if (ent_value == 0){
-          // cout << "WTF " << tableau[at(0, npm)] << " " << endl;
           if (isGreaterEqual(tableau[at(0, npm)], 0)) status = LS_FEASIBLE;
           else status = LS_INFEASIBLE;
         }
@@ -282,10 +230,7 @@ Simplex::Simplex(int core, const MatrixXd& A, const VectorXd& b, const VectorXd&
       pivot(numcols, u, ent_col);
       if (status == LS_UNBOUNDED) break;
     }
-
     if (status == LS_FEASIBLE){
-      // #pragma omp single
-      // draw(tableau, m+2, numcols);
       // Phase-II: Initialization
       #pragma omp master
       {
@@ -308,67 +253,40 @@ Simplex::Simplex(int core, const MatrixXd& A, const VectorXd& b, const VectorXd&
         v_cache.resize(m);
         for (int j = 2; j <= m+1; j ++){
           int basic_col = bhead[j-2];
-          v_cache[j-2] = tableau[at(0, basic_col)];
+          v_cache(j-2) = tableau[at(0, basic_col)];
         }
       }
       #pragma omp barrier
-      // #pragma omp single
-      // draw(tableau, m+2, numcols);
       #pragma omp for
       for (int i = 0; i <= npm; i ++){
         double sub_obj = 0;
         for (int j = 2; j <= m+1; j ++){
           int basic_col = bhead[j-2];
-          if (basic_col < n) sub_obj += tableau[at(j, i)] * v_cache[j-2];
+          if (basic_col < n) sub_obj += tableau[at(j, i)] * v_cache(j-2);
         }
         tableau[at(0, i)] -= sub_obj;
       }
-
-      // #pragma omp single
-      // draw(tableau, m+2, numcols);
-      // #pragma omp single
-      // {
-      //   for (int i = 0; i < m; i ++){
-      //     cout << bhead[i] << " ";
-      //   }
-      //   cout << endl;
-      // }
-      // #pragma omp single
-      // draw(tableau, m+2, numcols);
 
       // Phase-II
       while (true){
         selectEnteringColumn(npm+1, u, ent_value, ent_col);
         #pragma omp master
         {
-          //cout << "ENT " << ent_value << " " << ent_col << endl;
           if (ent_value == 0){
             status = LS_FOUND;
-            // cout << "WTF " << tableau[at(0, npm)] << " " << endl;
           }
         }
         #pragma omp barrier
         if (status == LS_FOUND) break;
         pivot(npm+1, u, ent_col);
         if (status == LS_UNBOUNDED) break;
-
-        // #pragma omp single
-        // draw(tableau, m+2, numcols);
-        // #pragma omp single
-        // {
-        //   for (int i = 0; i < m; i ++){
-        //     cout << bhead[i] << " ";
-        //   }
-        //   cout << endl;
-        // }
       }
-
       // #pragma omp single
       // draw(tableau, m+2, numcols);
       // #pragma omp single
       // {
       //   for (int i = 0; i < m; i ++){
-      //     cout << bhead[i] << " ";
+      //     cout << (int)bhead[i] << " ";
       //   }
       //   cout << endl;
       // }

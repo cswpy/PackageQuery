@@ -21,6 +21,7 @@ int CooSparse::getSize(){
   return size;
 }
 
+// Product, rows as direction, cols as component
 void CooSparse::inplaceVectorProduct(const VectorXd& x, VectorXd& res){
   for (int i = 0; i < n; i ++){
     for (const auto& pi : rows[i]){
@@ -29,11 +30,12 @@ void CooSparse::inplaceVectorProduct(const VectorXd& x, VectorXd& res){
   }
 }
 
+// Transpose product, rows as component, cols as direction
 VectorXd CooSparse::vectorProduct(const VectorXd& x){
   VectorXd res (n); res.fill(0);
   for (int i = 0; i < n; i ++){
     for (const auto& pi : rows[i]){
-      res(pi.first) += x(i) * pi.second;
+      res(i) += x(pi.first) * pi.second;
     }
   }
   return res;

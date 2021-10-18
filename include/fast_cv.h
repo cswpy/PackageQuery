@@ -10,10 +10,10 @@ class FastCV{
 public:
   int n, m, c;
   CooSparse& mat;
-  const VectorXd& nbasic;
+  const vector<int>& nbasic;
   VectorXd col_norms;
 public:
   ~FastCV();
-  FastCV(int core, CooSparse& mat, const VectorXd& nbasic);
+  FastCV(int core, CooSparse& mat, const vector<int>& nbasic);
   VectorXd sample();
 };

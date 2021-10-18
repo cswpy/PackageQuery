@@ -9,7 +9,6 @@
 #include "fmt/core.h"
 #include "lattice_solver.h"
 #include "pseudo_walker.h"
-#include "fast_cv.h"
 #include "simplex.h"
 #include "utility.h"
 #include "omp.h"
@@ -20,10 +19,10 @@ using namespace std;
 #define tab(row, col) (simplex->tableau[simplex->numcols*(row)+(col)])
 
 LatticeSolver::~LatticeSolver(){
-  if (fcv) delete fcv;
 }
 
 LatticeSolver::LatticeSolver(int core, const MatrixXd& A, const VectorXd& b, const VectorXd& c, const VectorXd& u): A(A), b(b), c(c), u(u){
+  chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
   this->core = core;
   m = b.size();
   n = c.size();
@@ -33,13 +32,14 @@ LatticeSolver::LatticeSolver(int core, const MatrixXd& A, const VectorXd& b, con
   fscores.resize(m);
   bhead.resize(m);
   for (int i = 0; i < m; i ++) fscores(i) = b(i);
-  nbasic.resize(n); nbasic.fill(0);
+  nbasic.resize(n); fill(nbasic.begin(), nbasic.end(), 0);
   cscore = 0;
   relaxed_cscore = 0;
   best_cscore = -DBL_MAX;
   lattice_dirs = CooSparse(n, m);
-  chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
-  simplex = new Simplex(core, A, b, c, u);
+  exe_init = chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - start).count() / 1000000.0;
+  start = chrono::high_resolution_clock::now();
+  Simplex* simplex = new Simplex(core, A, b, c, u);
   exe_relaxed = chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - start).count() / 1000000.0;
   start = chrono::high_resolution_clock::now();
   if (simplex->status == LS_FOUND){
@@ -55,10 +55,6 @@ LatticeSolver::LatticeSolver(int core, const MatrixXd& A, const VectorXd& b, con
       VectorXd local_fscores (m); local_fscores.fill(0);
       #pragma omp for nowait
       for (int i = 0; i < n; i ++){
-        if (inv_bhead.find(i) == inv_bhead.end()){
-          if (isEqual(tab(1, i), 0)) nbasic(i) = 1.0;
-          else nbasic(i) = -1.0;
-        }
         r0(i) = tab(1, i);
         fracs(i) = modf(r0(i), &near_r0(i));
         if (fracs(i) > 0.5) near_r0(i) ++;
@@ -74,6 +70,7 @@ LatticeSolver::LatticeSolver(int core, const MatrixXd& A, const VectorXd& b, con
         #pragma omp atomic
         fscores(i) -= local_fscores(i);
       }
+      #pragma omp barrier
       #pragma omp for nowait
       for (int i = 0; i < m+n; i ++){
         if (inv_bhead.find(i) == inv_bhead.end()){
@@ -82,20 +79,21 @@ LatticeSolver::LatticeSolver(int core, const MatrixXd& A, const VectorXd& b, con
           for (int j = 0; j < m; j ++){
             if (i > bhead[j]) index --;
           }
+          double dir = 1.0;
+          if (isEqual(tab(1, i), 0)) dir = 1.0;
+          if (i < n) nbasic[index] = (i+1)*dir;
           for (int j = 2; j <= m+1; j ++){
             int basic_col = bhead[j-2];
             if (basic_col < n){
-              if (i < n) lattice_dirs.addEntry(index, basic_col, -tab(j, i) * nbasic(i));
-              else lattice_dirs.addEntry(index, basic_col, -tab(j, i));
+              lattice_dirs.addEntry(index, basic_col, -tab(j, i) * dir);
             }
           }
         }
       }
     }
-    fcv = new FastCV(core, lattice_dirs, nbasic);
   } else status = simplex->status;
   exe_tableau = chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - start).count() / 1000000.0;
-  // delete simplex;
+  delete simplex;
 }
 
 double LatticeSolver::getObjValue(VectorXd sol){
@@ -151,16 +149,28 @@ void LatticeSolver::solve(double time_budget){
   {
     // Local declaration
     default_random_engine gen {static_cast<long unsigned int>(time(0))};
+    //default_random_engine gen {0};
     uniform_real_distribution u_dist(0.0, 1.0);
     int local_try_count = 0;
     int local_step_count = 0;
     double local_best_cscore = -DBL_MAX;
+    VectorXd local_ts (20); local_ts.fill(0);
     VectorXd local_best_x;
     while (true) {
       if (chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - ep).count() / 1000000000.0 > time_budget)
         break;
       local_try_count ++;
-      VectorXd dir = fcv->sample();
+      VectorXd coefs (n);
+      coefs(0) = 1;
+      for (int i = 1; i < n; i ++) coefs(i) = u_dist(gen);
+      sort(coefs.begin(), coefs.end());
+      for (int i = n-1; i >= 1; i--) coefs(i) -= coefs(i-1);
+      VectorXd dir (n); dir.fill(0);
+      lattice_dirs.inplaceVectorProduct(coefs, dir);
+      for (int i = 0; i < n; i ++){
+        int comp = abs(nbasic[i]) - 1;
+        if (nbasic[i] != 0) dir(comp) = sign(nbasic[i]) * coefs(i);
+      }
       PseudoWalker* walker = new PseudoWalker(dir);
       VectorXd x = near_r0;
       VectorXd current_fscores = fscores;
@@ -221,10 +231,12 @@ void LatticeSolver::solve(double time_budget){
 void LatticeSolver::report(){
   fmt::print("-------------Problem statistics-------------\n");
   fmt::print("Problem size: {}x{}\n", m, n);
-  fmt::print("Time for find relaxed solution: {:.2Lf}ms\n", exe_relaxed);
+  fmt::print("Number of non-zero entries: {}\n", lattice_dirs.getSize());
+  fmt::print("Time for initialization: {:.2Lf}ms\n", exe_init);
+  fmt::print("Time for finding relaxed solution: {:.2Lf}ms\n", exe_relaxed);
   fmt::print("Time for processing simplex tableau: {:.2Lf}ms\n", exe_tableau);
   fmt::print("Time for lattice walking: {:.2Lf}ms\n", exe_solved);
-  fmt::print("Total time: {:.2Lf}ms\n", exe_relaxed+exe_tableau+exe_solved);
+  fmt::print("Total time: {:.2Lf}ms\n", exe_init+exe_relaxed+exe_tableau+exe_solved);
   fmt::print("Total cores: {}\n", core);
   fmt::print("------------Solution statistics-------------\n");
   fmt::print("Total directions: {}\n", try_count);
@@ -234,7 +246,7 @@ void LatticeSolver::report(){
     fmt::print("Best found combination: {}\n", solCombination(best_x));
     fmt::print("Best found objective: {:.8Lf}\n", best_cscore);
     fmt::print("Relaxed objective: {:.8Lf}\n", relaxed_cscore);
-    double relaxed_gap = (relaxed_cscore - best_cscore) / relaxed_cscore * 100;
+    double relaxed_gap = (relaxed_cscore - best_cscore) / fabs(relaxed_cscore) * 100;
     fmt::print("Objective gap to relaxed solution: {:.2Lf}%\n", relaxed_gap);
   } else {
     fmt::print("Relaxed objective: {:.8Lf}\n", relaxed_cscore);
@@ -247,8 +259,8 @@ void LatticeSolver::compareReport(VectorXd sol, double solved_time){
     fmt::print("Comparing combination: {}\n", solCombination(sol));
     double comparing_score = getObjValue(sol);
     fmt::print("Comparing objective: {:.8Lf}\n", comparing_score);
-    double comparing_gap = (comparing_score - best_cscore) / comparing_score * 100;
-    double lp_gap = (relaxed_cscore - comparing_score) / relaxed_cscore * 100;
+    double comparing_gap = (comparing_score - best_cscore) / fabs(comparing_score) * 100;
+    double lp_gap = (relaxed_cscore - comparing_score) / fabs(relaxed_cscore) * 100;
     fmt::print("Objective gap to comparing solution: {:.2Lf}%\n", comparing_gap);
     fmt::print("Comparing gap to relaxed solution: {:.2Lf}%\n", lp_gap);
     if (solved_time > 0) fmt::print("Comparing solution found in: {:.2Lf}ms\n", solved_time);

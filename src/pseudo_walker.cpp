@@ -1,5 +1,6 @@
 #include <iostream>
 
+
 #include "pseudo_walker.h"
 #include "utility.h"
 
@@ -11,19 +12,11 @@ PseudoWalker::~PseudoWalker(){
 PseudoWalker::PseudoWalker(VectorXd p, bool enable_correction){
   int dim = (int) p.size();
   assert(dim > 1);
-  double norm = 0;
-  double S = 0;
-  for (int i = 0; i < dim; i ++){
-    norm += p(i)*p(i);
-    S += fabs(p(i));
-  }
-  norm = sqrt(norm);
-  S /= norm;
-  this->p.resize(dim);
+  this->p = p / p.norm();
+  double S = this->p.cwiseAbs().sum();
   vector<pair<double, int>> init(dim);
   steps.resize(dim);
   for (int i = 0; i < dim; i++) {
-    this->p(i) = p(i) / norm;
     double abs_pi = abs(this->p(i));
     if (abs_pi > kFloatEps) {
       steps[i] = 2 - 2 * abs_pi * (abs_pi - (S - abs_pi) / (dim - 1.0));

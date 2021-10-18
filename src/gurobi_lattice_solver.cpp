@@ -101,6 +101,7 @@ void GurobiLatticeSolver::solveRelaxed() {
     delete ind;
     delete val;
   }
+  assert(!GRBsetintparam(env, GRB_INT_PAR_PRESOLVE, GRB_PRESOLVE_OFF));
   assert(!GRBupdatemodel(model));
   exe_init = chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - start).count() / 1000000000.0;
   GRBmodel* relaxed;
@@ -153,17 +154,18 @@ void GurobiLatticeSolver::solveRelaxed() {
     delete v.ind;
     delete v.val;
   }
-  // print(r0);
   // cout << "---------------------------------" << endl;
   // cout << tableau << endl;
   // cout << "---------------------------------" << endl;
-  // for (int i = 0; i < m; i ++) cout << bhead[i] << " ";
+  for (int i = 0; i < m; i ++) cout << bhead[i] << " ";
+  cout << endl;
+  // for (int i = 0; i < npm; i ++) cout << column_index[i] << " ";
   // cout << endl;
   //////////////////////////
   if (kIgnoreDegenerate){
     #pragma omp parallel for schedule(dynamic) num_threads(CORE_COUNT)
     for (int i = 0; i < n; i ++){
-      if (column_index[i] >= 0){
+      if (column_index[i] >= 0){ // i is basic column and column_index[i] is its row
         GRBsvec v = {npm, new int[npm], new double[npm]};
         #pragma omp critical
         {
@@ -352,37 +354,48 @@ void GurobiLatticeSolver::solve(double time_budget) {
   chrono::high_resolution_clock::time_point ep = chrono::high_resolution_clock::now();
   try_count = 0;
   avg_step_count = 0;
-  #pragma omp parallel num_threads(CORE_COUNT)
+  VectorXd ts (20); ts.fill(0);
+  #pragma omp parallel num_threads(80)
   {
     // Local declaration
     int local_try_count = 0;
     int local_step_count = 0;
     double local_best_c_score = -DBL_MAX;
+    VectorXd local_ts (20); local_ts.fill(0);
     VectorXd local_best_x;
-    default_random_engine gen {static_cast<long unsigned int>(time(0)*omp_get_thread_num())};
+    //default_random_engine gen {0};
+    default_random_engine gen {static_cast<long unsigned int>(time(0))};
     uniform_real_distribution u_dist(0.0, 1.0);
 
     while (true) {
       if (chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - ep).count() / 1000000000.0 > time_budget)
         break;
+      chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
       local_try_count ++;
+      chrono::high_resolution_clock::time_point t11 = chrono::high_resolution_clock::now();
       vector<double> splits(n-1);
+      chrono::high_resolution_clock::time_point t12 = chrono::high_resolution_clock::now();
       for (int i = 0; i < n-1; i++) splits[i] = u_dist(gen);
+      chrono::high_resolution_clock::time_point t13 = chrono::high_resolution_clock::now();
       VectorXd coefs = bucketSort(splits);
+      chrono::high_resolution_clock::time_point t14 = chrono::high_resolution_clock::now();
       for (int i = n-1; i >= 1; i--) coefs(i) -= coefs(i-1);
-      if (!kIgnoreDegenerate && degenerate_count < n){
-        for (int i = 0; i < n; i ++){
-          // Weird bug when coefs(i) = 0
-          if (degenerate_violation[i].size() > 0) coefs(i) = kFloatEps;
-        }
-        double sum_coefs = coefs.sum();
-        for (int i = 0; i < n; i ++) coefs(i) /= sum_coefs;
-      }
+      chrono::high_resolution_clock::time_point t15 = chrono::high_resolution_clock::now();
+      // if (!kIgnoreDegenerate && degenerate_count < n){
+      //   for (int i = 0; i < n; i ++){
+      //     // Weird bug when coefs(i) = 0
+      //     if (degenerate_violation[i].size() > 0) coefs(i) = kFloatEps;
+      //   }
+      //   double sum_coefs = coefs.sum();
+      //   for (int i = 0; i < n; i ++) coefs(i) /= sum_coefs;
+      // }
       VectorXd dir = lattice_dirs.vectorProduct(coefs);
+      chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
       AbstractWalker* walker;
       if (n < kLatticeUB) walker = new Walker(dir);
       else if (n < kRetargetUB) walker = new PseudoWalker(dir, true);
       else walker = new PseudoWalker(dir, false);
+      chrono::high_resolution_clock::time_point t3 = chrono::high_resolution_clock::now();
       VectorXd x = floor_r0;
       VectorXd current_e_score = e_score;
       VectorXd current_i_score = i_score;
@@ -393,6 +406,7 @@ void GurobiLatticeSolver::solve(double time_budget) {
           latticeStep(i+1, x, current_e_score, current_i_score, current_c_score, bound_map);
         }
       }
+      chrono::high_resolution_clock::time_point t4 = chrono::high_resolution_clock::now();
       if (checkFeasibilityStep(current_e_score, current_i_score, bound_map)){
         if (local_best_c_score < current_c_score){
           local_best_c_score = current_c_score;
@@ -401,6 +415,7 @@ void GurobiLatticeSolver::solve(double time_budget) {
       }
       int step_count = 0;
       double stubborn_scale = 1.0;
+      chrono::high_resolution_clock::time_point t5 = chrono::high_resolution_clock::now();
       while (true){
         int d = walker->step();
         if (!latticeStep(d, x, current_e_score, current_i_score, current_c_score, bound_map)) break;
@@ -417,10 +432,23 @@ void GurobiLatticeSolver::solve(double time_budget) {
         if (step_count > kSizeTol) break;
       }
       delete walker;
+      chrono::high_resolution_clock::time_point t6 = chrono::high_resolution_clock::now();
       local_step_count += step_count;
+      local_ts(6) += chrono::duration_cast<chrono::nanoseconds>(t2-t1).count()/1000000.0;
+      local_ts(7) += chrono::duration_cast<chrono::nanoseconds>(t3-t2).count()/1000000.0;
+      local_ts(8) += chrono::duration_cast<chrono::nanoseconds>(t4-t3).count()/1000000.0;
+      local_ts(9) += chrono::duration_cast<chrono::nanoseconds>(t5-t4).count()/1000000.0;
+      local_ts(10) += chrono::duration_cast<chrono::nanoseconds>(t6-t5).count()/1000000.0;
+      local_ts(0) += chrono::duration_cast<chrono::nanoseconds>(t11-t1).count()/1000000.0;
+      local_ts(1) += chrono::duration_cast<chrono::nanoseconds>(t12-t11).count()/1000000.0;
+      local_ts(2) += chrono::duration_cast<chrono::nanoseconds>(t13-t12).count()/1000000.0;
+      local_ts(3) += chrono::duration_cast<chrono::nanoseconds>(t14-t13).count()/1000000.0;
+      local_ts(4) += chrono::duration_cast<chrono::nanoseconds>(t15-t14).count()/1000000.0;
+      local_ts(5) += chrono::duration_cast<chrono::nanoseconds>(t2-t15).count()/1000000.0;
     }
     #pragma omp critical 
     {
+      ts += local_ts;
       if (best_c_score < local_best_c_score){
         best_c_score = local_best_c_score;
         best_x = local_best_x;
@@ -429,6 +457,9 @@ void GurobiLatticeSolver::solve(double time_budget) {
       avg_step_count += local_step_count;
     }
   }
+  ts /= try_count;
+  cout << "GLSTIME ";
+  print(ts);
   avg_step_count /= try_count;
   status = LS_NOT_FOUND;
   if (best_c_score != -DBL_MAX) status = LS_FOUND;

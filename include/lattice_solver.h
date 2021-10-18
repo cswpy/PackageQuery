@@ -1,8 +1,7 @@
 #pragma once
 
 #include <Eigen/Dense>
-#include "fast_cv.h"
-#include "simplex.h"
+#include "coo_sparse.h"
 
 using namespace Eigen;
 using namespace std;
@@ -13,13 +12,11 @@ public:
   const VectorXd& b;
   const VectorXd& c;
   const VectorXd& u;
-  vector<int> bhead;
-  FastCV* fcv;
-  Simplex* simplex;
+  vector<int> bhead, nbasic;
   CooSparse lattice_dirs;
   unordered_map<int, int> inv_bhead;
-  VectorXd r0, near_r0, fscores, best_x, nbasic, fracs;
-  double exe_relaxed, exe_tableau, exe_solved, relaxed_cscore, cscore, best_cscore, avg_step_count;
+  VectorXd r0, near_r0, fscores, best_x, fracs;
+  double exe_init, exe_relaxed, exe_tableau, exe_solved, relaxed_cscore, cscore, best_cscore, avg_step_count;
   int n, m, core, try_count, status;
 public:
   ~LatticeSolver();

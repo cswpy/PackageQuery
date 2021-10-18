@@ -8,7 +8,7 @@
 FastCV::~FastCV(){
 }
 
-FastCV::FastCV(int core, CooSparse& mat, const VectorXd& nbasic): mat(mat), nbasic(nbasic){
+FastCV::FastCV(int core, CooSparse& mat, const vector<int>& nbasic): mat(mat), nbasic(nbasic){
   m = mat.m;
   n = mat.n;
   if (n >= kFastCV){
@@ -28,9 +28,10 @@ FastCV::FastCV(int core, CooSparse& mat, const VectorXd& nbasic): mat(mat), nbas
 VectorXd FastCV::sample(){
   default_random_engine gen {static_cast<long unsigned int>(time(0))};
   uniform_real_distribution u_dist(0.0, 1.0);
-  vector<double> splits(n-1);
-  for (int i = 0; i < n-1; i++) splits[i] = u_dist(gen);
-  VectorXd coefs = bucketSort(splits);
+  VectorXd coefs (n);
+  coefs(0) = 1;
+  for (int i = 1; i < n; i ++) coefs(i) = u_dist(gen);
+  sort(coefs.begin(), coefs.end());
   for (int i = n-1; i >= 1; i--) coefs(i) -= coefs(i-1);
   VectorXd res (n); res.fill(0);
   if (n >= kFastCV){
@@ -55,7 +56,8 @@ VectorXd FastCV::sample(){
     mat.inplaceVectorProduct(coefs, res);
   }
   for (int i = 0; i < n; i ++){
-    if (nbasic(i) != 0) res(i) = nbasic(i) * coefs(i);
+    int comp = abs(nbasic[i]) - 1;
+    if (nbasic[i] != 0) res(comp) = sign(nbasic[i]) * coefs(i);
   }
   // VectorXd base (m); base.fill(0);
   // for (int i = 0; i < m; i ++){

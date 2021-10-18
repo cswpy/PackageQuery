@@ -7,7 +7,7 @@ using namespace Eigen;
 class Simplex{
 public:
   int n, m, ma, numcols, npm, status, lea_row;
-  vector<double> v_cache;
+  VectorXd v_cache;
   double min_ratio, d_cache, sum;
   double* tableau;
   double* bhead;
