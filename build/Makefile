@@ -123,6 +123,33 @@ main/fast:
 	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/build
 .PHONY : main/fast
 
+main_lattice_solver.o: main_lattice_solver.cpp.o
+
+.PHONY : main_lattice_solver.o
+
+# target to build an object file
+main_lattice_solver.cpp.o:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main_lattice_solver.cpp.o
+.PHONY : main_lattice_solver.cpp.o
+
+main_lattice_solver.i: main_lattice_solver.cpp.i
+
+.PHONY : main_lattice_solver.i
+
+# target to preprocess a source file
+main_lattice_solver.cpp.i:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main_lattice_solver.cpp.i
+.PHONY : main_lattice_solver.cpp.i
+
+main_lattice_solver.s: main_lattice_solver.cpp.s
+
+.PHONY : main_lattice_solver.s
+
+# target to generate assembly for a file
+main_lattice_solver.cpp.s:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main_lattice_solver.cpp.s
+.PHONY : main_lattice_solver.cpp.s
+
 src/coo_sparse.o: src/coo_sparse.cpp.o
 
 .PHONY : src/coo_sparse.o
@@ -393,33 +420,6 @@ src/walker.cpp.s:
 	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/walker.cpp.s
 .PHONY : src/walker.cpp.s
 
-test_speed_simplex.o: test_speed_simplex.cpp.o
-
-.PHONY : test_speed_simplex.o
-
-# target to build an object file
-test_speed_simplex.cpp.o:
-	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/test_speed_simplex.cpp.o
-.PHONY : test_speed_simplex.cpp.o
-
-test_speed_simplex.i: test_speed_simplex.cpp.i
-
-.PHONY : test_speed_simplex.i
-
-# target to preprocess a source file
-test_speed_simplex.cpp.i:
-	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/test_speed_simplex.cpp.i
-.PHONY : test_speed_simplex.cpp.i
-
-test_speed_simplex.s: test_speed_simplex.cpp.s
-
-.PHONY : test_speed_simplex.s
-
-# target to generate assembly for a file
-test_speed_simplex.cpp.s:
-	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/test_speed_simplex.cpp.s
-.PHONY : test_speed_simplex.cpp.s
-
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -429,6 +429,9 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
 	@echo "... main"
+	@echo "... main_lattice_solver.o"
+	@echo "... main_lattice_solver.i"
+	@echo "... main_lattice_solver.s"
 	@echo "... src/coo_sparse.o"
 	@echo "... src/coo_sparse.i"
 	@echo "... src/coo_sparse.s"
@@ -459,9 +462,6 @@ help:
 	@echo "... src/walker.o"
 	@echo "... src/walker.i"
 	@echo "... src/walker.s"
-	@echo "... test_speed_simplex.o"
-	@echo "... test_speed_simplex.i"
-	@echo "... test_speed_simplex.s"
 .PHONY : help
 
 

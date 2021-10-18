@@ -37,11 +37,13 @@ LatticeSolver::LatticeSolver(int core, const MatrixXd& A, const VectorXd& b, con
   relaxed_cscore = 0;
   best_cscore = -DBL_MAX;
   lattice_dirs = CooSparse(n, m);
-  exe_init = chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - start).count() / 1000000.0;
-  start = chrono::high_resolution_clock::now();
+  chrono::high_resolution_clock::time_point end = chrono::high_resolution_clock::now();
+  exe_init = chrono::duration_cast<chrono::nanoseconds>(end - start).count() / 1000000.0;
+  start = end;
   Simplex* simplex = new Simplex(core, A, b, c, u);
-  exe_relaxed = chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - start).count() / 1000000.0;
-  start = chrono::high_resolution_clock::now();
+  end = chrono::high_resolution_clock::now();
+  exe_relaxed = chrono::duration_cast<chrono::nanoseconds>(end - start).count() / 1000000.0;
+  start = end;
   if (simplex->status == LS_FOUND){
     for (int i = 0; i < m; i ++){
       inv_bhead[simplex->bhead[i]] = i;
@@ -145,20 +147,25 @@ void LatticeSolver::solve(double time_budget){
   chrono::high_resolution_clock::time_point ep = chrono::high_resolution_clock::now();
   try_count = 0;
   avg_step_count = 0;
+  exe_find_dir = 0;
+  exe_init_walk = 0;
+  exe_walk = 0;
   #pragma omp parallel num_threads(core)
   {
     // Local declaration
     default_random_engine gen {static_cast<long unsigned int>(time(0))};
-    //default_random_engine gen {0};
     uniform_real_distribution u_dist(0.0, 1.0);
     int local_try_count = 0;
     int local_step_count = 0;
     double local_best_cscore = -DBL_MAX;
-    VectorXd local_ts (20); local_ts.fill(0);
     VectorXd local_best_x;
+    double local_exe_find_dir = 0;
+    double local_exe_init_walk = 0;
+    double local_exe_walk = 0;
     while (true) {
       if (chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - ep).count() / 1000000000.0 > time_budget)
         break;
+      chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
       local_try_count ++;
       VectorXd coefs (n);
       coefs(0) = 1;
@@ -171,7 +178,13 @@ void LatticeSolver::solve(double time_budget){
         int comp = abs(nbasic[i]) - 1;
         if (nbasic[i] != 0) dir(comp) = sign(nbasic[i]) * coefs(i);
       }
+      chrono::high_resolution_clock::time_point end = chrono::high_resolution_clock::now();
+      local_exe_find_dir += chrono::duration_cast<chrono::nanoseconds>(end - start).count() / 1000000.0;
+      start = end;
       PseudoWalker* walker = new PseudoWalker(dir);
+      end = chrono::high_resolution_clock::now();
+      local_exe_init_walk += chrono::duration_cast<chrono::nanoseconds>(end - start).count() / 1000000.0;
+      start = end;
       VectorXd x = near_r0;
       VectorXd current_fscores = fscores;
       double current_cscore = cscore;
@@ -207,6 +220,7 @@ void LatticeSolver::solve(double time_budget){
       }
       delete walker;
       local_step_count += step_count;
+      local_exe_walk += chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - start).count() / 1000000.0;
     }
     #pragma omp critical 
     {
@@ -219,8 +233,17 @@ void LatticeSolver::solve(double time_budget){
     try_count += local_try_count;
     #pragma omp atomic
     avg_step_count += local_step_count;
+    #pragma omp atomic
+    exe_find_dir += local_exe_find_dir;
+    #pragma omp atomic
+    exe_init_walk += local_exe_init_walk;
+    #pragma omp atomic
+    exe_walk += local_exe_walk;
   }
   avg_step_count /= try_count;
+  exe_find_dir /= try_count;
+  exe_init_walk /=  try_count;
+  exe_walk /= try_count;
   if (best_cscore != -DBL_MAX){
     if (status == LS_NOT_FOUND) status = LS_FOUND;
   }
@@ -234,7 +257,10 @@ void LatticeSolver::report(){
   fmt::print("Time for initialization: {:.2Lf}ms\n", exe_init);
   fmt::print("Time for finding relaxed solution: {:.2Lf}ms\n", exe_relaxed);
   fmt::print("Time for processing simplex tableau: {:.2Lf}ms\n", exe_tableau);
-  fmt::print("Time for lattice walking: {:.2Lf}ms\n", exe_solved);
+  fmt::print("Time for lattice solving: {:.2Lf}ms\n", exe_solved);
+  fmt::print("\tAverage time for computing a lattice direction: {:.2Lf}ms\n", exe_find_dir);
+  fmt::print("\tAverage time for initializing pseudo lattice: {:2Lf}ms\n", exe_init_walk);
+  fmt::print("\tAverage time for walking on a lattice direction: {:.2Lf}ms\n", exe_walk);
   fmt::print("Total time: {:.2Lf}ms\n", exe_init+exe_relaxed+exe_tableau+exe_solved);
   fmt::print("Total cores: {}\n", core);
   fmt::print("------------Solution statistics-------------\n");

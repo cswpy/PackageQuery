@@ -77,7 +77,7 @@ int main(){
     VectorXd c (n);
     generateProlem(n, A, b, c);
     VectorXd u (n); u.fill(1);
-    if (i <= 7){
+    if (i <= 6){
       benchmarks(i-2, 0) = gurobiILP(A, b, c, u, false);
       benchmarks(i-2, 1) = gurobiILP(A, b, c, u, true);
     }

@@ -21,10 +21,10 @@ set(EXECUTABLE_NAME "main")
 
 #set(MAIN_NAME "main_simplex")
 #set(MAIN_NAME "main_mc_matrix")
-#set(MAIN_NAME "main_lattice_solver")
+set(MAIN_NAME "main_lattice_solver")
 #set(MAIN_NAME "test_accuracy_lattice_walk")
 #set(MAIN_NAME "test_speed_lattice_walk")
-set(MAIN_NAME "test_speed_simplex")
+#set(MAIN_NAME "test_speed_simplex")
 
 message("PROJECT NAME: " ${PROJECT_NAME})
 message("SOURCE FOLDER: " ${CMAKE_SOURCE_DIR})

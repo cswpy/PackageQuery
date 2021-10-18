@@ -163,14 +163,14 @@ void test(){
 }
 
 int main(){
-  int n = 1000000;
+  int n = 10000000;
   int m = 6;
   MatrixXd A (m, n);
   VectorXd b (m);
   VectorXd c (n);
   generateProlem(n, A, b, c);
   VectorXd u (n); u.fill(1);
-  GurobiSolver gs = GurobiSolver(A, b, c, u);
-  gs.solveRelaxed();
-  cout << gs.relaxed_cscore << " " << gs.exe_relaxed << endl;
+  LatticeSolver ls = LatticeSolver(80, A, b, c, u);
+  ls.solve(2);
+  ls.report();
 }

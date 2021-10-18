@@ -16,7 +16,8 @@ public:
   CooSparse lattice_dirs;
   unordered_map<int, int> inv_bhead;
   VectorXd r0, near_r0, fscores, best_x, fracs;
-  double exe_init, exe_relaxed, exe_tableau, exe_solved, relaxed_cscore, cscore, best_cscore, avg_step_count;
+  double relaxed_cscore, cscore, best_cscore, avg_step_count;
+  double exe_init, exe_relaxed, exe_tableau, exe_solved, exe_find_dir, exe_init_walk, exe_walk;
   int n, m, core, try_count, status;
 public:
   ~LatticeSolver();
