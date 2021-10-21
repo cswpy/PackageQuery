@@ -14,7 +14,7 @@ public:
   const VectorXd& u;
   int n, m;
   VectorXd r0, x0;
-  double exe_init, exe_relaxed, exe_ilp, relaxed_cscore, ilp_cscore;
+  double exe_init, exe_relaxed, exe_ilp, relaxed_cscore, ilp_cscore, iteration_count;
   int relaxed_status, ilp_status;
   GRBenv* env;
   GRBmodel* model;

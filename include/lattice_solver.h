@@ -12,13 +12,13 @@ public:
   const VectorXd& b;
   const VectorXd& c;
   const VectorXd& u;
-  vector<int> bhead, nbasic;
+  vector<int> bhead;
   CooSparse lattice_dirs;
   unordered_map<int, int> inv_bhead;
   VectorXd r0, near_r0, fscores, best_x, fracs;
   double relaxed_cscore, cscore, best_cscore, avg_step_count;
   double exe_init, exe_relaxed, exe_tableau, exe_solved, exe_find_dir, exe_init_walk, exe_walk;
-  int n, m, core, try_count, status;
+  int n, m, core, try_count, status, opt;
 public:
   ~LatticeSolver();
   LatticeSolver(int core, const MatrixXd& A, const VectorXd& b, const VectorXd& c, const VectorXd& u);

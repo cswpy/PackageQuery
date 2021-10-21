@@ -11,6 +11,7 @@
 #include "gurobi_lattice_solver.h"
 #include "gurobi_solver.h"
 #include "fmt/core.h"
+#include "CCfits/CCfits.h"
 
 using namespace std;
 using namespace Eigen;
@@ -19,11 +20,9 @@ using namespace Eigen;
 
 void generateProlem(int n, MatrixXd& A, VectorXd& b, VectorXd& c){
   A.resize(6, n); b.resize(6); c.resize(n);
-  default_random_engine gen;
-  gen.seed(1);
-  //default_random_engine gen {static_cast<long unsigned int>(time(0))};
+  default_random_engine gen {static_cast<long unsigned int>(time(0))};
   uniform_real_distribution u_dist(0.0, 1.0);
-  int expected_numvar = 10;
+  int expected_numvar = 500;
   normal_distribution n_dist(0.5*expected_numvar, 1.0/12*expected_numvar);
   normal_distribution n_dist_c(0.0, 500.0);
   #pragma omp parallel for num_threads(CORE_COUNT)
@@ -44,12 +43,12 @@ void generateProlem(int n, MatrixXd& A, VectorXd& b, VectorXd& c){
   b(1) = tol1 - b(0);
   b(2) = n_dist(gen) + tol2;
   b(3) = tol2 - b(2);
-  b(4) = 30;
+  b(4) = 1000;
   b(5) = -5;
 }
 
 void test(){
-  int n = 100000;
+  int n = 200000;
   int m = 6;
   MatrixXd A (m, n);
   VectorXd b (m);
@@ -162,8 +161,8 @@ void test(){
   // cout << "HERE " << c.dot(gls.x0) << endl;
 }
 
-int main(){
-  int n = 10000000;
+void quickRun(){
+  int n = 200000;
   int m = 6;
   MatrixXd A (m, n);
   VectorXd b (m);
@@ -171,6 +170,27 @@ int main(){
   generateProlem(n, A, b, c);
   VectorXd u (n); u.fill(1);
   LatticeSolver ls = LatticeSolver(80, A, b, c, u);
-  ls.solve(2);
-  ls.report();
+  // showHistogram(ls.r0, 10, 0, 0);
+  // ls.solve(2);
+  // ls.report();
+  // GurobiSolver gs = GurobiSolver(A, b, c, u);
+  // gs.solveIlp();
+  // ls.compareReport(gs.x0, gs.exe_ilp);
+  // VectorXd len (n); len.fill(0);
+  // for (int i = 0; i < n; i ++){
+  //   for (const auto& pi : ls.lattice_dirs.rows[i]){
+  //     len(i) += pi.second*pi.second;
+  //   }
+  //   len(i) = sqrt(len(i));
+  // }
+  // showHistogram(len, 10, 0, 0);
+}
+
+int main(){
+  quickRun();
+  // default_random_engine gen {static_cast<long unsigned int>(time(0))};
+  // uniform_real_distribution u_dist(0.0, 1.0);
+  // VectorXd x (10000);
+  // for (int i = 0; i < (int) x.size(); i ++) x(i) = u_dist(gen);
+  // showHistogram(x, 10, 0, 0.1);
 }

@@ -3,6 +3,7 @@
 #include <queue>
 #include <Eigen/Dense>
 #include "abstract_walker.h"
+#include "parallel_pq.h"
 
 using namespace Eigen;
 using namespace std;
@@ -13,8 +14,9 @@ public:
   VectorXd p, x;
   vector<double> steps;
   priority_queue<pair<double, int>> pq;
+  ParallelPQ* ppq;
   bool enable_correction;
-  int step_count, correction_count;
+  int n, step_count, correction_count, core;
   double sum_p;
 
 private:
@@ -22,6 +24,6 @@ private:
 
 public:
   ~PseudoWalker();
-  PseudoWalker(VectorXd p, bool enable_correction=true);
+  PseudoWalker(VectorXd p, bool enable_correction=true, int core=1);
   int step();
 };

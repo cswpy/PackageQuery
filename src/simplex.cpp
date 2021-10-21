@@ -31,6 +31,7 @@ Simplex::~Simplex(){
 void Simplex::pivot(int horizon, const VectorXd& u, int ent_col){
   #pragma omp master
   {
+    iteration_count ++;
     lea_row = -1;
     min_ratio = DBL_MAX;
     double col_obj = tableau[at(0, ent_col)];
@@ -69,6 +70,7 @@ void Simplex::pivot(int horizon, const VectorXd& u, int ent_col){
         lea_row = j;
       }
     }
+
   }
   #pragma omp barrier
   if (lea_row == 1){
@@ -81,8 +83,7 @@ void Simplex::pivot(int horizon, const VectorXd& u, int ent_col){
       for (int j = 2; j <= m+1; j ++){
         // Update cur
         int basic_col = bhead[j-2];
-        double tmp = step*tableau[at(j, ent_col)];
-        tableau[at(1, basic_col)] += tmp;
+        tableau[at(1, basic_col)] += step*tableau[at(j, ent_col)];
         if (isEqual(tableau[at(1, basic_col)], 0)) tableau[at(1, basic_col)] = 0;
       }
     }
@@ -125,7 +126,7 @@ void Simplex::pivot(int horizon, const VectorXd& u, int ent_col){
   #pragma omp barrier
 }
 
-void Simplex::selectEnteringColumn(int horizon, const VectorXd& u, double& ent_value, int& ent_col){
+void Simplex::selectEnteringColumn(int horizon, const VectorXd& c, const VectorXd& u, double& ent_value, int& ent_col){
   // Choosing entering variable
   #pragma omp master
   {
@@ -139,14 +140,42 @@ void Simplex::selectEnteringColumn(int horizon, const VectorXd& u, double& ent_v
   for (int i = 0; i < horizon; i ++){
     if (i == npm) continue;
     double cur = tableau[at(1, i)];
-    double c = tableau[at(0, i)];
+    // Positive col_obj wants to decrease, Negative col_obj wants to increase
+    double col_obj = tableau[at(0, i)];
     // If the entering variable already lower bounded and obj is non negative
-    if (isEqual(cur, 0) && isGreaterEqual(c, 0)) continue;
+    if (isEqual(cur, 0) && isGreaterEqual(col_obj, 0)) continue;
     // If the entering variable already upper bounded and obj is non positive
-    if (i < n && isEqual(cur, u(i)) && isLessEqual(c, 0)) continue;
-    if (local_ent_value < fabs(c)){
-      local_ent_value = fabs(c);
-      local_ent_col = i;
+    if (i < n && isEqual(cur, u(i)) && isLessEqual(col_obj, 0)) continue;
+    
+    // "Dantzig's rule"
+    // if (local_ent_value < fabs(col_obj)){
+    //   local_ent_value = fabs(col_obj);
+    //   local_ent_col = i;
+    // }
+
+    // "Steepest-edge rule"
+    // TO-DO: IMPLEMENT RECURSIVE UPDATE FOR STEEPEST-EDGE RULE
+    double s = sign(col_obj);
+    double dot = 0;
+    double sq_norm = 0;
+    if (i < n){
+      dot -= s*c(i);
+      sq_norm += 1;
+    }
+    for (int j = 2; j <= m+1; j ++){
+      int basic_col = bhead[j-2];
+      if (basic_col < n){
+        double val = tableau[at(j, i)];
+        dot += s*val*c(basic_col);
+        sq_norm += val*val;
+      }
+    }
+    if (sq_norm > 0){
+      double cmp = dot / sqrt(sq_norm);
+      if (local_ent_value < cmp){
+        local_ent_value = cmp;
+        local_ent_col = i;
+      }
     }
   }
   #pragma omp critical
@@ -161,6 +190,7 @@ void Simplex::selectEnteringColumn(int horizon, const VectorXd& u, double& ent_v
 
 Simplex::Simplex(int core, const MatrixXd& A, const VectorXd& b, const VectorXd& c, const VectorXd& u){
   status = LS_NOT_FOUND;
+  iteration_count = 0;
   n = c.size();
   m = b.size();
   npm = n+m;
@@ -217,7 +247,7 @@ Simplex::Simplex(int core, const MatrixXd& A, const VectorXd& b, const VectorXd&
     }
     // Phase-I
     while (true){
-      selectEnteringColumn(numcols, u, ent_value, ent_col);
+      selectEnteringColumn(numcols, c, u, ent_value, ent_col);
       #pragma omp master
       {
         if (ent_value == 0){
@@ -269,7 +299,7 @@ Simplex::Simplex(int core, const MatrixXd& A, const VectorXd& b, const VectorXd&
 
       // Phase-II
       while (true){
-        selectEnteringColumn(npm+1, u, ent_value, ent_col);
+        selectEnteringColumn(npm+1, c, u, ent_value, ent_col);
         #pragma omp master
         {
           if (ent_value == 0){

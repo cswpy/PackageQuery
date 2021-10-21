@@ -123,32 +123,32 @@ main/fast:
 	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/build
 .PHONY : main/fast
 
-main_lattice_solver.o: main_lattice_solver.cpp.o
+runnable/main_reducer.o: runnable/main_reducer.cpp.o
 
-.PHONY : main_lattice_solver.o
+.PHONY : runnable/main_reducer.o
 
 # target to build an object file
-main_lattice_solver.cpp.o:
-	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main_lattice_solver.cpp.o
-.PHONY : main_lattice_solver.cpp.o
+runnable/main_reducer.cpp.o:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/runnable/main_reducer.cpp.o
+.PHONY : runnable/main_reducer.cpp.o
 
-main_lattice_solver.i: main_lattice_solver.cpp.i
+runnable/main_reducer.i: runnable/main_reducer.cpp.i
 
-.PHONY : main_lattice_solver.i
+.PHONY : runnable/main_reducer.i
 
 # target to preprocess a source file
-main_lattice_solver.cpp.i:
-	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main_lattice_solver.cpp.i
-.PHONY : main_lattice_solver.cpp.i
+runnable/main_reducer.cpp.i:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/runnable/main_reducer.cpp.i
+.PHONY : runnable/main_reducer.cpp.i
 
-main_lattice_solver.s: main_lattice_solver.cpp.s
+runnable/main_reducer.s: runnable/main_reducer.cpp.s
 
-.PHONY : main_lattice_solver.s
+.PHONY : runnable/main_reducer.s
 
 # target to generate assembly for a file
-main_lattice_solver.cpp.s:
-	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main_lattice_solver.cpp.s
-.PHONY : main_lattice_solver.cpp.s
+runnable/main_reducer.cpp.s:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/runnable/main_reducer.cpp.s
+.PHONY : runnable/main_reducer.cpp.s
 
 src/coo_sparse.o: src/coo_sparse.cpp.o
 
@@ -312,6 +312,33 @@ src/lattice_solver.cpp.s:
 	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/lattice_solver.cpp.s
 .PHONY : src/lattice_solver.cpp.s
 
+src/parallel_pq.o: src/parallel_pq.cpp.o
+
+.PHONY : src/parallel_pq.o
+
+# target to build an object file
+src/parallel_pq.cpp.o:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/parallel_pq.cpp.o
+.PHONY : src/parallel_pq.cpp.o
+
+src/parallel_pq.i: src/parallel_pq.cpp.i
+
+.PHONY : src/parallel_pq.i
+
+# target to preprocess a source file
+src/parallel_pq.cpp.i:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/parallel_pq.cpp.i
+.PHONY : src/parallel_pq.cpp.i
+
+src/parallel_pq.s: src/parallel_pq.cpp.s
+
+.PHONY : src/parallel_pq.s
+
+# target to generate assembly for a file
+src/parallel_pq.cpp.s:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/parallel_pq.cpp.s
+.PHONY : src/parallel_pq.cpp.s
+
 src/pseudo_walker.o: src/pseudo_walker.cpp.o
 
 .PHONY : src/pseudo_walker.o
@@ -338,6 +365,33 @@ src/pseudo_walker.s: src/pseudo_walker.cpp.s
 src/pseudo_walker.cpp.s:
 	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/pseudo_walker.cpp.s
 .PHONY : src/pseudo_walker.cpp.s
+
+src/reducer.o: src/reducer.cpp.o
+
+.PHONY : src/reducer.o
+
+# target to build an object file
+src/reducer.cpp.o:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/reducer.cpp.o
+.PHONY : src/reducer.cpp.o
+
+src/reducer.i: src/reducer.cpp.i
+
+.PHONY : src/reducer.i
+
+# target to preprocess a source file
+src/reducer.cpp.i:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/reducer.cpp.i
+.PHONY : src/reducer.cpp.i
+
+src/reducer.s: src/reducer.cpp.s
+
+.PHONY : src/reducer.s
+
+# target to generate assembly for a file
+src/reducer.cpp.s:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/reducer.cpp.s
+.PHONY : src/reducer.cpp.s
 
 src/simplex.o: src/simplex.cpp.o
 
@@ -429,9 +483,9 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
 	@echo "... main"
-	@echo "... main_lattice_solver.o"
-	@echo "... main_lattice_solver.i"
-	@echo "... main_lattice_solver.s"
+	@echo "... runnable/main_reducer.o"
+	@echo "... runnable/main_reducer.i"
+	@echo "... runnable/main_reducer.s"
 	@echo "... src/coo_sparse.o"
 	@echo "... src/coo_sparse.i"
 	@echo "... src/coo_sparse.s"
@@ -450,9 +504,15 @@ help:
 	@echo "... src/lattice_solver.o"
 	@echo "... src/lattice_solver.i"
 	@echo "... src/lattice_solver.s"
+	@echo "... src/parallel_pq.o"
+	@echo "... src/parallel_pq.i"
+	@echo "... src/parallel_pq.s"
 	@echo "... src/pseudo_walker.o"
 	@echo "... src/pseudo_walker.i"
 	@echo "... src/pseudo_walker.s"
+	@echo "... src/reducer.o"
+	@echo "... src/reducer.i"
+	@echo "... src/reducer.s"
 	@echo "... src/simplex.o"
 	@echo "... src/simplex.i"
 	@echo "... src/simplex.s"

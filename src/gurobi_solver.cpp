@@ -68,6 +68,7 @@ void GurobiSolver::solveRelaxed(bool is_concurrent){
   exe_relaxed = exeTime([](GRBmodel* relaxed) {
     assert(!GRBoptimize(relaxed));
   }, relaxed);
+  assert(!GRBgetdblattr(relaxed, GRB_DBL_ATTR_ITERCOUNT, &iteration_count));
   assert(!GRBgetintattr(relaxed, GRB_INT_ATTR_STATUS, &relaxed_status));
   if (relaxed_status == GRB_OPTIMAL){
     relaxed_status = LS_FOUND;

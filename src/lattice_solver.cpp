@@ -32,7 +32,6 @@ LatticeSolver::LatticeSolver(int core, const MatrixXd& A, const VectorXd& b, con
   fscores.resize(m);
   bhead.resize(m);
   for (int i = 0; i < m; i ++) fscores(i) = b(i);
-  nbasic.resize(n); fill(nbasic.begin(), nbasic.end(), 0);
   cscore = 0;
   relaxed_cscore = 0;
   best_cscore = -DBL_MAX;
@@ -83,12 +82,10 @@ LatticeSolver::LatticeSolver(int core, const MatrixXd& A, const VectorXd& b, con
           }
           double dir = -1.0;
           if (isEqual(tab(1, i), 0)) dir = 1.0;
-          if (i < n) nbasic[index] = (i+1)*dir;
+          if (i < n) lattice_dirs.addEntry(index, i, dir);
           for (int j = 2; j <= m+1; j ++){
             int basic_col = bhead[j-2];
-            if (basic_col < n){
-              lattice_dirs.addEntry(index, basic_col, -tab(j, i) * dir);
-            }
+            if (basic_col < n) lattice_dirs.addEntry(index, basic_col, -tab(j, i) * dir);
           }
         }
       }
@@ -174,10 +171,6 @@ void LatticeSolver::solve(double time_budget){
       for (int i = n-1; i >= 1; i--) coefs(i) -= coefs(i-1);
       VectorXd dir (n); dir.fill(0);
       lattice_dirs.inplaceVectorProduct(coefs, dir);
-      for (int i = 0; i < n; i ++){
-        int comp = abs(nbasic[i]) - 1;
-        if (nbasic[i] != 0) dir(comp) = sign(nbasic[i]) * coefs(i);
-      }
       chrono::high_resolution_clock::time_point end = chrono::high_resolution_clock::now();
       local_exe_find_dir += chrono::duration_cast<chrono::nanoseconds>(end - start).count() / 1000000.0;
       start = end;
@@ -203,7 +196,6 @@ void LatticeSolver::solve(double time_budget){
         }
       }
       int step_count = 0;
-      double stubborn_scale = 1.0;
       while (true){
         int d = walker->step();
         if (!latticeStep(d, x, current_fscores, current_cscore, bound_map)) break;
@@ -211,12 +203,9 @@ void LatticeSolver::solve(double time_budget){
           if (local_best_cscore < current_cscore){
             local_best_cscore = current_cscore;
             local_best_x = x;
-            stubborn_scale = 1.0;
           }
-          if (u_dist(gen) < stubborn_scale * (best_cscore - current_cscore) / best_cscore) break;
         }
         step_count ++;
-        stubborn_scale *= kStubbornMultiplier;
       }
       delete walker;
       local_step_count += step_count;
@@ -275,8 +264,6 @@ void LatticeSolver::report(){
     fmt::print("Objective gap to relaxed solution: {:.2Lf}%\n", relaxed_gap);
     double ar = relaxed_cscore / best_cscore;
     fmt::print("Approximation ratio to relaxed objective: {:.5Lf}\n", ar);
-  } else {
-    fmt::print("Relaxed objective: {:.8Lf}\n", relaxed_cscore);
   }
 }
 
@@ -292,6 +279,12 @@ void LatticeSolver::compareReport(VectorXd sol, double solved_time){
     fmt::print("Comparing gap to relaxed solution: {:.2Lf}%\n", lp_gap);
     double ar = comparing_score / best_cscore;
     fmt::print("Approximation ratio to comparing objective: {:.5Lf}\n", ar);
+    if (solved_time > 0) fmt::print("Comparing solution found in: {:.2Lf}ms\n", solved_time);
+  } else{
+    double comparing_score = getObjValue(sol);
+    fmt::print("Comparing objective: {:.8Lf}\n", comparing_score);
+    double lp_gap = (relaxed_cscore - comparing_score) / fabs(relaxed_cscore) * 100;
+    fmt::print("Comparing gap to relaxed solution: {:.2Lf}%\n", lp_gap);
     if (solved_time > 0) fmt::print("Comparing solution found in: {:.2Lf}ms\n", solved_time);
   }
 }

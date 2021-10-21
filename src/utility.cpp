@@ -4,15 +4,48 @@
 #include <string>
 #include <fstream>
 #include <random>
+#include <float.h>
 #include <limits.h>
 #include <unistd.h>
 #include <filesystem>
 
 #include "ilcplex/ilocplex.h"
 #include "utility.h"
+#include "fitsio.h"
 #include <fmt/core.h>
 
 namespace fs = filesystem;
+
+void showHistogram(VectorXd x, int bucket_count, double start, double end){
+  assert(bucket_count >= 1);
+  double min_x = x.minCoeff();
+  double max_x = x.maxCoeff();
+  if (start <= min_x) start = min_x;
+  if (end >= max_x) end = max_x;
+  if (end <= start){
+    start = min_x;
+    end = max_x;
+  }
+  int outlier = 0;
+  vector<int> buckets (bucket_count, 0);
+  double dist = (end-start) / bucket_count;
+  for (double x_val : x){
+    if (start <= x_val && x_val <= end){
+      int index = (int) min(floor((x_val - start) / dist), bucket_count-1.0);
+      buckets[index] ++;
+    } else outlier ++;
+  }
+  for (int i = 0; i <= bucket_count; i ++){
+    double val = start + i * dist;
+    fmt::print("{: 8.2Lf}", val);
+  }
+  cout << endl;
+  for (int i = 0; i < bucket_count; i ++){
+    fmt::print("{: 8d}", buckets[i]);
+  }
+  fmt::print("{: 8d}", outlier);
+  cout << endl;
+}
 
 bool isEqual(double x, double y, double eps){
   return fabs(x-y) < eps;
@@ -167,4 +200,136 @@ VectorXd bucketSort(vector<double> array){
     res(j+1) = key;
   }
   return res;
+}
+
+MeanVar::MeanVar(){
+}
+
+
+MeanVar::MeanVar(int attr_count){
+  mean.resize(attr_count); mean.fill(0);
+  M2.resize(attr_count); M2.fill(0);
+  var.resize(attr_count); var.fill(0);
+  this->attr_count = attr_count;
+  sample_count = 0;
+}
+
+void MeanVar::add(const VectorXd& x){
+  sample_count ++;
+  VectorXd delta = x - mean;
+  mean += delta / sample_count;
+  M2 += delta.cwiseProduct(x - mean);
+  var = M2 / sample_count;
+}
+
+int getNumRows(string file_name){
+  fitsfile *fptr; 
+  int status = 0;
+  int hdunum, hdutype;
+  long nrows;
+  assert(!fits_open_file(&fptr, file_name.c_str(), READONLY, &status));
+  if (fits_get_hdu_num(fptr, &hdunum) == 1) fits_movabs_hdu(fptr, 2, &hdutype, &status);
+  else fits_get_hdu_type(fptr, &hdutype, &status);
+  assert(hdutype != IMAGE_HDU);
+  fits_get_num_rows(fptr, &nrows, &status);
+  assert(!fits_close_file(fptr, &status));
+  return nrows;
+}
+
+MatrixXd readTable(string file_name, const vector<int>& cols, vector<string>& column_names){
+  fitsfile *fptr; 
+  int status = 0;
+  int hdunum, hdutype, ncols, anynul;
+  long nrows;
+  assert(!fits_open_file(&fptr, file_name.c_str(), READONLY, &status));
+  if (fits_get_hdu_num(fptr, &hdunum) == 1) fits_movabs_hdu(fptr, 2, &hdutype, &status);
+  else fits_get_hdu_type(fptr, &hdutype, &status);
+  assert(hdutype != IMAGE_HDU);
+  fits_get_num_rows(fptr, &nrows, &status);
+  fits_get_num_cols(fptr, &ncols, &status);
+  MatrixXd table (nrows, cols.size()); // Column major
+  char colname[100];
+  char tpl[] = "*";
+  int colnum = -1;
+  int cur = 0;
+  column_names.clear();
+  while (status != COL_NOT_FOUND && cur < (int)cols.size()){
+    fits_get_colname(fptr, CASEINSEN, tpl, colname, &colnum, &status);
+    if (colnum == cols[cur]){
+      string name (colname);
+      column_names.push_back(name);
+      cur ++;
+    }
+  }
+  status = 0;
+  for (int i = 0; i < (int)cols.size(); i ++){
+    assert(!ffgcvd(fptr, cols[i]+1, 1, 1, nrows, -DBL_MAX, &table(0, i), &anynul, &status));
+  }
+  assert(!fits_close_file(fptr, &status));
+  return table;
+}
+
+vector<int> GalaxyDB::galaxy_cols = {2, 3, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 55, 56, 57, 58, 59, 60, 61, 62, 63, 70, 74, 75, 76, 79};
+vector<int> GalaxyDB::Q1 = {9, -9, 16, -20};
+vector<int> GalaxyDB::Q2 = {14, -14, 4, -26};
+
+GalaxyDB::GalaxyDB(int max_rows){
+  vector<string> paths = getAllFiles(fmt::format("{}/resource/galaxy", kProjectHome), ".fits");
+  vector<MatrixXd> tables;
+  num_rows = 0;
+  for (int i = 0; i < (int)paths.size(); i ++){
+    string name = paths[i];
+    string file_name = fmt::format("{}/resource/galaxy/{}.fits", kProjectHome, name);
+    int cur_rows = getNumRows(file_name);
+    if (num_rows + cur_rows < max_rows){
+      MatrixXd table = readTable(file_name, GalaxyDB::galaxy_cols, column_names);
+      num_rows += table.rows();
+      tables.push_back(table);
+    }
+    fmt::print("[{}/{}]Finished reading {}\n", i+1, paths.size(), file_name);
+  }
+  num_cols = column_names.size();
+  data.resize(num_rows, num_cols);
+  int row_offset = 0;
+  for (MatrixXd table : tables){
+    int cur_rows = table.rows();
+    data.middleRows(row_offset, cur_rows) = table;
+    row_offset += cur_rows;
+  }
+  mv = MeanVar(num_cols);
+  for (int i = 0; i < num_rows; i ++) mv.add(data.row(i).transpose());
+  fmt::print("Finished loading galaxy database with {} rows and {} cols\n", num_rows, num_cols);
+}
+
+void GalaxyDB::generateQuery(double percent, int c_att, vector<int> atts, int expected_sol_size, MatrixXd& A, VectorXd& b, VectorXd& c, VectorXd& u){
+  int n = (int) num_rows*percent;
+  int m = atts.size() + 1;
+  A.resize(m, n); b.resize(m); c.resize(n); u.resize(n); u.fill(1);
+  vector<int> index (num_rows);
+  iota(index.begin(), index.end(), 0);
+  shuffle(index.begin(), index.end(), std::mt19937{std::random_device{}()});
+  VectorXd chebyshev (m);
+  double k = sqrt(1/kGalaxyOutlierProb);
+  for (int i = 0; i < m-1; i ++){
+    int att_index = abs(atts[i]) - 1;
+    double mu = expected_sol_size * mv.mean(att_index);
+    double dist = k * expected_sol_size * mv.var(att_index);
+    if (atts[i] > 0) b(i) = mu + dist;
+    else b(i) = dist - mu;
+  }
+  b(m-1) = -1;
+  #pragma omp parallel for num_threads(CORE_COUNT)
+  for (int j = 0; j < n; j ++){
+    if (c_att >= 0) c(j) = data(index[j], c_att);
+    else c(j) = 1.0;
+    for (int i = 0; i < m; i ++){
+      if (i < m-1){
+        int att_index = abs(atts[i]) - 1;
+        A(i, j) = sign(atts[i]) * data(index[j], att_index);
+      } else {
+        // i = m-1
+        A(i, j) = -1.0;
+      }
+    }
+  }
 }

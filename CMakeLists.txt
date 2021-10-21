@@ -19,12 +19,19 @@ set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR})
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 set(EXECUTABLE_NAME "main")
 
+# MAIN
 #set(MAIN_NAME "main_simplex")
 #set(MAIN_NAME "main_mc_matrix")
-set(MAIN_NAME "main_lattice_solver")
+#set(MAIN_NAME "main_lattice_solver")
+#set(MAIN_NAME "main_ccfits")
+set(MAIN_NAME "main_reducer")
+
+# TEST 
 #set(MAIN_NAME "test_accuracy_lattice_walk")
 #set(MAIN_NAME "test_speed_lattice_walk")
 #set(MAIN_NAME "test_speed_simplex")
+#set(MAIN_NAME "test_lattice_solver")
+#set(MAIN_NAME "test_ppq")
 
 message("PROJECT NAME: " ${PROJECT_NAME})
 message("SOURCE FOLDER: " ${CMAKE_SOURCE_DIR})
@@ -39,7 +46,7 @@ include_directories(
 )
 
 file(GLOB all_SRCS
-  "${MAIN_NAME}.cpp"
+  "${CMAKE_SOURCE_DIR}/runnable/${MAIN_NAME}.cpp"
   "${PROJECT_SOURCE_DIR}/include/*.h"
   "${PROJECT_SOURCE_DIR}/include/*.hpp"
   "${PROJECT_SOURCE_DIR}/src/*.cpp"
