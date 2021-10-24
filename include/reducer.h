@@ -9,8 +9,9 @@ class Reducer{
 public:
   MatrixXd* A;
   VectorXd* b, *c, *u;
-  int status;
+  VectorXd best_x;
+  int status, reduce_count;
+  double best_score;
 public:
   ~Reducer();
   Reducer(int core, MatrixXd* AA, VectorXd* bb, VectorXd* cc, VectorXd* uu);
-};
