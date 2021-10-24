@@ -16,6 +16,12 @@
 
 namespace fs = filesystem;
 
+void showHistogram(vector<int> x, int bucket_count, double start, double end){
+  VectorXd dx (x.size());
+  for (int i = 0; i < (int)x.size(); i ++) dx(i) = x[i];
+  showHistogram(dx, bucket_count, start, end);
+}
+
 void showHistogram(VectorXd x, int bucket_count, double start, double end){
   assert(bucket_count >= 1);
   double min_x = x.minCoeff();
@@ -223,7 +229,7 @@ void MeanVar::add(const VectorXd& x){
 }
 
 int getNumRows(string file_name){
-  fitsfile *fptr; 
+  fitsfile *fptr;
   int status = 0;
   int hdunum, hdutype;
   long nrows;
@@ -237,7 +243,7 @@ int getNumRows(string file_name){
 }
 
 MatrixXd readTable(string file_name, const vector<int>& cols, vector<string>& column_names){
-  fitsfile *fptr; 
+  fitsfile *fptr;
   int status = 0;
   int hdunum, hdutype, ncols, anynul;
   long nrows;
