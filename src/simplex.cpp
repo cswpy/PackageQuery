@@ -118,7 +118,7 @@ void Simplex::pivot(int horizon, const VectorXd& u, int ent_col){
     #pragma omp for nowait
     for (int i = 0; i < horizon; i ++){
       for (int j = m+1; j >= 0; j --){
-        if (j != 1 && j != lea_row) 
+        if (j != 1 && j != lea_row)
           tableau[at(j, i)] -= tableau[at(lea_row, i)] * v_cache(j);
       }
     }
@@ -136,7 +136,7 @@ void Simplex::selectEnteringColumn(int horizon, const VectorXd& c, const VectorX
   #pragma omp barrier
   double local_ent_value = 0;
   int local_ent_col = -1;
-  #pragma omp for nowait
+  #pragma omp for
   for (int i = 0; i < horizon; i ++){
     if (i == npm) continue;
     double cur = tableau[at(1, i)];
@@ -146,7 +146,7 @@ void Simplex::selectEnteringColumn(int horizon, const VectorXd& c, const VectorX
     if (isEqual(cur, 0) && isGreaterEqual(col_obj, 0)) continue;
     // If the entering variable already upper bounded and obj is non positive
     if (i < n && isEqual(cur, u(i)) && isLessEqual(col_obj, 0)) continue;
-    
+
     // "Dantzig's rule"
     // if (local_ent_value < fabs(col_obj)){
     //   local_ent_value = fabs(col_obj);
