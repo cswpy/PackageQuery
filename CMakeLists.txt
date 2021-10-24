@@ -19,19 +19,44 @@ set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR})
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 set(EXECUTABLE_NAME "main")
 
+# Matplotlib
+include(GNUInstallDirs)
+set(PACKAGE_NAME matplotlib_cpp)
+set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/${PACKAGE_NAME}/cmake)
+
+add_library(matplotlib_cpp INTERFACE)
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+target_link_libraries(matplotlib_cpp INTERFACE
+  Python3::Python
+  Python3::Module
+)
+find_package(Python3 COMPONENTS NumPy)
+if(Python3_NumPy_FOUND)
+  target_link_libraries(matplotlib_cpp INTERFACE
+    Python3::NumPy
+  )
+else()
+  target_compile_definitions(matplotlib_cpp INTERFACE WITHOUT_NUMPY)
+endif()
+install(
+  TARGETS matplotlib_cpp
+  EXPORT install_targets
+)
+
 # MAIN
 #set(MAIN_NAME "main_simplex")
 #set(MAIN_NAME "main_mc_matrix")
 #set(MAIN_NAME "main_lattice_solver")
 #set(MAIN_NAME "main_ccfits")
-set(MAIN_NAME "main_reducer")
+#set(MAIN_NAME "main_reducer")
 
-# TEST 
+# TEST
 #set(MAIN_NAME "test_accuracy_lattice_walk")
 #set(MAIN_NAME "test_speed_lattice_walk")
 #set(MAIN_NAME "test_speed_simplex")
 #set(MAIN_NAME "test_lattice_solver")
 #set(MAIN_NAME "test_ppq")
+set(MAIN_NAME "test_plot")
 
 message("PROJECT NAME: " ${PROJECT_NAME})
 message("SOURCE FOLDER: " ${CMAKE_SOURCE_DIR})
@@ -41,8 +66,8 @@ message("EXECUTABLE NAME: " ${MAIN_NAME})
 
 include_directories("${PROJECT_SOURCE_DIR}")
 include_directories(
-	${PROJECT_SOURCE_DIR}/include
-	${PROJECT_SOURCE_DIR}/src
+        ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/src
 )
 
 file(GLOB all_SRCS
@@ -91,3 +116,35 @@ endif()
 
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE ${CONAN_LIBS} ${GUROBI_LIBRARY} ${CMAKE_DL_LIBS})
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE ${CPLEX_LIBRARIES})
+
+target_link_libraries(${EXECUTABLE_NAME} PRIVATE matplotlib_cpp)
+set_target_properties(${EXECUTABLE_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/resource/matplotlib")
+
+# Matplotlib
+install(FILES
+  "${PROJECT_SOURCE_DIR}/include/matplotlibcpp.h"
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+install(EXPORT install_targets
+  FILE
+    ${PACKAGE_NAME}Targets.cmake
+  NAMESPACE
+    ${PACKAGE_NAME}::
+  DESTINATION
+    ${INSTALL_CONFIGDIR}
+)
+
+message("CMAKE CURRENT SOURCE DIR: " ${CMAKE_CURRENT_SOURCE_DIR})
+message("CMAKE CURRENT BINARY DIR: " ${CMAKE_CURRENT_BINARY_DIR})
+message("INSTALL CONFIGDIR: " ${INSTALL_CONFIGDIR})
+
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/cmake/${PACKAGE_NAME}Config.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/${PACKAGE_NAME}Config.cmake
+  INSTALL_DESTINATION ${INSTALL_CONFIGDIR}
+)
+install(FILES
+  ${CMAKE_CURRENT_BINARY_DIR}/${PACKAGE_NAME}Config.cmake
+  DESTINATION ${INSTALL_CONFIGDIR}
+)
