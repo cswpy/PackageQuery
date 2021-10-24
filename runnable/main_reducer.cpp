@@ -31,7 +31,7 @@ void generateProlem(int n, MatrixXd& A, VectorXd& b, VectorXd& c){
   A.resize(6, n); b.resize(6); c.resize(n);
   default_random_engine gen {static_cast<long unsigned int>(time(0))};
   uniform_real_distribution u_dist(0.0, 1.0);
-  int expected_numvar = 500;
+  int expected_numvar = 20;
   normal_distribution n_dist(0.5*expected_numvar, 1.0/12*expected_numvar);
   normal_distribution n_dist_c(0.0, 500.0);
   #pragma omp parallel for num_threads(CORE_COUNT)
@@ -52,7 +52,7 @@ void generateProlem(int n, MatrixXd& A, VectorXd& b, VectorXd& c){
   b(1) = tol1 - b(0);
   b(2) = n_dist(gen) + tol2;
   b(3) = tol2 - b(2);
-  b(4) = 1000;
+  b(4) = 40;
   b(5) = -5;
 }
 
@@ -94,7 +94,7 @@ void test_ppw(){
 }
 
 int main(){
-  int n = 1000000;
+  int n = 100000000;
   int m = 6;
   MatrixXd A (m, n);
   VectorXd b (m);
@@ -111,18 +111,57 @@ int main(){
 
   cout << "START REDUCER" << endl;
   chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
+  // VectorXd x (10); x.fill(0);
+  // VectorXd y(5); y.fill(1);
+  // print(x);
+  // x(seqN(3, 5)) = y;
+  // print(x);
+  // VectorXd *x = new VectorXd(10); x->fill(10);
+  // VectorXd *a = x;
+  // print(*a);
+  // x = new VectorXd(4); x->fill(3);
+  // print(*a);
+  // print(*x);
+  // delete a;
+  // a = x;
+  // print(*a);
+  // delete x;
   Reducer reducer = Reducer(80, &A, &b, &c, &u);
+  // Simplex simplex = Simplex(80, A, b, c, u);
+  // cout << simplex.iteration_count <<  endl;
   chrono::high_resolution_clock::time_point end = chrono::high_resolution_clock::now();
   double exe = chrono::duration_cast<chrono::nanoseconds>(end - start).count() / 1000000.0;
   cout << exe << endl;
 
+  start = chrono::high_resolution_clock::now();
+  LatticeSolver ls = LatticeSolver(80, A, b, c, u);
+  end = chrono::high_resolution_clock::now();
+  double exe2 = chrono::duration_cast<chrono::nanoseconds>(end - start).count() / 1000000.0;
+  cout << exe2 << endl;
+  for (int i = 0; i < m; i ++){
+    if (A.row(i).dot(reducer.best_x) > b(i)) cout << "WTF" << endl;
+  }
+  for (int i = 0; i < n; i ++){
+    if (reducer.best_x(i) < 0 || reducer.best_x(i) > u(i)) cout << "WTF2" << endl;
+  }
+  double gap = (ls.relaxed_cscore - reducer.best_score) / ls.relaxed_cscore;
+  cout << gap * 100 << " " << ls.relaxed_cscore / reducer.best_score << endl;
+
+
   // start = chrono::high_resolution_clock::now();
   // GurobiSolver gs = GurobiSolver(A, b, c, u);
-  // gs.solveRelaxed();
-  // cout << gs.iteration_count << endl;
+  // gs.solveIlp();
   // end = chrono::high_resolution_clock::now();
   // double exe2 = chrono::duration_cast<chrono::nanoseconds>(end - start).count() / 1000000.0;
   // cout << exe2 << endl;
+  // for (int i = 0; i < m; i ++){
+  //   if (A.row(i).dot(reducer.best_x) > b(i)) cout << "WTF" << endl;
+  // }
+  // for (int i = 0; i < n; i ++){
+  //   if (reducer.best_x(i) < 0 || reducer.best_x(i) > u(i)) cout << "WTF2" << endl;
+  // }
+  // double gap = (gs.ilp_cscore - reducer.best_score) / gs.ilp_cscore;
+  // cout << gap * 100 << " " << gs.ilp_cscore / reducer.best_score << endl;
 
   // VectorXd r0 (n);
   // for (int i = 0; i < n; i ++) r0(i) = tab(1, i);
