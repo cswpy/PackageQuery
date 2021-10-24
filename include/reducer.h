@@ -15,3 +15,4 @@ public:
 public:
   ~Reducer();
   Reducer(int core, MatrixXd* AA, VectorXd* bb, VectorXd* cc, VectorXd* uu);
+};
