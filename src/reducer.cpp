@@ -5,9 +5,11 @@
 #include <chrono>
 #include <random>
 #include <unordered_map>
+#include <numeric>
 
 #include "fmt/core.h"
 #include "pseudo_walker.h"
+#include "gurobi_solver.h"
 #include "simplex.h"
 #include "utility.h"
 #include "reducer.h"
@@ -22,8 +24,18 @@ Reducer::~Reducer(){
 }
 
 Reducer::Reducer(int core, MatrixXd* AA, VectorXd* bb, VectorXd* cc, VectorXd* uu): A(AA), b(bb), c(cc), u(uu){
+  MatrixXd* nextA;
+  VectorXd*nextb, *nextc, *nextu;
+  int nn = cc->size();
+  vector<int> original_index (nn);
+  vector<int> next_original_index;
+  iota(original_index.begin(), original_index.end(), 0);
+  best_x.resize(nn);
+  best_score = 0;
+  int m = b->size();
+  reduce_count = 0;
+  status = LS_NOT_FOUND;
   while (true){
-    int m = b->size();
     int n = c->size();
     if (n < kReduce) break;
     Simplex simplex = Simplex(core, *A, *b, *c, *u);
@@ -32,16 +44,24 @@ Reducer::Reducer(int core, MatrixXd* AA, VectorXd* bb, VectorXd* cc, VectorXd* u
       VectorXd r0 (n);
       unordered_map<int, int> inv_bhead;
       for (int i = 0; i < m; i ++) inv_bhead[simplex.bhead[i]] = i;
+      int stay_count = 0;
       #pragma omp parallel num_threads(core)
       {
         double whole;
-        #pragma omp for
+        int local_stay_count = 0;
+        #pragma omp for nowait
         for (int i = 0; i < n; i ++){
           centroid_dir(i) = 0;
           whole = round(tab(1, i));
           if (isEqual(whole-tab(1, i), 0)) r0(i) = whole;
-          else r0(i) = -1;
+          else{
+            r0(i) = -1;
+            local_stay_count ++;
+          }
         }
+        #pragma omp atomic
+        stay_count += local_stay_count;
+        #pragma omp barrier
         unordered_map<int, double> local_centroid_dir;
         #pragma omp for nowait
         for (int i = 0; i < m+n; i ++){
@@ -69,13 +89,95 @@ Reducer::Reducer(int core, MatrixXd* AA, VectorXd* bb, VectorXd* cc, VectorXd* u
       int step_horizon = (int)ceil(n / log2(n) * kRedundant);
       for (int i = 0; i < step_horizon; i ++){
         int index = abs(walker.step())-1;
-        r0(index) = -1;
+        if (r0(index) >= 0){
+          r0(index) = -1;
+          stay_count ++;
+        }
       }
-      showHistogram(r0, 10, 0, 0);
+      vector<int> stay_index (stay_count);
+      next_original_index.resize(stay_count);
+      nextA = new MatrixXd(m, stay_count);
+      nextc = new VectorXd(stay_count);
+      nextu = new VectorXd(stay_count);
+      nextb = new VectorXd(m);
+      for (int i = 0; i < m; i ++){
+        (*nextb)(i) = (*b)(i);
+      }
+      stay_count = 0;
+      #pragma omp parallel num_threads(core)
+      {
+        int local_start_index = -1;
+        int local_stay_count = 0;
+        vector<int> local_stay_index;
+        VectorXd local_bl (m); local_bl.fill(0);
+        local_stay_index.reserve(stay_count);
+        #pragma omp for nowait
+        for (int i = 0; i < n; i ++){
+          if (r0(i) < 0){
+            local_stay_count ++;
+            local_stay_index.push_back(i);
+          } else{
+            best_x(original_index[i]) = r0(i);
+            #pragma omp atomic
+            best_score += r0(i)*((*c)(i));
+            for (int j = 0; j < m; j ++){
+              local_bl(j) += (*A)(j, i) * r0(i);
+            }
+          }
+        }
+        #pragma omp critical
+        {
+          local_start_index = stay_count;
+          stay_count += local_stay_count;
+        }
+        for (int i = 0; i < m; i ++){
+          #pragma omp atomic
+          (*nextb)(i) -= local_bl(i);
+        }
+        #pragma omp barrier
+        for (int i = local_start_index; i < local_start_index + local_stay_count; i ++){
+          stay_index[i] = local_stay_index[i-local_start_index];
+          next_original_index[i] = original_index[stay_index[i]];
+        }
+        #pragma omp barrier
+        #pragma omp for
+        for (int i = 0; i < stay_count; i ++){
+          original_index[i] = next_original_index[i];
+          for (int j = 0; j < m; j ++){
+            (*nextA)(j, i) = (*A)(j, stay_index[i]);
+          }
+          (*nextc)(i) = (*c)(stay_index[i]);
+          (*nextu)(i) = (*u)(stay_index[i]);
+        }
+        #pragma omp master
+        {
+          if (reduce_count > 0){
+            delete A;
+            delete b;
+            delete c;
+            delete u;
+          }
+          A = nextA;
+          b = nextb;
+          c = nextc;
+          u = nextu;
+        }
+        #pragma omp barrier
+      }
+      reduce_count ++;
     } else{
       status = simplex.status;
       break;
     }
-    break;
+  }
+  if (status == LS_NOT_FOUND){
+    GurobiSolver gs = GurobiSolver(*A, *b, *c, *u);
+    gs.solveIlp();
+    if (gs.ilp_status == LS_FOUND){
+      for (int i = 0; i < gs.n; i ++){
+        best_x(original_index[i]) = gs.x0(i);
+        best_score += gs.x0(i) * ((*c)(i));
+      }
+    } else status = gs.ilp_status;
   }
 }
