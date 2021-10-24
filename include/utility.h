@@ -43,6 +43,7 @@ bool isGreater(double x, double y, double eps=kFloatEps);
 bool isLessEqual(double x, double y, double eps=kFloatEps);
 bool isGreaterEqual(double x, double y, double eps=kFloatEps);
 
+void showHistogram(vector<int> x, int bucket_count, double start, double end);
 void showHistogram(VectorXd x, int bucket_count, double start, double end);
 VectorXd readSolution(string problem);
 vector<string> getAllFiles(string root, string ext);
