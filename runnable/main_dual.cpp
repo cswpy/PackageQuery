@@ -109,7 +109,7 @@ void testL3Cache(){
 }
 
 void quickRun(){
-  int n = 10000000;
+  int n = 1000000;
   MatrixXd A;
   VectorXd bl, bu, c;
   generateBoundedProlem(10, 0.8, 3.0, n, A, bl, bu, c);

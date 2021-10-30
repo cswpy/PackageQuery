@@ -93,7 +93,7 @@ void test_ppw(){
 }
 
 int main(){
-  int n = 1000000;
+  int n = 100000;
   int m = 6;
   MatrixXd A (m, n);
   VectorXd b (m);

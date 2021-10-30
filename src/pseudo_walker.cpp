@@ -15,7 +15,7 @@ PseudoWalker::PseudoWalker(VectorXd p, bool enable_correction, int core){
   n = (int) p.size();
   assert(n > 1);
   steps.resize(n);
-  x.resize(n);
+  x.resize(n); x.fill(0);
   this->enable_correction = enable_correction;
   this->core = core;
   step_count = 0;
@@ -69,7 +69,6 @@ PseudoWalker::PseudoWalker(VectorXd p, bool enable_correction, int core){
       }
     }
     pq = priority_queue(init.begin(), init.end());
-    x.fill(0);
   }
 }
 

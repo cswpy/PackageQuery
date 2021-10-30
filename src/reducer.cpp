@@ -29,7 +29,7 @@ Reducer::Reducer(int core, MatrixXd* AA, VectorXd* bb, VectorXd* cc, VectorXd* u
   int nn = cc->size();
   vector<int> original_index (nn);
   vector<int> next_original_index;
-  iota(original_index.begin(), original_index.end(), 0);
+  //iota(original_index.begin(), original_index.end(), 0);
   best_x.resize(nn);
   best_score = 0;
   int m = b->size();
@@ -40,18 +40,21 @@ Reducer::Reducer(int core, MatrixXd* AA, VectorXd* bb, VectorXd* cc, VectorXd* u
     if (n < kReduce) break;
     Simplex simplex = Simplex(core, *A, *b, *c, *u);
     if (simplex.status == LS_FOUND){
-      VectorXd centroid_dir (n);
+      VectorXd centroid_dir (n); centroid_dir.fill(0);
       VectorXd r0 (n);
       unordered_map<int, int> inv_bhead;
       for (int i = 0; i < m; i ++) inv_bhead[simplex.bhead[i]] = i;
       int stay_count = 0;
       #pragma omp parallel num_threads(core)
       {
+        if (reduce_count == 0){
+          #pragma omp for nowait
+          for (int i = 0; i < nn; i ++) original_index[i] = i;
+        }
         double whole;
         int local_stay_count = 0;
         #pragma omp for nowait
         for (int i = 0; i < n; i ++){
-          centroid_dir(i) = 0;
           whole = round(tab(1, i));
           if (isEqual(whole-tab(1, i), 0)) r0(i) = whole;
           else{

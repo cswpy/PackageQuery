@@ -78,7 +78,7 @@ Dual::~Dual(){
 
 // Maximizing cc 
 // Dual minimizing c
-Dual::Dual(int core, const MatrixXd& A, const VectorXd& bbl, const VectorXd& bbu,  const VectorXd& c, const VectorXd& l, const VectorXd& u){
+Dual::Dual(int core, const MatrixXd& A, const VectorXd& bbl, const VectorXd& bbu,  const VectorXd& c, const VectorXd& l, const VectorXd& u): A(A), bbl(bbl), bbu(bbu), c(c), l(l), u(u){
   // vector<string> names = {"Copy", "RestInit", "BoundStricten", "InitXBound", "Compute XB", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18"};
   // Profiler pro = Profiler(names);
   chrono::high_resolution_clock::time_point start;
@@ -93,21 +93,21 @@ Dual::Dual(int core, const MatrixXd& A, const VectorXd& bbl, const VectorXd& bbu
   m = bbl.size();
 
   // pro.clock(0);
-  VectorXd bl = bbl;
-  VectorXd bu = bbu;
+  bl = bbl;
+  bu = bbu;
   // pro.stop(0);
   // pro.clock(1);
   // Norm square steepest edges
-  VectorXd beta (m); beta.fill(1);
+  beta.resize(m); beta.fill(1);
 
   // Reduced cost
-  VectorXd d (n+m); d.fill(0); 
+  d.resize(n+m); d.fill(0); 
 
   // Basis indices
   bhead.resize(m);
   for (int i = 0; i < m; i ++) bhead[i] = i+n;
   // Inv Basis indices
-  boost::dynamic_bitset<> inv_bhead {n+m, 0};
+  inv_bhead = boost::dynamic_bitset<>(n+m, 0);
   for (int i = 0; i < m; i ++) inv_bhead[bhead[i]].flip();
 
   // Primal solution
@@ -121,11 +121,11 @@ Dual::Dual(int core, const MatrixXd& A, const VectorXd& bbl, const VectorXd& bbu
   int q, q_index;
 
   // Binv
-  MatrixXd Binv = MatrixXd::Identity(m, m);
+  Binv = MatrixXd::Identity(m, m);
   // rho_r
-  VectorXd rho_r (m);
+  rho_r.resize(m);
   // alpha_r
-  VectorXd alpha_r (n+m);
+  alpha_r.resize(n+m);
   // delta of alpha_r
   double max_delta = 0;
   int sign_max_delta = 0;
@@ -140,9 +140,9 @@ Dual::Dual(int core, const MatrixXd& A, const VectorXd& bbl, const VectorXd& bbu
   double primal_step = 0;
 
   // alpha_q
-  VectorXd alpha_q (m);
+  alpha_q.resize(m);
   // tau for DSE
-  VectorXd tau (m);
+  tau.resize(m);
   
   // slope_partition
   VectorXi slope_partition (core+1);

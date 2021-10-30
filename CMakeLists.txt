@@ -61,7 +61,8 @@ install(
 #set(MAIN_NAME "main_lattice_solver")
 #set(MAIN_NAME "main_ccfits")
 #set(MAIN_NAME "main_reducer")
-set(MAIN_NAME "main_dual")
+#set(MAIN_NAME "main_dual")
+set(MAIN_NAME "main_dual_reducer")
 
 # TEST
 #set(MAIN_NAME "test_accuracy_lattice_walk")
