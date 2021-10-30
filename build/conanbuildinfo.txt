@@ -1,98 +1,92 @@
 [includedirs]
-/home/alm818/conan/fmt/8.0.1/_/_/package/30a9781670e6fb2f17b8355b17a15cf916045317/include
-/home/alm818/conan/eigen/3.4.0/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/include/eigen3
-/home/alm818/conan/boost/1.77.0/_/_/package/adf48b8e4446dcb68f440fe42ff08878d5c7feed/include
-/home/alm818/conan/ccfits/2.6/_/_/package/6092f179cf2ff7a710089a30e907ff9685c1f839/include
-/home/alm818/conan/bzip2/1.0.8/_/_/package/da606cf731e334010b0bf6e85a2a6f891b9f36b0/include
-/home/alm818/conan/libbacktrace/cci.20210118/_/_/package/6af9cc7cb931c5ad942174fd7838eb655717c709/include
-/home/alm818/conan/cfitsio/3.490/_/_/package/f99afdbf2a1cc98ba2029817b35103455b6a9b77/include
-/home/alm818/conan/zlib/1.2.11/_/_/package/6af9cc7cb931c5ad942174fd7838eb655717c709/include
+C:/Users/xuana/.conan/data/fmt/8.0.1/_/_/package/2be90237c5e294c2f30bf6b043d047624b893db3/include
+C:/Users/xuana/.conan/data/eigen/3.4.0/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/include/eigen3
+C:/.conan/aa76de/1/include
+C:/Users/xuana/.conan/data/ccfits/2.6/_/_/package/2240fa56643d33176b0c23292cf3312b768ee50c/include
+C:/Users/xuana/.conan/data/bzip2/1.0.8/_/_/package/d16a91eadaaf5829b928b12d2f836ff7680d3df5/include
+C:/Users/xuana/.conan/data/cfitsio/3.490/_/_/package/d140711d95cc16a85766a8fc3a551dfafe84cf63/include
+C:/Users/xuana/.conan/data/zlib/1.2.11/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/include
 
 [libdirs]
-/home/alm818/conan/fmt/8.0.1/_/_/package/30a9781670e6fb2f17b8355b17a15cf916045317/lib
-/home/alm818/conan/boost/1.77.0/_/_/package/adf48b8e4446dcb68f440fe42ff08878d5c7feed/lib
-/home/alm818/conan/ccfits/2.6/_/_/package/6092f179cf2ff7a710089a30e907ff9685c1f839/lib
-/home/alm818/conan/bzip2/1.0.8/_/_/package/da606cf731e334010b0bf6e85a2a6f891b9f36b0/lib
-/home/alm818/conan/libbacktrace/cci.20210118/_/_/package/6af9cc7cb931c5ad942174fd7838eb655717c709/lib
-/home/alm818/conan/cfitsio/3.490/_/_/package/f99afdbf2a1cc98ba2029817b35103455b6a9b77/lib
-/home/alm818/conan/zlib/1.2.11/_/_/package/6af9cc7cb931c5ad942174fd7838eb655717c709/lib
+C:/Users/xuana/.conan/data/fmt/8.0.1/_/_/package/2be90237c5e294c2f30bf6b043d047624b893db3/lib
+C:/.conan/aa76de/1/lib
+C:/Users/xuana/.conan/data/ccfits/2.6/_/_/package/2240fa56643d33176b0c23292cf3312b768ee50c/lib
+C:/Users/xuana/.conan/data/bzip2/1.0.8/_/_/package/d16a91eadaaf5829b928b12d2f836ff7680d3df5/lib
+C:/Users/xuana/.conan/data/cfitsio/3.490/_/_/package/d140711d95cc16a85766a8fc3a551dfafe84cf63/lib
+C:/Users/xuana/.conan/data/zlib/1.2.11/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/lib
 
 [bindirs]
-/home/alm818/conan/bzip2/1.0.8/_/_/package/da606cf731e334010b0bf6e85a2a6f891b9f36b0/bin
+C:/Users/xuana/.conan/data/bzip2/1.0.8/_/_/package/d16a91eadaaf5829b928b12d2f836ff7680d3df5/bin
 
 [resdirs]
 
 
 [builddirs]
-/home/alm818/conan/fmt/8.0.1/_/_/package/30a9781670e6fb2f17b8355b17a15cf916045317/
-/home/alm818/conan/eigen/3.4.0/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/
-/home/alm818/conan/boost/1.77.0/_/_/package/adf48b8e4446dcb68f440fe42ff08878d5c7feed/
-/home/alm818/conan/ccfits/2.6/_/_/package/6092f179cf2ff7a710089a30e907ff9685c1f839/
-/home/alm818/conan/bzip2/1.0.8/_/_/package/da606cf731e334010b0bf6e85a2a6f891b9f36b0/
-/home/alm818/conan/bzip2/1.0.8/_/_/package/da606cf731e334010b0bf6e85a2a6f891b9f36b0/lib/cmake
-/home/alm818/conan/libbacktrace/cci.20210118/_/_/package/6af9cc7cb931c5ad942174fd7838eb655717c709/
-/home/alm818/conan/cfitsio/3.490/_/_/package/f99afdbf2a1cc98ba2029817b35103455b6a9b77/
-/home/alm818/conan/zlib/1.2.11/_/_/package/6af9cc7cb931c5ad942174fd7838eb655717c709/
+C:/Users/xuana/.conan/data/fmt/8.0.1/_/_/package/2be90237c5e294c2f30bf6b043d047624b893db3/
+C:/Users/xuana/.conan/data/eigen/3.4.0/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/
+C:/.conan/aa76de/1/
+C:/Users/xuana/.conan/data/ccfits/2.6/_/_/package/2240fa56643d33176b0c23292cf3312b768ee50c/
+C:/Users/xuana/.conan/data/bzip2/1.0.8/_/_/package/d16a91eadaaf5829b928b12d2f836ff7680d3df5/
+C:/Users/xuana/.conan/data/bzip2/1.0.8/_/_/package/d16a91eadaaf5829b928b12d2f836ff7680d3df5/lib/cmake
+C:/Users/xuana/.conan/data/cfitsio/3.490/_/_/package/d140711d95cc16a85766a8fc3a551dfafe84cf63/
+C:/Users/xuana/.conan/data/zlib/1.2.11/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/
 
 [libs]
 fmt
-boost_contract
-boost_coroutine
-boost_fiber_numa
-boost_fiber
-boost_context
-boost_graph
-boost_iostreams
-boost_json
-boost_locale
-boost_log_setup
-boost_log
-boost_math_c99
-boost_math_c99f
-boost_math_c99l
-boost_math_tr1
-boost_math_tr1f
-boost_math_tr1l
-boost_nowide
-boost_program_options
-boost_random
-boost_regex
-boost_stacktrace_addr2line
-boost_stacktrace_backtrace
-boost_stacktrace_basic
-boost_stacktrace_noop
-boost_timer
-boost_type_erasure
-boost_thread
-boost_chrono
-boost_container
-boost_date_time
-boost_unit_test_framework
-boost_prg_exec_monitor
-boost_test_exec_monitor
-boost_exception
-boost_wave
-boost_filesystem
-boost_atomic
-boost_wserialization
-boost_serialization
+libboost_contract
+libboost_coroutine
+libboost_fiber_numa
+libboost_fiber
+libboost_context
+libboost_graph
+libboost_iostreams
+libboost_json
+libboost_locale
+libboost_log_setup
+libboost_log
+libboost_math_c99
+libboost_math_c99f
+libboost_math_c99l
+libboost_math_tr1
+libboost_math_tr1f
+libboost_math_tr1l
+libboost_nowide
+libboost_program_options
+libboost_random
+libboost_regex
+libboost_stacktrace_noop
+libboost_stacktrace_windbg
+libboost_stacktrace_windbg_cached
+libboost_timer
+libboost_type_erasure
+libboost_thread
+libboost_chrono
+libboost_container
+libboost_date_time
+libboost_unit_test_framework
+libboost_prg_exec_monitor
+libboost_test_exec_monitor
+libboost_exception
+libboost_wave
+libboost_filesystem
+libboost_atomic
+libboost_wserialization
+libboost_serialization
 CCfits
 bz2
-backtrace
 cfitsio
-z
+zlib
 
 [system_libs]
-dl
-rt
-pthread
-m
+ole32
+dbgeng
+bcrypt
 
 [defines]
-BOOST_STACKTRACE_ADDR2LINE_LOCATION="/usr/bin/addr2line"
-BOOST_STACKTRACE_USE_ADDR2LINE
-BOOST_STACKTRACE_USE_BACKTRACE
 BOOST_STACKTRACE_USE_NOOP
+BOOST_STACKTRACE_USE_WINDBG
+BOOST_STACKTRACE_USE_WINDBG_CACHED
+BOOST_ALL_NO_LIB
 
 [cppflags]
 
@@ -120,10 +114,10 @@ BOOST_STACKTRACE_USE_NOOP
 
 
 [includedirs_fmt]
-/home/alm818/conan/fmt/8.0.1/_/_/package/30a9781670e6fb2f17b8355b17a15cf916045317/include
+C:/Users/xuana/.conan/data/fmt/8.0.1/_/_/package/2be90237c5e294c2f30bf6b043d047624b893db3/include
 
 [libdirs_fmt]
-/home/alm818/conan/fmt/8.0.1/_/_/package/30a9781670e6fb2f17b8355b17a15cf916045317/lib
+C:/Users/xuana/.conan/data/fmt/8.0.1/_/_/package/2be90237c5e294c2f30bf6b043d047624b893db3/lib
 
 [bindirs_fmt]
 
@@ -132,7 +126,7 @@ BOOST_STACKTRACE_USE_NOOP
 
 
 [builddirs_fmt]
-/home/alm818/conan/fmt/8.0.1/_/_/package/30a9781670e6fb2f17b8355b17a15cf916045317/
+C:/Users/xuana/.conan/data/fmt/8.0.1/_/_/package/2be90237c5e294c2f30bf6b043d047624b893db3/
 
 [libs_fmt]
 fmt
@@ -168,7 +162,7 @@ fmt
 
 
 [rootpath_fmt]
-/home/alm818/conan/fmt/8.0.1/_/_/package/30a9781670e6fb2f17b8355b17a15cf916045317
+C:/Users/xuana/.conan/data/fmt/8.0.1/_/_/package/2be90237c5e294c2f30bf6b043d047624b893db3
 
 [name_fmt]
 fmt
@@ -186,7 +180,7 @@ pkg_config=fmt
 
 
 [includedirs_eigen]
-/home/alm818/conan/eigen/3.4.0/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/include/eigen3
+C:/Users/xuana/.conan/data/eigen/3.4.0/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/include/eigen3
 
 [libdirs_eigen]
 
@@ -198,13 +192,13 @@ pkg_config=fmt
 
 
 [builddirs_eigen]
-/home/alm818/conan/eigen/3.4.0/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/
+C:/Users/xuana/.conan/data/eigen/3.4.0/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/
 
 [libs_eigen]
 
 
 [system_libs_eigen]
-m
+
 
 [defines_eigen]
 
@@ -234,7 +228,7 @@ m
 
 
 [rootpath_eigen]
-/home/alm818/conan/eigen/3.4.0/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9
+C:/Users/xuana/.conan/data/eigen/3.4.0/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9
 
 [name_eigen]
 eigen
@@ -252,10 +246,10 @@ pkg_config=eigen3
 
 
 [includedirs_boost]
-/home/alm818/conan/boost/1.77.0/_/_/package/adf48b8e4446dcb68f440fe42ff08878d5c7feed/include
+C:/.conan/aa76de/1/include
 
 [libdirs_boost]
-/home/alm818/conan/boost/1.77.0/_/_/package/adf48b8e4446dcb68f440fe42ff08878d5c7feed/lib
+C:/.conan/aa76de/1/lib
 
 [bindirs_boost]
 
@@ -264,60 +258,59 @@ pkg_config=eigen3
 
 
 [builddirs_boost]
-/home/alm818/conan/boost/1.77.0/_/_/package/adf48b8e4446dcb68f440fe42ff08878d5c7feed/
+C:/.conan/aa76de/1/
 
 [libs_boost]
-boost_contract
-boost_coroutine
-boost_fiber_numa
-boost_fiber
-boost_context
-boost_graph
-boost_iostreams
-boost_json
-boost_locale
-boost_log_setup
-boost_log
-boost_math_c99
-boost_math_c99f
-boost_math_c99l
-boost_math_tr1
-boost_math_tr1f
-boost_math_tr1l
-boost_nowide
-boost_program_options
-boost_random
-boost_regex
-boost_stacktrace_addr2line
-boost_stacktrace_backtrace
-boost_stacktrace_basic
-boost_stacktrace_noop
-boost_timer
-boost_type_erasure
-boost_thread
-boost_chrono
-boost_container
-boost_date_time
-boost_unit_test_framework
-boost_prg_exec_monitor
-boost_test_exec_monitor
-boost_exception
-boost_wave
-boost_filesystem
-boost_atomic
-boost_wserialization
-boost_serialization
+libboost_contract
+libboost_coroutine
+libboost_fiber_numa
+libboost_fiber
+libboost_context
+libboost_graph
+libboost_iostreams
+libboost_json
+libboost_locale
+libboost_log_setup
+libboost_log
+libboost_math_c99
+libboost_math_c99f
+libboost_math_c99l
+libboost_math_tr1
+libboost_math_tr1f
+libboost_math_tr1l
+libboost_nowide
+libboost_program_options
+libboost_random
+libboost_regex
+libboost_stacktrace_noop
+libboost_stacktrace_windbg
+libboost_stacktrace_windbg_cached
+libboost_timer
+libboost_type_erasure
+libboost_thread
+libboost_chrono
+libboost_container
+libboost_date_time
+libboost_unit_test_framework
+libboost_prg_exec_monitor
+libboost_test_exec_monitor
+libboost_exception
+libboost_wave
+libboost_filesystem
+libboost_atomic
+libboost_wserialization
+libboost_serialization
 
 [system_libs_boost]
-dl
-rt
-pthread
+ole32
+dbgeng
+bcrypt
 
 [defines_boost]
-BOOST_STACKTRACE_ADDR2LINE_LOCATION="/usr/bin/addr2line"
-BOOST_STACKTRACE_USE_ADDR2LINE
-BOOST_STACKTRACE_USE_BACKTRACE
 BOOST_STACKTRACE_USE_NOOP
+BOOST_STACKTRACE_USE_WINDBG
+BOOST_STACKTRACE_USE_WINDBG_CACHED
+BOOST_ALL_NO_LIB
 
 [cppflags_boost]
 
@@ -344,7 +337,7 @@ BOOST_STACKTRACE_USE_NOOP
 
 
 [rootpath_boost]
-/home/alm818/conan/boost/1.77.0/_/_/package/adf48b8e4446dcb68f440fe42ff08878d5c7feed
+C:/.conan/aa76de/1
 
 [name_boost]
 boost
@@ -362,10 +355,10 @@ cmake_find_package_multi=Boost
 
 
 [includedirs_ccfits]
-/home/alm818/conan/ccfits/2.6/_/_/package/6092f179cf2ff7a710089a30e907ff9685c1f839/include
+C:/Users/xuana/.conan/data/ccfits/2.6/_/_/package/2240fa56643d33176b0c23292cf3312b768ee50c/include
 
 [libdirs_ccfits]
-/home/alm818/conan/ccfits/2.6/_/_/package/6092f179cf2ff7a710089a30e907ff9685c1f839/lib
+C:/Users/xuana/.conan/data/ccfits/2.6/_/_/package/2240fa56643d33176b0c23292cf3312b768ee50c/lib
 
 [bindirs_ccfits]
 
@@ -374,7 +367,7 @@ cmake_find_package_multi=Boost
 
 
 [builddirs_ccfits]
-/home/alm818/conan/ccfits/2.6/_/_/package/6092f179cf2ff7a710089a30e907ff9685c1f839/
+C:/Users/xuana/.conan/data/ccfits/2.6/_/_/package/2240fa56643d33176b0c23292cf3312b768ee50c/
 
 [libs_ccfits]
 CCfits
@@ -410,7 +403,7 @@ CCfits
 
 
 [rootpath_ccfits]
-/home/alm818/conan/ccfits/2.6/_/_/package/6092f179cf2ff7a710089a30e907ff9685c1f839
+C:/Users/xuana/.conan/data/ccfits/2.6/_/_/package/2240fa56643d33176b0c23292cf3312b768ee50c
 
 [name_ccfits]
 ccfits
@@ -426,20 +419,20 @@ pkg_config=CCfits
 
 
 [includedirs_bzip2]
-/home/alm818/conan/bzip2/1.0.8/_/_/package/da606cf731e334010b0bf6e85a2a6f891b9f36b0/include
+C:/Users/xuana/.conan/data/bzip2/1.0.8/_/_/package/d16a91eadaaf5829b928b12d2f836ff7680d3df5/include
 
 [libdirs_bzip2]
-/home/alm818/conan/bzip2/1.0.8/_/_/package/da606cf731e334010b0bf6e85a2a6f891b9f36b0/lib
+C:/Users/xuana/.conan/data/bzip2/1.0.8/_/_/package/d16a91eadaaf5829b928b12d2f836ff7680d3df5/lib
 
 [bindirs_bzip2]
-/home/alm818/conan/bzip2/1.0.8/_/_/package/da606cf731e334010b0bf6e85a2a6f891b9f36b0/bin
+C:/Users/xuana/.conan/data/bzip2/1.0.8/_/_/package/d16a91eadaaf5829b928b12d2f836ff7680d3df5/bin
 
 [resdirs_bzip2]
 
 
 [builddirs_bzip2]
-/home/alm818/conan/bzip2/1.0.8/_/_/package/da606cf731e334010b0bf6e85a2a6f891b9f36b0/
-/home/alm818/conan/bzip2/1.0.8/_/_/package/da606cf731e334010b0bf6e85a2a6f891b9f36b0/lib/cmake
+C:/Users/xuana/.conan/data/bzip2/1.0.8/_/_/package/d16a91eadaaf5829b928b12d2f836ff7680d3df5/
+C:/Users/xuana/.conan/data/bzip2/1.0.8/_/_/package/d16a91eadaaf5829b928b12d2f836ff7680d3df5/lib/cmake
 
 [libs_bzip2]
 bz2
@@ -475,7 +468,7 @@ bz2
 
 
 [rootpath_bzip2]
-/home/alm818/conan/bzip2/1.0.8/_/_/package/da606cf731e334010b0bf6e85a2a6f891b9f36b0
+C:/Users/xuana/.conan/data/bzip2/1.0.8/_/_/package/d16a91eadaaf5829b928b12d2f836ff7680d3df5
 
 [name_bzip2]
 bzip2
@@ -491,75 +484,11 @@ cmake_find_package_multi=BZip2
 
 
 
-[includedirs_libbacktrace]
-/home/alm818/conan/libbacktrace/cci.20210118/_/_/package/6af9cc7cb931c5ad942174fd7838eb655717c709/include
-
-[libdirs_libbacktrace]
-/home/alm818/conan/libbacktrace/cci.20210118/_/_/package/6af9cc7cb931c5ad942174fd7838eb655717c709/lib
-
-[bindirs_libbacktrace]
-
-
-[resdirs_libbacktrace]
-
-
-[builddirs_libbacktrace]
-/home/alm818/conan/libbacktrace/cci.20210118/_/_/package/6af9cc7cb931c5ad942174fd7838eb655717c709/
-
-[libs_libbacktrace]
-backtrace
-
-[system_libs_libbacktrace]
-
-
-[defines_libbacktrace]
-
-
-[cppflags_libbacktrace]
-
-
-[cxxflags_libbacktrace]
-
-
-[cflags_libbacktrace]
-
-
-[sharedlinkflags_libbacktrace]
-
-
-[exelinkflags_libbacktrace]
-
-
-[sysroot_libbacktrace]
-
-
-[frameworks_libbacktrace]
-
-
-[frameworkdirs_libbacktrace]
-
-
-[rootpath_libbacktrace]
-/home/alm818/conan/libbacktrace/cci.20210118/_/_/package/6af9cc7cb931c5ad942174fd7838eb655717c709
-
-[name_libbacktrace]
-libbacktrace
-
-[version_libbacktrace]
-cci.20210118
-
-[generatornames_libbacktrace]
-
-
-[generatorfilenames_libbacktrace]
-
-
-
 [includedirs_cfitsio]
-/home/alm818/conan/cfitsio/3.490/_/_/package/f99afdbf2a1cc98ba2029817b35103455b6a9b77/include
+C:/Users/xuana/.conan/data/cfitsio/3.490/_/_/package/d140711d95cc16a85766a8fc3a551dfafe84cf63/include
 
 [libdirs_cfitsio]
-/home/alm818/conan/cfitsio/3.490/_/_/package/f99afdbf2a1cc98ba2029817b35103455b6a9b77/lib
+C:/Users/xuana/.conan/data/cfitsio/3.490/_/_/package/d140711d95cc16a85766a8fc3a551dfafe84cf63/lib
 
 [bindirs_cfitsio]
 
@@ -568,13 +497,13 @@ cci.20210118
 
 
 [builddirs_cfitsio]
-/home/alm818/conan/cfitsio/3.490/_/_/package/f99afdbf2a1cc98ba2029817b35103455b6a9b77/
+C:/Users/xuana/.conan/data/cfitsio/3.490/_/_/package/d140711d95cc16a85766a8fc3a551dfafe84cf63/
 
 [libs_cfitsio]
 cfitsio
 
 [system_libs_cfitsio]
-m
+
 
 [defines_cfitsio]
 
@@ -604,7 +533,7 @@ m
 
 
 [rootpath_cfitsio]
-/home/alm818/conan/cfitsio/3.490/_/_/package/f99afdbf2a1cc98ba2029817b35103455b6a9b77
+C:/Users/xuana/.conan/data/cfitsio/3.490/_/_/package/d140711d95cc16a85766a8fc3a551dfafe84cf63
 
 [name_cfitsio]
 cfitsio
@@ -620,10 +549,10 @@ pkg_config=cfitsio
 
 
 [includedirs_zlib]
-/home/alm818/conan/zlib/1.2.11/_/_/package/6af9cc7cb931c5ad942174fd7838eb655717c709/include
+C:/Users/xuana/.conan/data/zlib/1.2.11/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/include
 
 [libdirs_zlib]
-/home/alm818/conan/zlib/1.2.11/_/_/package/6af9cc7cb931c5ad942174fd7838eb655717c709/lib
+C:/Users/xuana/.conan/data/zlib/1.2.11/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/lib
 
 [bindirs_zlib]
 
@@ -632,10 +561,10 @@ pkg_config=cfitsio
 
 
 [builddirs_zlib]
-/home/alm818/conan/zlib/1.2.11/_/_/package/6af9cc7cb931c5ad942174fd7838eb655717c709/
+C:/Users/xuana/.conan/data/zlib/1.2.11/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/
 
 [libs_zlib]
-z
+zlib
 
 [system_libs_zlib]
 
@@ -668,7 +597,7 @@ z
 
 
 [rootpath_zlib]
-/home/alm818/conan/zlib/1.2.11/_/_/package/6af9cc7cb931c5ad942174fd7838eb655717c709
+C:/Users/xuana/.conan/data/zlib/1.2.11/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab
 
 [name_zlib]
 zlib
@@ -685,21 +614,19 @@ cmake_find_package_multi=ZLIB
 
 
 [USER_boost]
-stacktrace_addr2line_available=True
+stacktrace_addr2line_available=False
 [USER_bzip2]
 [USER_ccfits]
 [USER_cfitsio]
 [USER_eigen]
 [USER_fmt]
-[USER_libbacktrace]
 [USER_zlib]
 [ENV_fmt]
 [ENV_eigen]
 [ENV_boost]
-BOOST_ROOT=/home/alm818/conan/boost/1.77.0/_/_/package/adf48b8e4446dcb68f440fe42ff08878d5c7feed
+BOOST_ROOT=C:\.conan\aa76de\1
 [ENV_ccfits]
 [ENV_bzip2]
-PATH=["/home/alm818/conan/bzip2/1.0.8/_/_/package/da606cf731e334010b0bf6e85a2a6f891b9f36b0/bin"]
-[ENV_libbacktrace]
+PATH=["C:\Users\xuana\.conan\data\bzip2\1.0.8\_\_\package\d16a91eadaaf5829b928b12d2f836ff7680d3df5\bin"]
 [ENV_cfitsio]
 [ENV_zlib]

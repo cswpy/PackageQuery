@@ -1,10 +1,6 @@
 {
  "options": [
   [
-   "boost:addr2line_location",
-   "/usr/bin/addr2line"
-  ],
-  [
    "boost:asio_no_deprecated",
    "False"
   ],
@@ -33,10 +29,6 @@
    "None"
   ],
   [
-   "boost:fPIC",
-   "True"
-  ],
-  [
    "boost:filesystem_no_deprecated",
    "False"
   ],
@@ -50,7 +42,7 @@
   ],
   [
    "boost:i18n_backend_iconv",
-   "libc"
+   "off"
   ],
   [
    "boost:i18n_backend_icu",
@@ -111,10 +103,6 @@
   [
    "boost:visibility",
    "hidden"
-  ],
-  [
-   "boost:with_stacktrace_backtrace",
-   "True"
   ],
   [
    "boost:without_atomic",
@@ -253,24 +241,12 @@
    "True"
   ],
   [
-   "bzip2:fPIC",
-   "True"
-  ],
-  [
    "bzip2:shared",
    "False"
   ],
   [
-   "ccfits:fPIC",
-   "True"
-  ],
-  [
    "ccfits:shared",
    "False"
-  ],
-  [
-   "cfitsio:fPIC",
-   "True"
   ],
   [
    "cfitsio:shared",
@@ -285,20 +261,8 @@
    "False"
   ],
   [
-   "cfitsio:with_bzip2",
-   "False"
-  ],
-  [
-   "cfitsio:with_curl",
-   "False"
-  ],
-  [
    "eigen:MPL2_only",
    "False"
-  ],
-  [
-   "fmt:fPIC",
-   "True"
   ],
   [
    "fmt:header_only",
@@ -314,18 +278,6 @@
   ],
   [
    "fmt:with_os_api",
-   "True"
-  ],
-  [
-   "libbacktrace:fPIC",
-   "True"
-  ],
-  [
-   "libbacktrace:shared",
-   "False"
-  ],
-  [
-   "zlib:fPIC",
    "True"
   ],
   [
