@@ -41,10 +41,11 @@ double getSlope(const VectorXd& u, const VectorXd& l, const VectorXd& bu, const 
 
 // All slopes are non-negative
 // We want to keep k smallest scores such that the sum is at least max_slope
-void pushHeap(const VectorXd& u, const VectorXd& l, const VectorXd& bu, const VectorXd& bl, const VectorXd& alpha_r, const VectorXd& d, pair<double, int>* heap, int &sz, double& sum_slope, double max_slope, int i){
+void pushHeap(const VectorXd& u, const VectorXd& l, const VectorXd& bu, const VectorXd& bl, const VectorXd& alpha_r, const VectorXd& d, pair<double, int>* heap, int& sz, double& sum_slope, double max_slope, int i){
   double score = d(i) / alpha_r(i);
   double current_slope = getSlope(u, l, bu, bl, alpha_r, i);
   if (sum_slope <= max_slope){
+    //cout << "PURE ADD1 " << score << " " << i << endl;
     heap[sz] = {score, i};
     sz ++;
     push_heap(heap, heap+sz);
@@ -56,13 +57,15 @@ void pushHeap(const VectorXd& u, const VectorXd& l, const VectorXd& bu, const Ve
       double replaced_slope = getSlope(u, l, bu, bl, alpha_r, heap[0].second);
       double next_sum_slope = sum_slope - replaced_slope + current_slope;
       if (next_sum_slope < max_slope){
+        //cout << "PURE ADD2 " << score << " " << i << endl;
         heap[sz] = {score, i};
         sz ++;
         push_heap(heap, heap+sz);
         sum_slope += current_slope;
       } else{
+        //cout << "REPLACEMENT " << score << " " << i << " " << heap[0].first << " " << heap[0].second << endl;
         pop_heap(heap, heap+sz);
-        heap[sz] = {score, i};
+        heap[sz-1] = {score, i};
         push_heap(heap, heap+sz);
         sum_slope = next_sum_slope;
       }
@@ -75,33 +78,30 @@ Dual::~Dual(){
 
 // Maximizing cc 
 // Dual minimizing c
-Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bbu,  const VectorXd& cc, const VectorXd& ll, const VectorXd& uu){
-  vector<string> names = {"Copy", "RestInit", "BoundStricten", "InitXBound", "Compute XB", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"};
-  Profiler pro = Profiler(names);
+Dual::Dual(int core, const MatrixXd& A, const VectorXd& bbl, const VectorXd& bbu,  const VectorXd& c, const VectorXd& l, const VectorXd& u){
+  // vector<string> names = {"Copy", "RestInit", "BoundStricten", "InitXBound", "Compute XB", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18"};
+  // Profiler pro = Profiler(names);
   chrono::high_resolution_clock::time_point start;
   start = chrono::high_resolution_clock::now();
+
   status = LS_NOT_FOUND;
   iteration_count = 0;
+  mini_iteration_count = 0;
   score = 0;
 
-  n = cc.size();
+  n = c.size();
   m = bbl.size();
 
-  pro.clock(0);
-  MatrixXd A = -AA;
+  // pro.clock(0);
   VectorXd bl = bbl;
   VectorXd bu = bbu;
-  VectorXd c = -cc;
-  VectorXd u = uu;
-  VectorXd l = ll;
-  pro.stop(0);
-  pro.clock(1);
+  // pro.stop(0);
+  // pro.clock(1);
   // Norm square steepest edges
   VectorXd beta (m); beta.fill(1);
 
   // Reduced cost
   VectorXd d (n+m); d.fill(0); 
-  d(seqN(0, n)) = c;
 
   // Basis indices
   bhead.resize(m);
@@ -159,11 +159,11 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
   // cout << "d" << endl;
   // print(d);
 
-  pro.stop(1);
+  // pro.stop(1);
   #pragma omp parallel num_threads(core)
   {
     // Phase-1 Dual
-    pro.clock(2);
+    // pro.clock(2);
     // Stricten bound
     #pragma omp master
     {
@@ -178,8 +178,8 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
         double local_bound = 0;
         #pragma omp for nowait
         for (int j = 0; j < n; j ++){
-          if (AA(i, j) > 0) local_bound += ll(j) * AA(i, j);
-          else local_bound += uu(j) * AA(i, j);
+          if (A(i, j) > 0) local_bound += l(j) * A(i, j);
+          else local_bound += u(j) * A(i, j);
         }
         #pragma omp atomic
         bl(i) += local_bound;
@@ -188,23 +188,24 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
         double local_bound = 0;
         #pragma omp for nowait
         for (int j = 0; j < n; j ++){
-          if (AA(i, j) > 0) local_bound += uu(j) * AA(i, j);
-          else local_bound += ll(j) * AA(i, j);
+          if (A(i, j) > 0) local_bound += u(j) * A(i, j);
+          else local_bound += l(j) * A(i, j);
         }
         #pragma omp atomic
         bu(i) += local_bound;
       }
     }
-    pro.stop(2);
+    // pro.stop(2);
     // Initialize x
-    pro.clock(3);
+    // pro.clock(3);
     #pragma omp for nowait
     for (int i = 0; i < n; i ++){
-      if (d(i) < 0) x(i) = u(i);
+      d(i) = -c(i);
+      if (c(i) > 0) x(i) = u(i);
       else x(i) = l(i);
     }
-    pro.stop(3);
-    pro.clock(4);
+    // pro.stop(3);
+    // pro.clock(4);
     #pragma omp barrier
     for (int i = 0; i < m; i ++){
       double local_anxn = 0;
@@ -213,9 +214,9 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
         local_anxn += A(i, j) * x(j);
       }
       #pragma omp atomic
-      x(i+n) -= local_anxn;
+      x(i+n) += local_anxn;
     }
-    pro.stop(4);
+    // pro.stop(4);
   }
 
   // Phase-2 Dual
@@ -223,15 +224,15 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
     #pragma omp parallel num_threads(core)
     {
       // Pricing
-      pro.clock(5);
+      // pro.clock(5);
       #pragma omp master
       {
         r = -1;
         double max_dse = -DBL_MAX;
         double delta = 0;
 
-        cout << "BASIS" << endl;
-        print(bhead);
+        // cout << "BASIS" << endl;
+        // print(bhead);
         // cout << "X" << endl;
         // print(x);
         // cout << "BOUNDS" << endl;
@@ -240,7 +241,8 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
         // cout << "SLACK BOUNDS" << endl;
         // print(bl);
         // print(bu);
-        // cout << "END" << endl;
+        // cout << "BETA" << endl;
+        // print(beta);
 
         for (int i = 0; i < m; i ++){
           if (bhead(i) < n){
@@ -271,24 +273,24 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
           rho_r = Binv.row(r);
         }
       }
-      pro.stop(5);
+      // pro.stop(5);
       #pragma omp barrier
       if (status != LS_FOUND){
-        pro.clock(6);
+        // pro.clock(6);
         // Pivot row
-        #pragma omp for
+        #pragma omp for nowait
         for (int i = 0; i < n+m; i ++){
           double val = 0;
           if (i < n){
             for (int j = 0; j < m; j ++) 
-              val += A(j, i) * rho_r(j);
+              val -= A(j, i) * rho_r(j);
           } else{
             val += rho_r(i-n);
           }
           alpha_r(i) = val * sign_max_delta;
         }
-        pro.stop(6);
-        pro.clock(7);
+        // pro.stop(6);
+        // pro.clock(7);
         // Initialize Ratio test
         #pragma omp master
         {
@@ -321,8 +323,8 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
             local_init_start = init_size;
             init_size += local_init_size;
           }
-          pro.stop(7);
-          pro.clock(8);
+          // pro.stop(7);
+          // pro.clock(8);
           #pragma omp barrier
           #pragma omp master
           {
@@ -333,10 +335,13 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
             int j = local_init[i-local_init_start];
             init[i] = {d(j)/alpha_r(j), j};
           }
-          pro.stop(8);
+          // pro.stop(8);
         } else{
           double sum_slope = 0;
           pair<double, int>* local_init = new pair<double, int>[(n+m)/core+1];
+
+          // cout << "MAX SLOPE: " << fabs(max_delta) << endl;
+
           #pragma omp for nowait
           for (int i = 0; i < n+m; i ++){
             if (!inv_bhead[i]){
@@ -344,10 +349,20 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
               if (i < n){
                 if ((isGreater(alpha_r(i), 0) && isEqual(x(i), l(i))) || (isLess(alpha_r(i), 0) && isEqual(x(i), u(i)))){
                   pushHeap(u, l, bu, bl, alpha_r, d, local_init, local_init_size, sum_slope, fabs(max_delta), i);
+                  // cout << "Adding " << i << " " << sum_slope << " " << local_init_size << endl;
+                  // for (int i = 0; i < local_init_size; i ++){
+                  //   cout << local_init[i].first << "," << local_init[i].second << "," << getSlope(u, l, bu, bl, alpha_r, i) << " ";
+                  // }
+                  // cout << endl;
                 }
               } else{
                 if ((isGreater(alpha_r(i), 0) && isEqual(x(i), bl(i-n))) || (isLess(alpha_r(i), 0) && isEqual(x(i), bu(i-n)))){
                   pushHeap(u, l, bu, bl, alpha_r, d, local_init, local_init_size, sum_slope, fabs(max_delta), i);
+                  // cout << "Adding " << i << " " << sum_slope << " " << local_init_size << endl;
+                  // for (int i = 0; i < local_init_size; i ++){
+                  //   cout << local_init[i].first << "," << local_init[i].second << "," << getSlope(u, l, bu, bl, alpha_r, i) << " ";
+                  // }
+                  // cout << endl;
                 }
               }
             }
@@ -357,8 +372,8 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
             local_init_start = init_size;
             init_size += local_init_size;
           }
-          pro.stop(7);
-          pro.clock(8);
+          // pro.stop(7);
+          // pro.clock(8);
           #pragma omp barrier
           #pragma omp master
           {
@@ -369,12 +384,12 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
             init[i] = local_init[i - local_init_start];
           }
           delete[] local_init;
-          pro.stop(8);
+          // pro.stop(8);
         }
       } else{
         double local_score = 0;
         #pragma omp for nowait
-        for (int i = 0; i < n; i ++) local_score += x(i) * cc(i);
+        for (int i = 0; i < n; i ++) local_score += x(i) * c(i);
         #pragma omp atomic
         score += local_score;
       }
@@ -382,14 +397,14 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
     if (status != LS_FOUND){
       // Ratio test using Algorithm 4 combining Algorithm 5
       // cout << "A " << iteration_count << " " << init_size << endl;
-      pro.clock(9, false);
+      // pro.clock(9, false);
       map_sort::Sort(init, init_size, core);
-      pro.stop(9, false);
+      // pro.stop(9, false);
       slope_partition.fill(init_size);
       slope_sums.resize(init_size);
       #pragma omp parallel num_threads(core)
       {
-        pro.clock(10);
+        // pro.clock(10);
         double sum_slope = 0;
         bool is_first = false;
         #pragma omp for
@@ -416,8 +431,8 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
           slope_sums(i) += slope_sums_parition(thread_num);
         }
         #pragma omp barrier
-        pro.stop(10);
-        pro.clock(11);
+        // pro.stop(10);
+        // pro.clock(11);
         #pragma omp master
         {
           // cout << "ALPHA_R" << endl;
@@ -431,13 +446,29 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
           } else{
             q_index = upper_bound(slope_sums.begin(), slope_sums.end(), fabs(max_delta)) - slope_sums.begin();
             q = init[q_index].second;
-            if (q_index > 0) max_delta = sign_max_delta * (fabs(max_delta) - slope_sums(q_index-1));
+
+            // cout << "SCORE" << endl;
+            // for (int i = 0; i < init_size; i ++) cout << init[i].first << " " << init[i].second << endl;
+
+            // cout << "PRE_MAX_DELTA " << max_delta << endl;
+
+            if (q_index > 0){
+              mini_iteration_count += q_index - 1;
+              max_delta = sign_max_delta * (fabs(max_delta) - slope_sums(q_index-1));
+            }
             dual_step = d(q) / alpha_r(q) * sign_max_delta;
             d(p) = -dual_step;
             tilde_a.fill(0);
 
+            // cout << "AFT_MAX_DELTA " << max_delta << endl;
+
+            // cout << "Q" << endl;
+            // cout << q_index << " " << q << endl;
+            // cout << "SLOPE SUMS" << endl;
+            // print(slope_sums);
+
             // FTran
-            if (q < n) alpha_q = Binv * A.col(q);
+            if (q < n) alpha_q = -Binv * A.col(q);
             else alpha_q = Binv.col(q-n);
 
             // DSE FTran
@@ -445,10 +476,10 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
           }
           // cout << "C1 " << iteration_count << " " << init_size << endl;
         }
-        pro.stop(11);
+        // pro.stop(11);
         #pragma omp barrier
         if (status != LS_DUAL_UNBOUNDED){
-          pro.clock(12);
+          // pro.clock(12);
           // Update d
           #pragma omp for nowait
           for (int i = 0; i < n+m; i ++){
@@ -457,8 +488,8 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
               d(i) -= dual_step * alpha_r(i) * sign_max_delta;
             }
           }
-          pro.stop(12);
-          pro.clock(13);
+          // pro.stop(12);
+          // pro.clock(13);
           // Update tilde_a
           VectorXd local_tilde_a (m); local_tilde_a.fill(0);
           #pragma omp for nowait
@@ -466,10 +497,10 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
             int j = init[i].second;
             if (j < n){
               if (isEqual(x(j), l(j))){
-                local_tilde_a += (u(j) - l(j)) * A.col(j);
+                local_tilde_a += (l(j) - u(j)) * A.col(j);
                 x(j) = u(j);
               } else{
-                local_tilde_a += (l(j) - u(j)) * A.col(j);
+                local_tilde_a += (u(j) - l(j)) * A.col(j);
                 x(j) = l(j);
               }
             } else{
@@ -488,8 +519,8 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
             tilde_a(i) += local_tilde_a(i);
           }
           #pragma omp barrier
-          pro.stop(13);
-          pro.clock(14);
+          // pro.stop(13);
+          // pro.clock(14);
           #pragma omp master
           {
             // cout << "D " << iteration_count << " " << init_size << endl;
@@ -499,10 +530,20 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
               x(bhead(i)) -= delta_xB(i);
             }
 
+            // cout << "BINV" << endl;
+            // cout << Binv << endl;
+            // cout << "TILDE_A" << endl;
+            // print(tilde_a);
+            // cout << "AFT TILDE_A" << endl;
+            // print(x);
+
             // Update primal solution
             primal_step = max_delta / alpha_q(r);
             for (int i = 0; i < m; i ++) x(bhead(i)) -= primal_step * alpha_q(i);
             x(q) += primal_step;
+
+            // cout << "AFT PRIMAL" << endl;
+            // print(x);
 
             // Update edge norm beta
             for (int i = 0; i < m; i ++){
@@ -530,12 +571,12 @@ Dual::Dual(int core, const MatrixXd& AA, const VectorXd& bbl, const VectorXd& bb
             // Iteration count for pivot
             iteration_count ++;
           }
-          pro.stop(14);
+          // pro.stop(14);
         }
       }
       if (status == LS_DUAL_UNBOUNDED) break;
     } else break;
   }
-  pro.print();
+  // pro.print();
   exe_solve = chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - start).count() / 1000000.0;
 }

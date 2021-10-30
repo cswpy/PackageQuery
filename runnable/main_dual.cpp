@@ -27,20 +27,21 @@
 using namespace std;
 using namespace Eigen;
 
-void generateBoundedProlem(int expected_n, double outlier_prob, int n, MatrixXd& A, VectorXd& bl, VectorXd& bu, VectorXd& c){
+void generateBoundedProlem(int expected_n, double outlier_prob, double att_var, int n, MatrixXd& A, VectorXd& bl, VectorXd& bu, VectorXd& c){
   A.resize(4, n); bl.resize(4); bu.resize(4); c.resize(n); 
   default_random_engine gen {static_cast<long unsigned int>(time(0))};
-  uniform_real_distribution u_dist(0.0, 1.0);
+  // uniform_real_distribution u_dist(0.0, 1.0);
+  normal_distribution att_dist(0.0, att_var);
   int expected_numvar = expected_n;
-  double mean = 0.5*expected_numvar;
-  double var = 1.0/12*expected_numvar;
-  normal_distribution n_dist(mean, var);
+  double mean = 0;
+  double var = att_var*expected_numvar;
+  normal_distribution n_dist(0.0, var);
   normal_distribution n_dist_c(0.0, 200.0);
   #pragma omp parallel for num_threads(CORE_COUNT)
   for (int i = 0; i < n; i ++){
-    A(0, i) = u_dist(gen);
-    A(1, i) = u_dist(gen);
-    A(2, i) = u_dist(gen);
+    A(0, i) = att_dist(gen);
+    A(1, i) = att_dist(gen);
+    A(2, i) = att_dist(gen);
     A(3, i) = 1;
     c(i) = n_dist_c(gen);
   }
@@ -108,10 +109,10 @@ void testL3Cache(){
 }
 
 void quickRun(){
-  int n = 10;
+  int n = 10000000;
   MatrixXd A;
   VectorXd bl, bu, c;
-  generateBoundedProlem(3, 0.8, n, A, bl, bu, c);
+  generateBoundedProlem(10, 0.8, 3.0, n, A, bl, bu, c);
   VectorXd u (n); u.fill(1);
   VectorXd l (n); l.fill(0);
 
@@ -128,20 +129,20 @@ void quickRun(){
 
   Dual dual = Dual(16, A, bl, bu, c, l, u);
   cout << solMessage(dual.status) << endl;
-  cout << dual.exe_solve << " " << dual.iteration_count << endl;
+  cout << dual.exe_solve << " " << dual.iteration_count << " " << dual.mini_iteration_count << endl;
   cout << dual.score << endl;
 
-  // GurobiSolver gs = GurobiSolver(A, bl, bu, c, l, u);
-  // gs.solveRelaxed();
-  // cout << gs.exe_relaxed << " " << gs.iteration_count << endl;
-  // cout << gs.relaxed_cscore << endl;
+  GurobiSolver gs = GurobiSolver(A, bl, bu, c, l, u);
+  gs.solveRelaxed();
+  cout << gs.exe_relaxed << " " << gs.iteration_count << endl;
+  cout << gs.relaxed_cscore << endl;
   // print(dual.x);
   // print(gs.r0);
-  // if (gs.relaxed_status == LS_FOUND && !isEqual(gs.relaxed_cscore, dual.score)){
-  //   for (int i = 0; i < n; i ++){
-  //     assert(isEqual(dual.x(i), gs.r0(i), 1e-6));
-  //   }
-  // }
+  if (gs.relaxed_status == LS_FOUND && !isEqual(gs.relaxed_cscore, dual.score, 1e-8)){
+    for (int i = 0; i < n; i ++){
+      assert(isEqual(dual.x(i), gs.r0(i), 1e-6));
+    }
+  }
 }
 
 void mapSort(){
@@ -171,7 +172,32 @@ void mapSort(){
   pro.print();
 }
 
+void testCopy(){
+  default_random_engine gen {static_cast<long unsigned int>(time(0))};
+  uniform_real_distribution u_dist(0.0, 1.0);
+  vector<string> names = {"1", "2", "3", "4", "5"};
+  Profiler pro = Profiler(names);
+  int N = 10000000;
+  MatrixXd A (6, N); 
+  for (int i = 0; i < 6; i ++){
+    #pragma omp parallel for num_threads(16)
+    for (int j = 0; j < N; j ++){
+      A(i,j) = u_dist(gen);
+    }
+  }
+  pro.clock(0);
+  MatrixXd B = A;
+  pro.stop(0);
+  pro.clock(1);
+  MatrixXd BB (6, N);
+  memcpy(&BB(0,0), &A(0,0), 6*N);
+  pro.stop(1);
+  pro.print();
+}
+
 int main(){
   //mapSort();
+  //for (int i = 0; i < 10000; i ++) quickRun();
   quickRun();
+  //testCopy();
 }

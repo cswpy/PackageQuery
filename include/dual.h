@@ -6,7 +6,7 @@ using namespace Eigen;
 
 class Dual{
 public:
-  int n, m, iteration_count, status;
+  int n, m, iteration_count, mini_iteration_count, status;
   VectorXd x;
   VectorXi bhead;
   double exe_solve, score;
