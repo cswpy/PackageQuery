@@ -39,37 +39,51 @@ inline void ParallelPQ::heapify(int i){
 
 ParallelPQ::ParallelPQ(int core, vector<pair<double, int>>* arr): q(arr){
   n = q->size();
-  assert(n > 2);
-  int layer = 1;
-  while (n > 1){
-    n >>= 1;
-    layer <<= 1;
-  }
-  n = q->size();
-  int left = -1; 
-  int right = -1;
-  #pragma omp parallel num_threads(core)
-  {
-    while (layer > 1){
-      #pragma omp barrier
-      #pragma omp master
-      {
-        left = (layer >> 1) - 1;
-        right = layer - 1;
-        layer >>= 1;
-      }
-      #pragma omp barrier
-      #pragma omp for
-      for (int index = left; index < right; index ++){
-        heapify(index);
+  if (n <= 2 && n > 0){
+    if (n == 2){
+      if ((*q)[0] < (*q)[1]) swap((*q)[0], (*q)[1]);
+    }
+  } else if (n > 2){
+    int layer = 1;
+    while (n > 1){
+      n >>= 1;
+      layer <<= 1;
+    }
+    n = q->size();
+    int left = -1; 
+    int right = -1;
+    #pragma omp parallel num_threads(core)
+    {
+      while (layer > 1){
+        #pragma omp barrier
+        #pragma omp master
+        {
+          left = (layer >> 1) - 1;
+          right = layer - 1;
+          layer >>= 1;
+        }
+        #pragma omp barrier
+        #pragma omp for
+        for (int index = left; index < right; index ++){
+          heapify(index);
+        }
       }
     }
+    lazy = (*q)[0].first - max((*q)[1].first, (*q)[2].first);
   }
-  lazy = (*q)[0].first - max((*q)[1].first, (*q)[2].first);
 }
 
 pair<double,int> ParallelPQ::peak(){
-  return (*q)[0];
+  if (n > 0) return (*q)[0];
+  return {0,-1};
+}
+
+void ParallelPQ::pop(){
+  if (n > 0){
+    swap((*q)[0], (*q)[n-1]);
+    n --;
+    heapify(0);
+  }
 }
 
 void ParallelPQ::subtractPeak(double pos_val){
@@ -79,5 +93,9 @@ void ParallelPQ::subtractPeak(double pos_val){
     heapify(0);
     lazy = (*q)[0].first - max((*q)[1].first, (*q)[2].first);
   }
+}
+
+int ParallelPQ::size(){
+  return n;
 }
 

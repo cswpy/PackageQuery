@@ -31,7 +31,6 @@ Simplex::~Simplex(){
 void Simplex::pivot(int horizon, const VectorXd& u, int ent_col){
   #pragma omp master
   {
-    iteration_count ++;
     lea_row = -1;
     min_ratio = DBL_MAX;
     double col_obj = tableau[at(0, ent_col)];
@@ -96,6 +95,7 @@ void Simplex::pivot(int horizon, const VectorXd& u, int ent_col){
     // Pivot happening, entering variable ent_col, leaving variable lea_row
     #pragma omp master
     {
+      iteration_count ++;
       double col_obj = tableau[at(0, ent_col)];
       double step = min_ratio * sign(col_obj);
       tableau[at(1, ent_col)] -= step;
@@ -177,6 +177,18 @@ void Simplex::selectEnteringColumn(int horizon, const VectorXd& c, const VectorX
         local_ent_col = i;
       }
     }
+
+    // "Another"
+    // double sq_norm = 1;
+    // for (int j = 2; j <= m+1; j ++){
+    //   double val = tableau[at(j, i)];
+    //   sq_norm += val*val;
+    // }
+    // double cmp = abs(tableau[at(0, i)]) / sqrt(sq_norm);
+    // if (local_ent_value < cmp){
+    //   local_ent_value = cmp;
+    //   local_ent_col = i;
+    // }
   }
   #pragma omp critical
   {

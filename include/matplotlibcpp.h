@@ -3,6 +3,13 @@
 // Python headers must be included before any system headers, since
 // they define _POSIX_C_SOURCE
 #include <Python.h>
+// #ifdef _DEBUG
+//   #undef _DEBUG
+//   #include <Python.h>
+//   #define _DEBUG
+// #else
+//   #include <Python.h>
+// #endif
 
 #include <vector>
 #include <map>

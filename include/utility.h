@@ -31,11 +31,13 @@ constexpr int LS_FOUND = 1;
 constexpr int LS_INFEASIBLE = 2;
 constexpr int LS_UNBOUNDED = 3;
 constexpr int LS_FEASIBLE = 4;
+constexpr int LS_DUAL_UNBOUNDED = 5;
 
 constexpr bool kIgnoreDegenerate = true;
 constexpr bool kDoPresolve = false;
 
-const string kProjectHome = "/home/alm818/package_query";
+//const string kProjectHome = "/home/alm818/package_query";
+const string kProjectHome = "C:/Users/xuana/Desktop/VisualStudioCode/PackageQuery";
 
 bool isEqual(double x, double y, double eps=kFloatEps);
 bool isLess(double x, double y, double eps=kFloatEps);
@@ -115,3 +117,23 @@ public:
   GalaxyDB(int max_rows);
   void generateQuery(double percent, int c_att, vector<int> atts, int expected_sol_size, MatrixXd& A, VectorXd& b, VectorXd& c, VectorXd& u);
 };
+
+class Profiler{
+public:
+  int n;
+  VectorXd time;
+  VectorXi count;
+  vector<chrono::high_resolution_clock::time_point> eps;
+  vector<string> names;
+  Profiler(vector<string> names);
+  void clock(int i, bool is_parallel=true);
+  void stop(int i, bool is_parallel=true);
+  void print();
+};
+
+// Return the number of threads that would be executed in parallel regions
+int GetMaxThreads();
+// Set the number of threads that would be executed in parallel regions
+void SetNumThreads(int num_threads);
+// Return the thread number, which lies in [0, the number of threads)
+int GetThreadId();

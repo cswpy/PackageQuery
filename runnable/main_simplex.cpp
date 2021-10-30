@@ -96,7 +96,7 @@ void reportGurobi(MatrixXd A, VectorXd b, VectorXd c, double lb_value, double ub
 
 int main(){
   // test();
-  int N = 10000000;
+  int N = 1000000;
   MatrixXd A (6, N);
   VectorXd b (6);
   VectorXd c (N);
@@ -108,12 +108,12 @@ int main(){
   // VectorXd u (2); u << 10, 10;
   chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
   cout << "START " << endl;
-  Simplex simplex = Simplex(80, A, b, c, u);
+  Simplex simplex = Simplex(16, A, b, c, u);
   cout << simplex.status << endl;
   double t = chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - start).count() / 1000000.0;
-  cout << "IN " << t << "ms" << endl;
-  double obj_value = 0;
-  for (int i = 0; i < N; i ++) obj_value += simplex.tableau[simplex.numcols + i]*c(i);
-  cout << "MY OBJ " << obj_value << endl;
-  reportGurobi(A, b, c, 0, 1, 2, false);
+  // cout << "IN " << t << "ms" << endl;
+  // double obj_value = 0;
+  // for (int i = 0; i < N; i ++) obj_value += simplex.tableau[simplex.numcols + i]*c(i);
+  // cout << "MY OBJ " << obj_value << endl;
+  // reportGurobi(A, b, c, 0, 1, 2, false);
 }

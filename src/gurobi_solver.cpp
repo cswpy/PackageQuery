@@ -12,7 +12,40 @@
 using namespace Eigen;
 using namespace std;
 
-GurobiSolver::GurobiSolver(const MatrixXd& A, const VectorXd& b, const VectorXd& c, const VectorXd& u, bool is_presolve): A(A), b(b), c(c), u(u) {
+GurobiSolver::GurobiSolver(const MatrixXd& A, const VectorXd& bl, const VectorXd& bu, const VectorXd& c, const VectorXd& l, const VectorXd& u, bool is_presolve): c(c){
+  chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
+  relaxed_status = LS_NOT_FOUND;
+  ilp_status = LS_NOT_FOUND;
+  n = c.size();
+  m = bl.size();
+  env = NULL;
+  model = NULL;
+  assert(!GRBemptyenv(&env));
+  assert(!GRBsetparam(env, "OutputFlag", "0"));
+  assert(!GRBstartenv(env));
+  assert(!GRBnewmodel(env, &model, "origin", 0, NULL, NULL, NULL, NULL, NULL));
+  for (int i = 0; i < n; i++) {
+    assert(!GRBaddvar(model, 0, NULL, NULL, c(i), l(i), u(i), GRB_INTEGER, NULL));
+  }
+  assert(!GRBsetintattr(model, GRB_INT_ATTR_MODELSENSE, GRB_MAXIMIZE));
+  for (int i = 0; i < A.innerSize(); i++) {
+    int* ind = new int[n];
+    double* val = new double[n];
+    for (int j = 0; j < n; j++) {
+      ind[j] = j;
+      val[j] = A(i, j);
+    }
+    if (bu(i) != DBL_MAX) assert(!GRBaddconstr(model, n, ind, val, GRB_LESS_EQUAL, bu(i), NULL));
+    if (bl(i) != -DBL_MAX) assert(!GRBaddconstr(model, n, ind, val, GRB_GREATER_EQUAL, bl(i), NULL));
+    delete ind;
+    delete val;
+  }
+  if (!is_presolve) assert(!GRBsetintparam(env, GRB_INT_PAR_PRESOLVE, GRB_PRESOLVE_OFF));
+  assert(!GRBupdatemodel(model));
+  exe_init = chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - start).count() / 1000000.0;
+}
+
+GurobiSolver::GurobiSolver(const MatrixXd& A, const VectorXd& b, const VectorXd& c, const VectorXd& u, bool is_presolve): c(c) {
   chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
   relaxed_status = LS_NOT_FOUND;
   ilp_status = LS_NOT_FOUND;

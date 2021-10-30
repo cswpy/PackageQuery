@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "/home/alm818/cplex/cplex/include/",
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/include/**",
+                "/home/alm818/downloads/gurobi912/linux64/include/**",
+                "/home/alm818/conan/eigen/3.4.0/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/include/**",
+                "/home/alm818/conan/fmt/8.0.1/_/_/package/30a9781670e6fb2f17b8355b17a15cf916045317/include/**",
+                "/home/alm818/conan/boost/1.77.0/_/_/package/adf48b8e4446dcb68f440fe42ff08878d5c7feed/include/**",
+                "/home/alm818/conan/ccfits/2.6/_/_/package/6092f179cf2ff7a710089a30e907ff9685c1f839/include",
+                "/home/alm818/conan/cfitsio/3.490/_/_/package/f99afdbf2a1cc98ba2029817b35103455b6a9b77/include"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "gnu17",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+    ],
+    "version": 4
+}

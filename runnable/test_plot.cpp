@@ -1,3 +1,4 @@
+#define _USE_MATH_DEFINES
 #define FMT_HEADER_ONLY
 
 #include <iostream>
@@ -40,19 +41,20 @@ int main(){
   }
 
   // Set the size of output image to 1200x780 pixels
-  plt::figure_size(1200, 780);
-  // Plot line from given x and y data. Color is selected automatically.
-  plt::plot(x, y);
-  // Plot a red dashed line from given x and y data.
-  plt::plot(x, w,"r--");
-  // Plot a line whose name will show up as "log(x)" in the legend.
-  plt::named_plot("log(x)", x, z);
-  // Set x-axis to interval [0,1000000]
-  plt::xlim(0, 1000*1000);
-  // Add graph title
-  plt::title("Sample figure");
-  // Enable legend.
-  plt::legend();
-  // Save the image (file format is determined by the extension)
-  plt::save("../resource/matplotlib/basic.png");
+  // plt::figure_size(1200, 780);
+  // // Plot line from given x and y data. Color is selected automatically.
+  // plt::plot(x, y);
+  // // Plot a red dashed line from given x and y data.
+  // plt::plot(x, w,"r--");
+  // // Plot a line whose name will show up as "log(x)" in the legend.
+  // plt::named_plot("log(x)", x, z);
+  // // Set x-axis to interval [0,1000000]
+  // plt::xlim(0, 1000*1000);
+  // // Add graph title
+  // plt::title("Sample figure");
+  // // Enable legend.
+  // plt::legend();
+  // // Save the image (file format is determined by the extension)
+  // plt::save(fmt::format("{}/resource/matplotlib/basic.png", kProjectHome));
+  cout << "OK" << endl;
 }

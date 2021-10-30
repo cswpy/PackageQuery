@@ -7,6 +7,7 @@
 #include <random>
 
 #include "utility.h"
+#include "pseudo_walker.h"
 #include "lattice_solver.h"
 #include "gurobi_lattice_solver.h"
 #include "gurobi_solver.h"
@@ -187,10 +188,11 @@ void quickRun(){
 }
 
 int main(){
-  quickRun();
-  // default_random_engine gen {static_cast<long unsigned int>(time(0))};
-  // uniform_real_distribution u_dist(0.0, 1.0);
-  // VectorXd x (10000);
-  // for (int i = 0; i < (int) x.size(); i ++) x(i) = u_dist(gen);
+  // quickRun();
+  default_random_engine gen {static_cast<long unsigned int>(time(0))};
+  uniform_real_distribution u_dist(0.0, 1.0);
+  VectorXd x (10000000);
+  for (int i = 0; i < (int) x.size(); i ++) x(i) = u_dist(gen);
+  PseudoWalker pw = PseudoWalker(x, true, 16);
   // showHistogram(x, 10, 0, 0.1);
 }

@@ -1,4 +1,6 @@
-set(GUROBI_HOME "/home/alm818/downloads/gurobi912/linux64")
+set (GUROBI_HOME "C:/gurobi912/win64")
+# set(GUROBI_HOME "/home/alm818/downloads/gurobi912/linux64")
+
 message("CUSTOM GUROBI HOME: " ${GUROBI_HOME})
 
 find_path(GUROBI_INCLUDE_DIR

@@ -103,19 +103,22 @@ Reducer::Reducer(int core, MatrixXd* AA, VectorXd* bb, VectorXd* cc, VectorXd* u
       for (int i = 0; i < m; i ++){
         (*nextb)(i) = (*b)(i);
       }
-      stay_count = 0;
       #pragma omp parallel num_threads(core)
       {
         int local_start_index = -1;
         int local_stay_count = 0;
-        vector<int> local_stay_index;
+        vector<int> local_stay_index (stay_count);
         VectorXd local_bl (m); local_bl.fill(0);
-        local_stay_index.reserve(stay_count);
+        #pragma omp master
+        {
+          stay_count = 0;
+        }
+        #pragma omp barrier
         #pragma omp for nowait
         for (int i = 0; i < n; i ++){
           if (r0(i) < 0){
+            local_stay_index[local_stay_count] = i;
             local_stay_count ++;
-            local_stay_index.push_back(i);
           } else{
             best_x(original_index[i]) = r0(i);
             #pragma omp atomic

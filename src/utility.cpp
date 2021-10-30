@@ -2,11 +2,12 @@
 
 #include <sstream>
 #include <string>
+#include <numeric>
 #include <fstream>
 #include <random>
 #include <float.h>
 #include <limits.h>
-#include <unistd.h>
+#include <omp.h>
 #include <filesystem>
 
 #include "ilcplex/ilocplex.h"
@@ -78,7 +79,8 @@ vector<string> sol_messages = {
   "FOUND",
   "INFEASIBLE",
   "UNBOUNDED",
-  "FEASIBLE"
+  "FEASIBLE",
+  "DUAL UNBOUNDED"
 };
 
 string solMessage(int sol_status){
@@ -338,4 +340,80 @@ void GalaxyDB::generateQuery(double percent, int c_att, vector<int> atts, int ex
       }
     }
   }
+}
+
+Profiler::Profiler(vector<string> names): names(names){
+  n = names.size();
+  time.resize(n); time.fill(0);
+  count.resize(n); count.fill(0);
+  eps.resize(n);
+}
+
+void Profiler::clock(int i, bool is_parallel){
+  if (is_parallel){
+    #pragma omp barrier
+    #pragma omp master
+    {
+      if (0 <= i && i < n) eps[i] = chrono::high_resolution_clock::now();
+    }
+    #pragma omp barrier
+  } else{
+    if (0 <= i && i < n) eps[i] = chrono::high_resolution_clock::now();
+  }
+}
+
+void Profiler::stop(int i, bool is_parallel){
+  if (is_parallel){
+    #pragma omp barrier
+    #pragma omp master
+    {
+      if (0 <= i && i < n){
+        time(i) += chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - eps[i]).count() / 1000000.0;
+        count(i) ++;
+      }
+    }
+    #pragma omp barrier
+  } else{
+    if (0 <= i && i < n){
+      time(i) += chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - eps[i]).count() / 1000000.0;
+      count(i) ++;
+    }
+  }
+}
+
+void Profiler::print(){
+  for (int i = 0; i < n; i ++){
+    if (count(i) > 0){
+      cout << names[i] << " Total:" << time(i) << "ms Count:" << count(i) << " Average:" << time(i)/count(i) << "ms" << endl;
+    }
+  }
+}
+
+// Return the number of threads that would be executed in parallel regions
+int GetMaxThreads() {
+  #ifdef _OPENMP
+    return omp_get_max_threads();
+  #else
+    return 1;
+  #endif
+}
+
+// Set the number of threads that would be executed in parallel regions
+void SetNumThreads(int num_threads) {
+  #ifdef _OPENMP
+    omp_set_num_threads(num_threads);
+  #else
+    if (num_threads != 1) {
+      assert(!"compile with -fopenmp");
+    }
+  #endif
+}
+
+// Return the thread number, which lies in [0, the number of threads)
+int GetThreadId() {
+  #ifdef _OPENMP
+    return omp_get_thread_num();
+  #else
+    return 0;
+  #endif
 }

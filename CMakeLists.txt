@@ -43,12 +43,25 @@ install(
   EXPORT install_targets
 )
 
+# For window
+# set(PYTHONPACKAGE "C:/Users/xuana/AppData/Local/Packages/PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0/LocalCache/local-packages/Python39/site-packages")
+# set(PYTHONHOME "C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.9_3.9.2032.0_x64__qbz5n2kfra8p0")
+# include_directories(${PYTHONHOME}/include)
+# include_directories(${PYTHONPACKAGE}/numpy/core/include)
+# link_directories(${PYTHONHOME}/libs)
+# add_definitions(-DMATPLOTLIBCPP_PYTHON_HEADER=Python.h)
+
+# find_package(PythonLibs REQUIRED)
+# INCLUDE_DIRECTORIES( ${PYTHON_INCLUDE_DIRS} )
+# link_directories( ${PYTHON_LIBRARIES})
+
 # MAIN
 #set(MAIN_NAME "main_simplex")
 #set(MAIN_NAME "main_mc_matrix")
 #set(MAIN_NAME "main_lattice_solver")
 #set(MAIN_NAME "main_ccfits")
 #set(MAIN_NAME "main_reducer")
+set(MAIN_NAME "main_dual")
 
 # TEST
 #set(MAIN_NAME "test_accuracy_lattice_walk")
@@ -56,7 +69,7 @@ install(
 #set(MAIN_NAME "test_speed_simplex")
 #set(MAIN_NAME "test_lattice_solver")
 #set(MAIN_NAME "test_ppq")
-set(MAIN_NAME "test_plot")
+#set(MAIN_NAME "test_plot")
 
 message("PROJECT NAME: " ${PROJECT_NAME})
 message("SOURCE FOLDER: " ${CMAKE_SOURCE_DIR})
@@ -78,16 +91,18 @@ file(GLOB all_SRCS
   "${PROJECT_SOURCE_DIR}/src/*.c"
 )
 
-#OpenMP Deprecated
-# find_package(OpenMP)
-# if (OPENMP_FOUND)
-#     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-#     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-#     set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
-# endif()
+#OpenMP for Windows
+find_package(OpenMP)
+if (OPENMP_FOUND)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+endif()
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
+if(CMAKE_COMPILER_IS_GNUCXX)
+  set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+  set(CMAKE_CXX_FLAGS_DEBUG "-g")
+endif(CMAKE_COMPILER_IS_GNUCXX)
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 # Conan
@@ -104,11 +119,11 @@ include_directories(${CPLEX_INCLUDE_DIRS})
 
 add_executable(${EXECUTABLE_NAME} ${all_SRCS})
 
-# OpenMP
-find_package(OpenMP)
-if(OpenMP_CXX_FOUND)
-    target_link_libraries(${EXECUTABLE_NAME} PRIVATE OpenMP::OpenMP_CXX)
-endif()
+# OpenMP for Ubuntu
+# find_package(OpenMP)
+# if(OpenMP_CXX_FOUND)
+#     target_link_libraries(${EXECUTABLE_NAME} PRIVATE OpenMP::OpenMP_CXX)
+# endif()
 
 if(CXX)
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE optimized ${GUROBI_CXX_LIBRARY} debug ${GUROBI_CXX_DEBUG_LIBRARY})
