@@ -89,7 +89,10 @@ string solMessage(int sol_status){
 
 string solCombination(VectorXd sol){
   string combs = "";
+  double frac, whole;
   for (int i = 0; i < sol.size(); i ++){
+    frac = modf(sol(i), &whole);
+    assert(isEqual(frac, 0));
     int count = sol(i);
     if (count == 1) combs += to_string(i) + " ";
     else if (count > 1) combs += fmt::format("{}x{} ", to_string(i), count);

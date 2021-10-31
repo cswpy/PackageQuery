@@ -31,18 +31,19 @@ using namespace Eigen;
 void generateBoundedProlem(int expected_n, double outlier_prob, double att_var, int n, MatrixXd& A, VectorXd& bl, VectorXd& bu, VectorXd& c){
   A.resize(4, n); bl.resize(4); bu.resize(4); c.resize(n); 
   default_random_engine gen {static_cast<long unsigned int>(time(0))};
-  // uniform_real_distribution u_dist(0.0, 1.0);
-  normal_distribution att_dist(0.0, att_var);
+  uniform_real_distribution u_dist(0.0, 1.0);
+  double multiplicity = att_var * 12;
+  //normal_distribution att_dist(10.0, att_var);
   int expected_numvar = expected_n;
-  double mean = 0;
+  double mean = 0.5*multiplicity*expected_numvar;
   double var = att_var*expected_numvar;
   normal_distribution n_dist(0.0, var);
   normal_distribution n_dist_c(0.0, 200.0);
   #pragma omp parallel for num_threads(CORE_COUNT)
   for (int i = 0; i < n; i ++){
-    A(0, i) = att_dist(gen);
-    A(1, i) = att_dist(gen);
-    A(2, i) = att_dist(gen);
+    A(0, i) = u_dist(gen)*multiplicity;
+    A(1, i) = u_dist(gen)*multiplicity;
+    A(2, i) = u_dist(gen)*multiplicity;
     A(3, i) = 1;
     c(i) = n_dist_c(gen);
   }
@@ -63,13 +64,21 @@ void centroid_test(){
   int m = 4;
   MatrixXd A (m, n); A << 1.0/3, 1, 4.0/3, -1, -1.0/4, 1, 1, -1;
   VectorXd bl (m); bl << 8.0/3, -DBL_MAX, 1.0/2, 0;
-  VectorXd bu (m); bu << DBL_MAX, 17.0/3, 3, DBL_MAX;
-  VectorXd c (n); c << -1, 2;
+  VectorXd bu (m); bu << DBL_MAX, 17.0/3, 6, DBL_MAX;
+  VectorXd c (n); c << 1, 1;
   VectorXd l (n); l << 0, 0;
   VectorXd u (n); u << 10, 10;
 
   Dual* dual = new Dual(core, A, bl, bu, c, l, u);
   print(dual->x);
+
+  MatrixXd BA = dual->Binv * dual->A;
+  cout << BA << endl;
+  cout << endl;
+  cout << dual->Binv << endl;
+  cout << "BASIS" << endl;
+  print(dual->bhead);
+  cout << endl;
 
   if (dual->status == LS_FOUND){
     VectorXd centroid_dir (n); centroid_dir.fill(0);
@@ -126,6 +135,7 @@ void centroid_test(){
       #pragma omp barrier
       #pragma omp master
       {
+        cout << "SUM ROW" << endl;
         print(sum_row);
         for (int i = 0; i < m; i ++){
           if (dual->bhead(i) < n){
@@ -147,11 +157,11 @@ void centroid_test(){
 }
 
 void quickRun(){
-  int n = 100;
+  int n = 100000;
   MatrixXd A;
   VectorXd bl, bu, c;
-  generateBoundedProlem(10, 0.8, 3.0, n, A, bl, bu, c);
-  VectorXd u (n); u.fill(1);
+  generateBoundedProlem(1000, 0.9, 3, n, A, bl, bu, c);
+  VectorXd u (n); u.fill(3);
   VectorXd l (n); l.fill(0);
 
   // VectorXd* a = new VectorXd(10);
@@ -163,21 +173,30 @@ void quickRun(){
   // print(*a);
   // print(*b);
 
-  GurobiSolver gs = GurobiSolver(A, bl, bu, c, l, u);
-  gs.solveRelaxed();
-  // print(gs.r0);
-  cout << gs.exe_relaxed << " " << gs.iteration_count << endl;
-  cout << gs.relaxed_cscore << endl;
+  // GurobiSolver gs = GurobiSolver(A, bl, bu, c, l, u);
+  // gs.solveRelaxed();
+  // // print(gs.r0);
+  // cout << gs.exe_relaxed << " " << gs.iteration_count << endl;
+  // cout << gs.relaxed_cscore << endl;
 
-  cout << "-------------------" << endl;
+  // cout << "-------------------" << endl;
 
-  DualReducer dr = DualReducer(16, &A, &bl, &bu, &c, &l, &u);
+  DualReducer dr = DualReducer(8, &A, &bl, &bu, &c, &l, &u);
+  for (auto oi : dr.original_indices){
+    cout << oi->size() << " ";
+  }
+  cout << endl;
   cout << solMessage(dr.status) << " " << dr.exe_solve << endl;
   double r0_obj = dr.duals[0]->score;
   double gap = (r0_obj - dr.best_score) / r0_obj * 100;
   cout << dr.best_score << " " << r0_obj << " " << gap << "%" << endl;
-  
-  // testL3Cache();
+  // cout << solCombination(dr.best_x) << endl;
+
+  // GurobiSolver igs = GurobiSolver(A, bl, bu, c, l, u);
+  // igs.solveIlp();
+  // double gap2 = (igs.ilp_cscore - dr.best_score) / igs.ilp_cscore * 100;
+  // cout << igs.ilp_cscore << " " << gap2 << "%" << endl;
+  // cout << igs.exe_ilp + igs.exe_init << endl;
 
   // int n = 2;
   // int m = 4;
@@ -207,6 +226,6 @@ void quickRun(){
 }
 
 int main(){
-  //quickRun();
-  centroid_test();
+  quickRun();
+  //centroid_test();
 }
