@@ -105,6 +105,10 @@ void GurobiSolver::solveRelaxed(bool is_concurrent){
   assert(!GRBgetintattr(relaxed, GRB_INT_ATTR_STATUS, &relaxed_status));
   if (relaxed_status == GRB_OPTIMAL){
     relaxed_status = LS_FOUND;
+    int* bhead = new int[m];
+    assert(!GRBgetBasisHead(relaxed, bhead));
+    for (int i = 0; i < m; i ++) cout << bhead[i] << " ";
+    cout << endl;
     r0.resize(n);
     assert(!GRBgetdblattrarray(relaxed, GRB_DBL_ATTR_X, 0, n, &r0(0)));
     relaxed_cscore = c.dot(r0);

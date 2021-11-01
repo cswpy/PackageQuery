@@ -103,8 +103,8 @@ void only_pseudo(){
       }
       double conj = 0.5 / max_abs_val;
       int step = (int)pow(10, log_step);
-      PseudoWalker pw = PseudoWalker(p, false);
-      PseudoWalker pw2 = PseudoWalker(p, true);
+      PseudoWalker pw = PseudoWalker(p, true, 2);
+      PseudoWalker pw2 = PseudoWalker(p, true, 16);
       VectorXd px(p.size()); px.fill(0);
       VectorXd px2(p.size()); px2.fill(0);
       double avg_pscore = 0;
@@ -132,7 +132,64 @@ void only_pseudo(){
   }
 }
 
+void only_pseudo_multicore(){
+  vector<string> names = {"1", "2", "3", "4", "5"};
+  int log_step_start = 2;
+  int log_step_end = 5;
+  int log_dim_start = 2;
+  int log_dim_end = 7;
+  for (int log_dim = log_dim_start; log_dim <= log_dim_end; log_dim++) {
+    int dim = (int)pow(10, log_dim);
+    Profiler pro = Profiler(names);
+    VectorXd p(dim);
+    for (int i = 0; i < dim; i++) p(i) = dist(gen);
+    VectorXd pp = p / p.norm();
+    double max_abs_val = -1;
+    for (int i = 0; i < dim; i++) {
+      max_abs_val = max(max_abs_val, abs(pp(i)));
+    }
+    double conj = 0.5 / max_abs_val;
+    int step = (int)dim/log2(dim)+1;
+    pro.clock(0, false);
+    PseudoWalker pw = PseudoWalker(p, true, 1);
+    pro.stop(0, false);
+    pro.clock(1, false);
+    PseudoWalker pw2 = PseudoWalker(p, true, 16);
+    pro.stop(1, false);
+    VectorXd px(p.size()); px.fill(0);
+    VectorXd px2(p.size()); px2.fill(0);
+    double avg_pscore = 0;
+    double avg_pscore2 = 0;
+    cout << "START" << endl;
+    for (int n = 0; n < step; n++) {
+      pro.clock(2, false);
+      int pd = pw.step();
+      pro.stop(2, false);
+      if (pd != 0) {
+        int i = abs(pd) - 1;
+        px(i) += sign(pd);
+      }
+      pro.clock(3, false);
+      int pd2 = pw2.step();
+      pro.stop(3, false);
+      if (pd2 != 0) {
+        int i = abs(pd2) - 1;
+        px2(i) += sign(pd2);
+      }
+      assert(pd == pd2);
+    }
+    cout << step << " " << log_dim << endl;
+    pro.print();
+    // avg_pscore /= step;
+    // avg_pscore2 /= step;
+    // double advantage = (avg_pscore - avg_pscore2) / avg_pscore2;
+    // fmt::print("{},{},{:.10Lf},{:.10Lf},{:.5Lf}\n", log_step, log_dim, avg_pscore, avg_pscore2, advantage*100);
+    //fmt::print("log_step={} log_dim={} avg_score={:.10Lf} avg_pscore={:.10Lf} advantage={:.2Lf}% avg_pscore2={:.10Lf} advantage2={:.2Lf}% conj={:.5Lf}\n", log_step, log_dim, avg_score, avg_pscore, advantage*100, avg_pscore2, advantage2*100, conj);
+  }
+}
+
 int main(){
   // all_three();
-  only_pseudo();
+  //only_pseudo();
+  only_pseudo_multicore();
 }

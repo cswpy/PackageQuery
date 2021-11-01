@@ -11,8 +11,7 @@ using namespace std;
 class PseudoWalker: public AbstractWalker{
 
 public:
-  VectorXd p, x;
-  vector<double> steps;
+  VectorXd p, x, steps;
   priority_queue<pair<double, int>> pq;
   ParallelPQ* ppq;
   bool enable_correction;

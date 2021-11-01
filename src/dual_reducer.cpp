@@ -37,11 +37,11 @@ DualReducer::~DualReducer(){
 }
 
 DualReducer::DualReducer(int core, MatrixXd* AA, VectorXd* bbl, VectorXd* bbu, VectorXd* cc, VectorXd* ll, VectorXd* uu){
-  // vector<string> names = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"};
-  // Profiler pro = Profiler(names);
+  vector<string> names = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"};
+  Profiler pro = Profiler(names);
   chrono::high_resolution_clock::time_point start;
   start = chrono::high_resolution_clock::now();
-  // pro.clock(0, false);
+  pro.clock(0, false);
   As.push_back(AA);
   bls.push_back(bbl);
   bus.push_back(bbu);
@@ -61,8 +61,9 @@ DualReducer::DualReducer(int core, MatrixXd* AA, VectorXd* bbl, VectorXd* bbu, V
   MatrixXd* A;
   VectorXd* bl, *bu, *c, *l, *u;
   VectorXi* original_index;
-  // pro.stop(0, false);
+  pro.stop(0, false);
   while (true){
+    // cout << "Z " << layer_count << endl;
     A = As[layer_count];
     bl = bls[layer_count];
     bu = bus[layer_count];
@@ -70,23 +71,26 @@ DualReducer::DualReducer(int core, MatrixXd* AA, VectorXd* bbl, VectorXd* bbu, V
     l = ls[layer_count];
     u = us[layer_count];
     original_index = original_indices[layer_count];
-
+    // cout << "Z1 " << layer_count << endl;
     int n = c->size();
     if (n < kIlpThreshold){
       if (layer_count == 0){
+        // cout << "Z11 " << layer_count << endl;
         for (int i = 0; i < nn; i ++) (*original_index)(i) = i;
-        // pro.clock(1, false);
+        pro.clock(1, false);
         Dual* dual = new Dual(core, *A, *bl, *bu, *c, *l, *u);
-        // pro.stop(1, false);
+        pro.stop(1, false);
         duals.push_back(dual);
+        // cout << "Z12 " << layer_count << endl;
       }
       break;
     }
-
-    // pro.clock(1, false);
+    // cout << "Z2 " << layer_count << endl;
+    pro.clock(1, false);
     Dual* dual = new Dual(core, *A, *bl, *bu, *c, *l, *u);
-    // pro.stop(1, false);
+    pro.stop(1, false);
     duals.push_back(dual);
+    // cout << "A " << layer_count << endl;
 
     if (dual->status == LS_FOUND){
       VectorXd centroid_dir (n); centroid_dir.fill(0);
@@ -96,7 +100,7 @@ DualReducer::DualReducer(int core, MatrixXd* AA, VectorXd* bbl, VectorXd* bbu, V
       int stay_count = 0;
       #pragma omp parallel num_threads(core)
       {
-        // pro.clock(2);
+        pro.clock(2);
         if (layer_count == 0){
           #pragma omp for nowait
           for (int i = 0; i < nn; i ++) (*original_index)(i) = i;
@@ -148,6 +152,7 @@ DualReducer::DualReducer(int core, MatrixXd* AA, VectorXd* bbl, VectorXd* bbu, V
         #pragma omp barrier
         #pragma omp master
         {
+          // cout << "A1 " << layer_count << endl;
           for (int i = 0; i < m; i ++){
             if (dual->bhead(i) < n){
               double val = 0;
@@ -158,11 +163,13 @@ DualReducer::DualReducer(int core, MatrixXd* AA, VectorXd* bbl, VectorXd* bbu, V
             }
           }
         }
-        // pro.stop(2);
+        pro.stop(2);
       }
-      // pro.clock(3, false);
+      pro.clock(3, false);
+      // cout << "A2 " << layer_count << endl;
       PseudoWalker walker = PseudoWalker(centroid_dir, true, core);
-      // pro.stop(3, false);
+      pro.stop(3, false);
+
       // print(dual->x);
       // print(centroid_dir);
       // MatrixXd BA = dual->Binv * dual->A;
@@ -172,7 +179,8 @@ DualReducer::DualReducer(int core, MatrixXd* AA, VectorXd* bbl, VectorXd* bbu, V
       // cout << "-----------------------" << endl;
       // print(r0);
       // print(centroid_dir);
-      // pro.clock(4, false);
+      
+      pro.clock(4, false);
       int step_horizon = (int)ceil(n / log2(n) * kStepTolerance);
       while (true){
         int step = walker.step();
@@ -183,15 +191,16 @@ DualReducer::DualReducer(int core, MatrixXd* AA, VectorXd* bbl, VectorXd* bbu, V
         }
         r0(index) += sign(step);
 
-        // cout << "STEP " << step_count << " " << step << " " << index << endl;
-        // print(r0);
+        // cout << "STEP " << walker.step_count << " " << step << " " << index << endl;
+        // shortPrint(r0);
 
         if (isGreaterEqual((*l)(index)-r0(index), 1) || isGreaterEqual(r0(index)-(*u)(index), 1) || walker.step_count == step_horizon){
           break;
         }
       }
-      // pro.stop(4, false);
-      // pro.clock(5, false);
+      //cout << "LAYER: " << layer_count << " STEP COUNT: " << walker.step_count << endl;
+      pro.stop(4, false);
+      pro.clock(5, false);
       VectorXi stay_index (stay_count);
       VectorXi* next_original_index = new VectorXi(stay_count);
       original_indices.push_back(next_original_index);
@@ -208,10 +217,11 @@ DualReducer::DualReducer(int core, MatrixXd* AA, VectorXd* bbl, VectorXd* bbu, V
       VectorXd* nextu = new VectorXd(stay_count);
       us.push_back(nextu);
       int start_stay_count = 0;
-      // pro.stop(5, false);
+      pro.stop(5, false);
+      //cout << "B " << layer_count << endl;
       #pragma omp parallel num_threads(core)
       {
-        // pro.clock(6);
+        pro.clock(6);
         int local_start_index = -1;
         int local_stay_count = 0;
         VectorXi local_stay_index (stay_count);
@@ -229,6 +239,8 @@ DualReducer::DualReducer(int core, MatrixXd* AA, VectorXd* bbl, VectorXd* bbu, V
             }
           }
         }
+        // #pragma omp single
+        // cout << "B1 " << layer_count << endl;
         #pragma omp critical
         {
           local_start_index = start_stay_count;
@@ -244,8 +256,8 @@ DualReducer::DualReducer(int core, MatrixXd* AA, VectorXd* bbl, VectorXd* bbu, V
             (*nextbu)(i) -= local_change_b(i);
           }
         }
-        // pro.stop(6);
-        // pro.clock(7);
+        pro.stop(6);
+        pro.clock(7);
         #pragma omp barrier
         for (int i = local_start_index; i < local_start_index + local_stay_count; i ++){
           stay_index(i) = local_stay_index(i-local_start_index);
@@ -261,20 +273,25 @@ DualReducer::DualReducer(int core, MatrixXd* AA, VectorXd* bbl, VectorXd* bbu, V
           (*nextl)(i) = (*l)(stay_index[i]);
           (*nextu)(i) = (*u)(stay_index[i]);
         }
-        // pro.stop(7);
+        pro.stop(7);
+        // #pragma omp single
+        // cout << "B2 " << layer_count << endl;
       }
       layer_count ++;
+      //cout << "B3 " << layer_count << endl;
     } else{
       status = dual->status;
       break;
     }
   }
-  // pro.clock(8, false);
+  // cout << "C " << layer_count << endl;
+  pro.clock(8, false);
   if (status == LS_NOT_FOUND){
     GurobiSolver gs = GurobiSolver(*A, *bl, *bu, *c, *l, *u);
     gs.solveIlp();
     if (gs.ilp_status == LS_FOUND){
       for (int i = 0; i < gs.n; i ++) best_x((*original_index)(i)) = gs.x0(i);
+      // cout << "C1 " << layer_count << endl;
       #pragma omp parallel num_threads(core)
       {
         double local_best_score = 0;
@@ -283,10 +300,11 @@ DualReducer::DualReducer(int core, MatrixXd* AA, VectorXd* bbl, VectorXd* bbu, V
         #pragma omp atomic
         best_score += local_best_score;
       }
+      // cout << "C2 " << layer_count << endl;
     }
     status = gs.ilp_status;
   }
-  // pro.stop(8, false);
-  // pro.print();
+  pro.stop(8, false);
+  pro.print();
   exe_solve = chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - start).count() / 1000000.0;
 }

@@ -15,8 +15,8 @@ constexpr char CPX_LESS_EQUAL = 'L';
 constexpr char CPX_GREATER_EQUAL = 'G';
 constexpr char CPX_RANGE = 'R';
 
-constexpr double kFloatEps = 1e-12;
-constexpr double kFeasTolerance = 1e-8;
+constexpr double kFloatEps = 1e-6;
+constexpr double kFeasTolerance = 1e-6;
 constexpr double kStubbornMultiplier = 2;
 constexpr double kSizeTol = 1e5;
 constexpr double kRedundant = 1.05;
@@ -79,6 +79,21 @@ string print(Matrix<T, Dynamic, 1> v) {
   }
   if (v.size() > 0) {
     s += to_string(v(v.size() - 1));
+  }
+  s += "]\n";
+  cout << s;
+  return s;
+}
+
+template <typename T>
+string shortPrint(Matrix<T, Dynamic, 1> v) {
+  string s = "[";
+  for (int i = 0; i < v.size() - 1; i++) {
+    if (isEqual(v(i), 0)) continue;
+    s += to_string(i) + ":" + to_string(v(i)) + " ";
+  }
+  if (v.size() > 0 && !isEqual(v(v.size() - 1), 0)) {
+    s += to_string(v.size() - 1) + ":" + to_string(v(v.size() - 1));
   }
   s += "]\n";
   cout << s;

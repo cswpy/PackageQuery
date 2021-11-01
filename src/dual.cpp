@@ -11,6 +11,26 @@
 
 using namespace std;
 
+// bool verify2(VectorXd x, const MatrixXd& A, const VectorXd& bl, const VectorXd& bu, const VectorXd& c, const VectorXd& l, const VectorXd& u){
+//   int n = l.size();
+//   VectorXd sol = x(seqN(0, n));
+//   int m = bl.size();
+//   // for (int i = 0; i < n; i ++){
+//   //   if (isLess(sol(i), l(i)) || isGreater(sol(i),u(i))){
+//   //     cout << "N:" << i << " VIOLATIONS" << endl;
+//   //     return false;
+//   //   }
+//   // }
+//   VectorXd b = A * sol;
+//   for (int i = 0; i < m; i ++){
+//     if (isLess(b(i), bl(i)) || isGreater(b(i), bu(i))){
+//       cout << "M:" << i << " VIOLATIONS" << endl;
+//       // return false;
+//     }
+//   }
+//   return true;
+// }
+
 // Primal feasibility tolerance
 const double kE_P = 1e-7;
 // Relative primal feasibility tolerance
@@ -29,6 +49,14 @@ double primalInfeasibilities(double x, double l, double u){
   if (x > u) return x-u;
   return 0;
 }
+
+// double primalInfeasibilities(double x, double l, double u){
+//   double left = l - l * kE_r - kE_P;
+//   if (x < left) return x-left;
+//   double right = u + u * kE_r + kE_P;
+//   if (x > right) return x-right;
+//   return 0;
+// }
 
 double getSlope(const VectorXd& u, const VectorXd& l, const VectorXd& bu, const VectorXd& bl, const VectorXd& alpha_r, int i){
   int n = u.size();
@@ -234,10 +262,11 @@ Dual::Dual(int core, const MatrixXd& A, const VectorXd& bbl, const VectorXd& bbu
         // cout << "BASIS" << endl;
         // print(bhead);
         // cout << "X" << endl;
-        // print(x);
-        // cout << "BOUNDS" << endl;
-        // print(l);
-        // print(u);
+        // shortPrint(x);
+        // cout << "VERIFY: " << verify2(x, A, bbl, bbu, c, l, u) << endl;
+        // // cout << "BOUNDS" << endl;
+        // // print(l);
+        // // print(u);
         // cout << "SLACK BOUNDS" << endl;
         // print(bl);
         // print(bu);
@@ -396,10 +425,11 @@ Dual::Dual(int core, const MatrixXd& A, const VectorXd& bbl, const VectorXd& bbu
     }
     if (status != LS_FOUND){
       // Ratio test using Algorithm 4 combining Algorithm 5
-      // cout << "A " << iteration_count << " " << init_size << endl;
+      //cout << "A " << iteration_count << " " << init_size << endl;
       // pro.clock(9, false);
       map_sort::Sort(init, init_size, core);
       // pro.stop(9, false);
+      // cout << "TIME " << pro.time(9) << " " << init_size << endl;
       slope_partition.fill(init_size);
       slope_sums.resize(init_size);
       #pragma omp parallel num_threads(core)
@@ -418,7 +448,7 @@ Dual::Dual(int core, const MatrixXd& A, const VectorXd& bbl, const VectorXd& bbu
         }
         #pragma omp master
         {
-          // cout << "B " << iteration_count << " " << init_size << endl;
+          //cout << "B " << iteration_count << " " << init_size << endl;
           sort(slope_partition.begin(), slope_partition.end());
           slope_sums_parition(0) = 0;
           for (int i = 1; i < core; i ++){
@@ -440,16 +470,18 @@ Dual::Dual(int core, const MatrixXd& A, const VectorXd& bbl, const VectorXd& bbu
           // for (int i = 0; i < init_size; i ++) cout << init[i].first << " " << init[i].second << endl;
           // cout << "MAX_SLOPE: " << fabs(max_delta) << endl;
           // print(slope_sums);
-          // cout << "C " << iteration_count << " " << init_size << endl;
-          if (isLessEqual(slope_sums(init_size-1), fabs(max_delta))){
+          //cout << "C " << iteration_count << " " << init_size << endl;
+          if (isLess(slope_sums(init_size-1), fabs(max_delta))){
             status = LS_DUAL_UNBOUNDED;
           } else{
             q_index = upper_bound(slope_sums.begin(), slope_sums.end(), fabs(max_delta)) - slope_sums.begin();
+            // cout << q_index << " " << init_size << " " << slope_sums.size() << endl;
+            q_index = min(q_index, init_size-1);
             q = init[q_index].second;
 
+            // cout << "PIVOT " << fabs(alpha_r(q)) << endl;
             // cout << "SCORE" << endl;
             // for (int i = 0; i < init_size; i ++) cout << init[i].first << " " << init[i].second << endl;
-
             // cout << "PRE_MAX_DELTA " << max_delta << endl;
 
             if (q_index > 0){
@@ -461,7 +493,6 @@ Dual::Dual(int core, const MatrixXd& A, const VectorXd& bbl, const VectorXd& bbu
             tilde_a.fill(0);
 
             // cout << "AFT_MAX_DELTA " << max_delta << endl;
-
             // cout << "Q" << endl;
             // cout << q_index << " " << q << endl;
             // cout << "SLOPE SUMS" << endl;
@@ -474,7 +505,7 @@ Dual::Dual(int core, const MatrixXd& A, const VectorXd& bbl, const VectorXd& bbu
             // DSE FTran
             tau = Binv * rho_r;
           }
-          // cout << "C1 " << iteration_count << " " << init_size << endl;
+          //cout << "C1 " << iteration_count << " " << init_size << endl;
         }
         // pro.stop(11);
         #pragma omp barrier
@@ -523,7 +554,7 @@ Dual::Dual(int core, const MatrixXd& A, const VectorXd& bbl, const VectorXd& bbu
           // pro.clock(14);
           #pragma omp master
           {
-            // cout << "D " << iteration_count << " " << init_size << endl;
+            //cout << "D " << iteration_count << " " << init_size << endl;
             // Update xb based on tilde_a
             VectorXd delta_xB = Binv * tilde_a;
             for (int i = 0; i < m; i ++){
@@ -532,10 +563,10 @@ Dual::Dual(int core, const MatrixXd& A, const VectorXd& bbl, const VectorXd& bbu
 
             // cout << "BINV" << endl;
             // cout << Binv << endl;
-            // cout << "TILDE_A" << endl;
-            // print(tilde_a);
+            // // cout << "TILDE_A" << endl;
+            // // print(tilde_a);
             // cout << "AFT TILDE_A" << endl;
-            // print(x);
+            // shortPrint(x);
 
             // Update primal solution
             primal_step = max_delta / alpha_q(r);
@@ -543,7 +574,7 @@ Dual::Dual(int core, const MatrixXd& A, const VectorXd& bbl, const VectorXd& bbu
             x(q) += primal_step;
 
             // cout << "AFT PRIMAL" << endl;
-            // print(x);
+            // shortPrint(x);
 
             // Update edge norm beta
             for (int i = 0; i < m; i ++){
@@ -558,6 +589,25 @@ Dual::Dual(int core, const MatrixXd& A, const VectorXd& bbl, const VectorXd& bbu
             inv_bhead[p].flip();
             bhead(r) = q;
             inv_bhead[q].flip();
+
+            // for (int i = 0; i < n+m; i ++){
+            //   if (!inv_bhead[i]){
+            //     if (i < n){
+            //       bool t = (isEqual(x(i),l(i)) && isGreaterEqual(d(i), 0)) || (isEqual(x(i),u(i)) && isLessEqual(d(i), 0));
+            //       if (!t){
+            //         fmt::print("{} {:.10Lf} {:.10Lf} {:.10Lf} {:.10Lf}\n", i, x(i), l(i), u(i), d(i));
+            //         assert(0==1);
+            //       }
+            //     } else{
+            //       int index = i - n;
+            //       bool t = (isEqual(x(i),bl(index)) && isGreaterEqual(d(i), 0)) || (isEqual(x(i),bu(index)) && isLessEqual(d(i), 0));
+            //       if (!t){
+            //         fmt::print("{} {:.10Lf} {:.10Lf} {:.10Lf} {:.10Lf}\n", i, x(i), bl(index), bu(index), d(i));
+            //         assert(0==1);
+            //       }
+            //     }
+            //   }
+            // }
 
             // Update Binv
             for (int i = 0; i < m; i ++){

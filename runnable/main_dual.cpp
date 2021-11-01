@@ -27,6 +27,38 @@
 using namespace std;
 using namespace Eigen;
 
+#define ta(row, col) (primal.tableau[primal.numcols*(row)+(col)])
+
+void generateBoundedProlem2(int expected_n, double outlier_prob, double att_var, int n, MatrixXd& A, VectorXd& bl, VectorXd& bu, VectorXd& c){
+  A.resize(4, n); bl.resize(4); bu.resize(4); c.resize(n); 
+  default_random_engine gen {static_cast<long unsigned int>(time(0))};
+  uniform_real_distribution u_dist(0.0, 1.0);
+  double multiplicity = att_var * 12;
+  //normal_distribution att_dist(10.0, att_var);
+  int expected_numvar = expected_n;
+  double mean = 0.5*multiplicity*expected_numvar;
+  double var = att_var*expected_numvar;
+  normal_distribution n_dist(0.0, var);
+  normal_distribution n_dist_c(0.0, 200.0);
+  #pragma omp parallel for num_threads(CORE_COUNT)
+  for (int i = 0; i < n; i ++){
+    A(0, i) = u_dist(gen)*multiplicity;
+    A(1, i) = u_dist(gen)*multiplicity;
+    A(2, i) = u_dist(gen)*multiplicity;
+    A(3, i) = 1;
+    c(i) = n_dist_c(gen);
+  }
+  double tol = var*sqrt(1/outlier_prob);
+  bl(0) = mean - tol;
+  bu(0) = mean + tol;
+  bl(1) = -DBL_MAX;
+  bu(1) = mean + tol;
+  bl(2) = mean- tol;
+  bu(2) = DBL_MAX;
+  bl(3) = expected_n/2;
+  bu(3) = expected_n*2;
+}
+
 void generateBoundedProlem(int expected_n, double outlier_prob, double att_var, int n, MatrixXd& A, VectorXd& bl, VectorXd& bu, VectorXd& c){
   A.resize(4, n); bl.resize(4); bu.resize(4); c.resize(n); 
   default_random_engine gen {static_cast<long unsigned int>(time(0))};
@@ -52,8 +84,53 @@ void generateBoundedProlem(int expected_n, double outlier_prob, double att_var, 
   bu(1) = mean + tol;
   bl(2) = mean- tol;
   bu(2) = DBL_MAX;
-  bl(3) = expected_n/2;
-  bu(3) = expected_n*2;
+  bl(3) = expected_n;
+  bu(3) = expected_n;
+}
+
+bool verify(VectorXd x, const MatrixXd& A, const VectorXd& bl, const VectorXd& bu, const VectorXd& c, const VectorXd& l, const VectorXd& u){
+  int n = l.size();
+  VectorXd sol = x(seqN(0, n));
+  int m = bl.size();
+  for (int i = 0; i < n; i ++){
+    if (isLess(sol(i), l(i)) || isGreater(sol(i),u(i))){
+      cout << "N:" << i << " VIOLATIONS" << endl;
+      return false;
+    }
+  }
+  VectorXd b = A * sol;
+  for (int i = 0; i < m; i ++){
+    if (isLess(b(i), bl(i)) || isGreater(b(i), bu(i))){
+      cout << "M:" << i << " VIOLATIONS" << endl;
+      return false;
+    }
+  }
+  return true;
+}
+
+void convert(const MatrixXd& A, const VectorXd& bl, const VectorXd& bu, MatrixXd& AA, VectorXd& bb){
+  int m = A.innerSize();
+  int n = A.outerSize();
+  int mm = 0;
+  for (int i = 0; i < m; i ++){
+    if (bl(i) != -DBL_MAX) mm ++;
+    if (bu(i) != DBL_MAX) mm ++;
+  }
+  AA.resize(mm, n);
+  bb.resize(mm);
+  int index = 0;
+  for (int i = 0; i < m; i ++){
+    if (bl(i) != -DBL_MAX){
+      for (int j = 0; j < n; j ++) AA(index, j) = -A(i, j);
+      bb(index) = -bl(i);
+      index ++;
+    }
+    if (bu(i) != DBL_MAX){
+      for (int j = 0; j < n; j ++) AA(index, j) = A(i, j);
+      bb(index) = bu(i);
+      index ++;
+    }
+  }
 }
 
 void testL3Cache(){
@@ -112,10 +189,9 @@ void quickRun(){
   int n = 1000000;
   MatrixXd A;
   VectorXd bl, bu, c;
-  generateBoundedProlem(10, 0.8, 3.0, n, A, bl, bu, c);
+  generateBoundedProlem2(10, 0.9, 4, n, A, bl, bu, c);
   VectorXd u (n); u.fill(1);
   VectorXd l (n); l.fill(0);
-
   // testL3Cache();
 
   // int n = 2;
@@ -127,18 +203,38 @@ void quickRun(){
   // VectorXd l (n); l << 0, 0;
   // VectorXd u (n); u << 10, 10;
 
-  Dual dual = Dual(16, A, bl, bu, c, l, u);
+  // MatrixXd AA; VectorXd bb;
+  // convert(A, bl, bu, AA, bb);
+  // int mm = bb.size();
+  // Simplex primal = Simplex(16, AA, bb, c, u);
+  // VectorXd primal_sol (n);
+  // for (int i = 0; i < n; i ++) primal_sol(i) = ta(1, i);
+  // double obj = 0;
+  // for (int i = 0; i < n; i ++){
+  //   obj += primal_sol(i) * c(i);
+  // }
+  // fmt::print("{:.10Lf}\n", obj);
+  // for (int i = 0; i < mm; i ++){
+  //   cout << primal.bhead[i] << " ";
+  // }
+  // cout << endl;
+
+  Dual dual = Dual(8, A, bl, bu, c, l, u);
   cout << solMessage(dual.status) << endl;
   cout << dual.exe_solve << " " << dual.iteration_count << " " << dual.mini_iteration_count << endl;
-  cout << dual.score << endl;
-
+  fmt::print("{:.10Lf}\n", dual.score);
+  // shortPrint(dual.x);
+  // print(dual.bhead);
+  cout << "----------------------" << endl;
   GurobiSolver gs = GurobiSolver(A, bl, bu, c, l, u);
   gs.solveRelaxed();
   cout << gs.exe_relaxed << " " << gs.iteration_count << endl;
-  cout << gs.relaxed_cscore << endl;
+  // shortPrint(gs.r0);
+  fmt::print("{:.10Lf}\n", gs.relaxed_cscore);
   // print(dual.x);
   // print(gs.r0);
-  if (gs.relaxed_status == LS_FOUND && !isEqual(gs.relaxed_cscore, dual.score, 1e-8)){
+  cout << verify(dual.x, A, bl, bu, c, l, u) << " " << verify(gs.r0, A, bl, bu, c, l, u) << endl;
+  if (gs.relaxed_status == LS_FOUND && !isEqual(gs.relaxed_cscore, dual.score, 1e-4)){
     for (int i = 0; i < n; i ++){
       assert(isEqual(dual.x(i), gs.r0(i), 1e-6));
     }
@@ -197,7 +293,10 @@ void testCopy(){
 
 int main(){
   //mapSort();
-  //for (int i = 0; i < 10000; i ++) quickRun();
+  // for (int i = 0; i < 10000; i ++){
+  //   quickRun();
+  //   cout << "--------------------------------" << endl;
+  // }
   quickRun();
   //testCopy();
 }

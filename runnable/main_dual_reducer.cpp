@@ -157,11 +157,11 @@ void centroid_test(){
 }
 
 void quickRun(){
-  int n = 100000;
+  int n = 1000000;
   MatrixXd A;
   VectorXd bl, bu, c;
-  generateBoundedProlem(1000, 0.9, 3, n, A, bl, bu, c);
-  VectorXd u (n); u.fill(3);
+  generateBoundedProlem(10, 0.9, 4, n, A, bl, bu, c);
+  VectorXd u (n); u.fill(1);
   VectorXd l (n); l.fill(0);
 
   // VectorXd* a = new VectorXd(10);
@@ -173,14 +173,13 @@ void quickRun(){
   // print(*a);
   // print(*b);
 
-  // GurobiSolver gs = GurobiSolver(A, bl, bu, c, l, u);
-  // gs.solveRelaxed();
-  // // print(gs.r0);
-  // cout << gs.exe_relaxed << " " << gs.iteration_count << endl;
-  // cout << gs.relaxed_cscore << endl;
+  GurobiSolver gs = GurobiSolver(A, bl, bu, c, l, u);
+  gs.solveRelaxed();
+  // print(gs.r0);
+  cout << gs.exe_relaxed << " " << gs.iteration_count << endl;
+  cout << gs.relaxed_cscore << endl;
 
-  // cout << "-------------------" << endl;
-
+  cout << "-------------------" << endl;
   DualReducer dr = DualReducer(8, &A, &bl, &bu, &c, &l, &u);
   for (auto oi : dr.original_indices){
     cout << oi->size() << " ";
@@ -190,7 +189,7 @@ void quickRun(){
   double r0_obj = dr.duals[0]->score;
   double gap = (r0_obj - dr.best_score) / r0_obj * 100;
   cout << dr.best_score << " " << r0_obj << " " << gap << "%" << endl;
-  // cout << solCombination(dr.best_x) << endl;
+  cout << solCombination(dr.best_x) << endl;
 
   // GurobiSolver igs = GurobiSolver(A, bl, bu, c, l, u);
   // igs.solveIlp();

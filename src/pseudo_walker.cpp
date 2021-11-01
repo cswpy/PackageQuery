@@ -12,6 +12,7 @@ PseudoWalker::~PseudoWalker(){
 }
 
 PseudoWalker::PseudoWalker(VectorXd p, bool enable_correction, int core){
+  ppq = NULL; // Very important to avoid deleting uninitialized non-null ptr
   n = (int) p.size();
   assert(n > 1);
   steps.resize(n);
@@ -51,7 +52,7 @@ PseudoWalker::PseudoWalker(VectorXd p, bool enable_correction, int core){
         this->p(i) = p(i) / p_norm;
         double abs_pi = abs(this->p(i));
         if (abs_pi > kFloatEps) {
-          steps[i] = 2 - 2 * abs_pi * (abs_pi - (S - abs_pi) / (n - 1.0));
+          steps(i) = 2 - 2 * abs_pi * (abs_pi - (S - abs_pi) / (n - 1.0));
           (*init)[i] = { this->p(i) * this->p(i), i };
         }
       }
@@ -64,7 +65,7 @@ PseudoWalker::PseudoWalker(VectorXd p, bool enable_correction, int core){
     for (int i = 0; i < n; i++) {
       double abs_pi = abs(this->p(i));
       if (abs_pi > kFloatEps) {
-        steps[i] = 2 - 2 * abs_pi * (abs_pi - (S - abs_pi) / (n - 1.0));
+        steps(i) = 2 - 2 * abs_pi * (abs_pi - (S - abs_pi) / (n - 1.0));
         init[i] = { this->p(i) * this->p(i), i };
       }
     }
@@ -107,12 +108,12 @@ int PseudoWalker::executeStep(int i){
 int PseudoWalker::step() {
   if (core > 1){
     const auto& pi = ppq->peak();
-    ppq->subtractPeak(steps[pi.second]);
+    ppq->subtractPeak(steps(pi.second));
     return executeStep(pi.second);
   } else{
     const auto& pi = pq.top();
     int i = pi.second;
-    double new_pv = pi.first - steps[i];
+    double new_pv = pi.first - steps(i);
     pq.pop();
     pq.emplace(new_pv, i);
     return executeStep(i);
