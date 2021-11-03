@@ -27,6 +27,9 @@ PseudoWalker::PseudoWalker(VectorXd p, bool enable_correction, int core){
     vector<pair<double, int>>* init = new vector<pair<double, int>>(n);
     double p_norm = 0;
     double S = 0;
+    VectorXd pp = p / p.norm();
+    // cout << "THEIR NORM:" << p.norm() << endl;
+    // cout << "THEIR S:" << pp.cwiseAbs().sum() << endl; 
     #pragma omp parallel num_threads(core)
     {
       double local_p_norm = 0;
@@ -51,12 +54,12 @@ PseudoWalker::PseudoWalker(VectorXd p, bool enable_correction, int core){
       for (int i = 0; i < n; i ++){
         this->p(i) = p(i) / p_norm;
         double abs_pi = abs(this->p(i));
-        if (abs_pi > kFloatEps) {
-          steps(i) = 2 - 2 * abs_pi * (abs_pi - (S - abs_pi) / (n - 1.0));
-          (*init)[i] = { this->p(i) * this->p(i), i };
-        }
+        steps(i) = 2 - 2 * abs_pi * (abs_pi - (S - abs_pi) / (n - 1.0));
+        (*init)[i] = { this->p(i) * this->p(i), i };
       }
     }
+    // cout << "MY S: " << S << endl;
+    // cout << "MY P_NORM: " << p_norm << endl;
     ppq = new ParallelPQ(core, init);
   } else{
     this->p = p / p.norm();
@@ -64,10 +67,8 @@ PseudoWalker::PseudoWalker(VectorXd p, bool enable_correction, int core){
     vector<pair<double, int>> init(n);
     for (int i = 0; i < n; i++) {
       double abs_pi = abs(this->p(i));
-      if (abs_pi > kFloatEps) {
-        steps(i) = 2 - 2 * abs_pi * (abs_pi - (S - abs_pi) / (n - 1.0));
-        init[i] = { this->p(i) * this->p(i), i };
-      }
+      steps(i) = 2 - 2 * abs_pi * (abs_pi - (S - abs_pi) / (n - 1.0));
+      init[i] = { this->p(i) * this->p(i), i };
     }
     pq = priority_queue(init.begin(), init.end());
   }
@@ -85,9 +86,7 @@ int PseudoWalker::executeStep(int i){
       #pragma omp parallel for num_threads(core)
       for (int i = 0; i < n; i++){
         double abs_pi = abs(this->p(i));
-        if (abs_pi > kFloatEps) {
-          (*init)[i] = { abs_pi * (abs_pi + 2*sum_p) - 2*abs(x(i)), i };
-        }
+        (*init)[i] = { abs_pi * (abs_pi + 2*sum_p) - 2*abs(x(i)), i };
       }
       delete ppq;
       ppq = new ParallelPQ(core, init);
@@ -95,9 +94,7 @@ int PseudoWalker::executeStep(int i){
       vector<pair<double, int>> init (n);
       for (int i = 0; i < n; i++) {
         double abs_pi = abs(this->p(i));
-        if (abs_pi > kFloatEps) {
-          init[i] = { abs_pi * (abs_pi + 2*sum_p) - 2*abs(x(i)), i };
-        }
+        init[i] = { abs_pi * (abs_pi + 2*sum_p) - 2*abs(x(i)), i };
       }
       pq = priority_queue(init.begin(), init.end());
     }
@@ -108,6 +105,9 @@ int PseudoWalker::executeStep(int i){
 int PseudoWalker::step() {
   if (core > 1){
     const auto& pi = ppq->peak();
+    // cout << "SUBTRACING STEP AT " << pi.second << " " << steps(pi.second) << endl;
+    // double abs_pi = abs(p(pi.second));
+    // cout << p(pi.second) << " " << abs_pi << " " << n << endl;
     ppq->subtractPeak(steps(pi.second));
     return executeStep(pi.second);
   } else{

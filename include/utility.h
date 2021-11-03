@@ -36,6 +36,8 @@ constexpr int LS_DUAL_UNBOUNDED = 5;
 constexpr bool kIgnoreDegenerate = true;
 constexpr bool kDoPresolve = false;
 
+typedef Matrix<double, Dynamic, Dynamic, RowMajor> RMatrixXd;
+
 //const string kProjectHome = "/home/alm818/package_query";
 const string kProjectHome = "C:/Users/xuana/Desktop/VisualStudioCode/PackageQuery";
 

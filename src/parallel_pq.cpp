@@ -87,6 +87,11 @@ void ParallelPQ::pop(){
 }
 
 void ParallelPQ::subtractPeak(double pos_val){
+  // cout << "SUBTRACTING: " << pos_val << " TO " << lazy << endl;
+  // cout << "3 BIGS:" << endl;
+  // cout << (*q)[0].first << ":" << (*q)[0].second << endl;
+  // cout << (*q)[1].first << ":" << (*q)[1].second << endl;
+  // cout << (*q)[2].first << ":" << (*q)[2].second << endl;
   lazy -= pos_val;
   (*q)[0].first -= pos_val;
   if (lazy < 0){

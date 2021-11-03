@@ -24,6 +24,8 @@
 #include "reducer.h"
 #include "fmt/core.h"
 
+#define CORE_COUNT2 16
+
 using namespace std;
 using namespace Eigen;
 
@@ -40,7 +42,7 @@ void generateBoundedProlem2(int expected_n, double outlier_prob, double att_var,
   double var = att_var*expected_numvar;
   normal_distribution n_dist(0.0, var);
   normal_distribution n_dist_c(0.0, 200.0);
-  #pragma omp parallel for num_threads(CORE_COUNT)
+  #pragma omp parallel for num_threads(CORE_COUNT2)
   for (int i = 0; i < n; i ++){
     A(0, i) = u_dist(gen)*multiplicity;
     A(1, i) = u_dist(gen)*multiplicity;
@@ -55,8 +57,8 @@ void generateBoundedProlem2(int expected_n, double outlier_prob, double att_var,
   bu(1) = mean + tol;
   bl(2) = mean- tol;
   bu(2) = DBL_MAX;
-  bl(3) = expected_n/2;
-  bu(3) = expected_n*2;
+  bl(3) = expected_n;
+  bu(3) = expected_n;
 }
 
 void generateBoundedProlem(int expected_n, double outlier_prob, double att_var, int n, MatrixXd& A, VectorXd& bl, VectorXd& bu, VectorXd& c){
@@ -69,7 +71,7 @@ void generateBoundedProlem(int expected_n, double outlier_prob, double att_var, 
   double var = att_var*expected_numvar;
   normal_distribution n_dist(0.0, var);
   normal_distribution n_dist_c(0.0, 200.0);
-  #pragma omp parallel for num_threads(CORE_COUNT)
+  #pragma omp parallel for num_threads(CORE_COUNT2)
   for (int i = 0; i < n; i ++){
     A(0, i) = att_dist(gen);
     A(1, i) = att_dist(gen);
@@ -189,8 +191,8 @@ void quickRun(){
   int n = 1000000;
   MatrixXd A;
   VectorXd bl, bu, c;
-  generateBoundedProlem2(10, 0.9, 4, n, A, bl, bu, c);
-  VectorXd u (n); u.fill(1);
+  generateBoundedProlem2(20, 0.9, 4, n, A, bl, bu, c);
+  VectorXd u (n); u.fill(100);
   VectorXd l (n); l.fill(0);
   // testL3Cache();
 
@@ -218,27 +220,32 @@ void quickRun(){
   //   cout << primal.bhead[i] << " ";
   // }
   // cout << endl;
-
+  
+  // Dual dual1 = Dual(1, A, bl, bu, c, l, u);
+  // cout << dual1.exe_solve << endl;
+  cout << "START" << endl;
   Dual dual = Dual(8, A, bl, bu, c, l, u);
   cout << solMessage(dual.status) << endl;
   cout << dual.exe_solve << " " << dual.iteration_count << " " << dual.mini_iteration_count << endl;
   fmt::print("{:.10Lf}\n", dual.score);
-  // shortPrint(dual.x);
-  // print(dual.bhead);
+  shortPrint(dual.x);
+  print(dual.bhead);
   cout << "----------------------" << endl;
   GurobiSolver gs = GurobiSolver(A, bl, bu, c, l, u);
   gs.solveRelaxed();
-  cout << gs.exe_relaxed << " " << gs.iteration_count << endl;
+  cout << gs.exe_relaxed+gs.exe_init << " " << gs.iteration_count << endl;
+  // cout << "AMDA1:" << 8.0/7.0 * (1 - dual.exe_solve / dual1.exe_solve) << endl;
+  // cout << "AMDA2:" << 8.0/7.0 * (1 - (gs.exe_relaxed+gs.exe_init) / dual1.exe_solve) << endl;
   // shortPrint(gs.r0);
-  fmt::print("{:.10Lf}\n", gs.relaxed_cscore);
-  // print(dual.x);
-  // print(gs.r0);
-  cout << verify(dual.x, A, bl, bu, c, l, u) << " " << verify(gs.r0, A, bl, bu, c, l, u) << endl;
-  if (gs.relaxed_status == LS_FOUND && !isEqual(gs.relaxed_cscore, dual.score, 1e-4)){
-    for (int i = 0; i < n; i ++){
-      assert(isEqual(dual.x(i), gs.r0(i), 1e-6));
-    }
-  }
+  // fmt::print("{:.10Lf}\n", gs.relaxed_cscore);
+  // // print(dual.x);
+  // // print(gs.r0);
+  // cout << verify(dual.x, A, bl, bu, c, l, u) << " " << verify(gs.r0, A, bl, bu, c, l, u) << endl;
+  // if (gs.relaxed_status == LS_FOUND && !isEqual(gs.relaxed_cscore, dual.score, 1e-4)){
+  //   for (int i = 0; i < n; i ++){
+  //     assert(isEqual(dual.x(i), gs.r0(i), 1e-6));
+  //   }
+  // }
 }
 
 void mapSort(){

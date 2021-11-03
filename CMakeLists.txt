@@ -62,7 +62,7 @@ install(
 #set(MAIN_NAME "main_ccfits")
 #set(MAIN_NAME "main_reducer")
 #set(MAIN_NAME "main_dual")
-set(MAIN_NAME "main_dual_reducer")
+#set(MAIN_NAME "main_dual_reducer")
 
 # TEST
 #set(MAIN_NAME "test_accuracy_lattice_walk")
@@ -71,6 +71,7 @@ set(MAIN_NAME "main_dual_reducer")
 #set(MAIN_NAME "test_lattice_solver")
 #set(MAIN_NAME "test_ppq")
 #set(MAIN_NAME "test_plot")
+set(MAIN_NAME "test_dual_reducer")
 
 message("PROJECT NAME: " ${PROJECT_NAME})
 message("SOURCE FOLDER: " ${CMAKE_SOURCE_DIR})

@@ -2,13 +2,14 @@
 
 #include <Eigen/Dense>
 #include <boost/dynamic_bitset.hpp>
+#include "utility.h"
 
 using namespace Eigen;
 
 class Dual{
 public:
   // Original data
-  const MatrixXd& A;
+  const RMatrixXd& A;
   const VectorXd& bbl;
   const VectorXd& bbu;
   const VectorXd& c;
@@ -26,5 +27,5 @@ public:
   MatrixXd Binv;
 public:
   ~Dual();
-  Dual(int core, const MatrixXd& A, const VectorXd& bl, const VectorXd& bu, const VectorXd& c, const VectorXd& l, const VectorXd& u);
+  Dual(int core, const RMatrixXd& A, const VectorXd& bl, const VectorXd& bu, const VectorXd& c, const VectorXd& l, const VectorXd& u);
 };

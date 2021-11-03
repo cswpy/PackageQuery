@@ -28,22 +28,23 @@
 using namespace std;
 using namespace Eigen;
 
-void generateBoundedProlem(int expected_n, double outlier_prob, double att_var, int n, MatrixXd& A, VectorXd& bl, VectorXd& bu, VectorXd& c){
+void generateNormalProlem(int expected_n, double outlier_prob, double att_var, int n, MatrixXd& A, VectorXd& bl, VectorXd& bu, VectorXd& c){
   A.resize(4, n); bl.resize(4); bu.resize(4); c.resize(n); 
   default_random_engine gen {static_cast<long unsigned int>(time(0))};
   uniform_real_distribution u_dist(0.0, 1.0);
-  double multiplicity = att_var * 12;
-  //normal_distribution att_dist(10.0, att_var);
+  // double multiplicity = att_var * 12;
+  double one_mean = 100;
+  normal_distribution att_dist(one_mean, att_var);
   int expected_numvar = expected_n;
-  double mean = 0.5*multiplicity*expected_numvar;
+  double mean = one_mean*expected_numvar;
   double var = att_var*expected_numvar;
   normal_distribution n_dist(0.0, var);
-  normal_distribution n_dist_c(0.0, 200.0);
+  normal_distribution n_dist_c(0.0, 1.0);
   #pragma omp parallel for num_threads(CORE_COUNT)
   for (int i = 0; i < n; i ++){
-    A(0, i) = u_dist(gen)*multiplicity;
-    A(1, i) = u_dist(gen)*multiplicity;
-    A(2, i) = u_dist(gen)*multiplicity;
+    A(0, i) = att_dist(gen);
+    A(1, i) = att_dist(gen);
+    A(2, i) = att_dist(gen);
     A(3, i) = 1;
     c(i) = n_dist_c(gen);
   }
@@ -55,7 +56,39 @@ void generateBoundedProlem(int expected_n, double outlier_prob, double att_var, 
   bl(2) = mean- tol;
   bu(2) = DBL_MAX;
   bl(3) = expected_n/2;
-  bu(3) = expected_n*2;
+  bu(3) = expected_n*3/2;
+}
+
+void generateBoundedProlem(int expected_n, double outlier_prob, double att_var, int n, MatrixXd& A, VectorXd& bl, VectorXd& bu, VectorXd& c){
+  A.resize(4, n); bl.resize(4); bu.resize(4); c.resize(n); 
+  default_random_engine gen {static_cast<long unsigned int>(time(0))};
+  uniform_real_distribution u_dist(-1.0, 1.0);
+  double multiplicity = att_var * 6;
+  //normal_distribution att_dist(10.0, att_var);
+  int expected_numvar = expected_n;
+  double mean = 0.5*multiplicity*expected_numvar;
+  double var = att_var*expected_numvar;
+  normal_distribution n_dist(0.0, var);
+  //normal_distribution n_dist_c(0.0, 1.0/12);
+  uniform_real_distribution n_dist_c(-1.0, 1.0);
+  #pragma omp parallel for num_threads(CORE_COUNT)
+  for (int i = 0; i < n; i ++){
+    A(0, i) = u_dist(gen)*multiplicity;
+    A(1, i) = u_dist(gen)*multiplicity;
+    A(2, i) = u_dist(gen)*multiplicity;
+    A(3, i) = 1;
+    c(i) = n_dist_c(gen)*multiplicity;
+    //c(i) = A(0, i) + A(1, i) + A(2, i);
+  }
+  double tol = var*sqrt(1/outlier_prob);
+  bl(0) = mean - tol;
+  bu(0) = mean + tol;
+  bl(1) = -DBL_MAX;
+  bu(1) = mean + tol;
+  bl(2) = mean- tol;
+  bu(2) = DBL_MAX;
+  bl(3) = expected_n/2;
+  bu(3) = expected_n*3/2;
 }
 
 void centroid_test(){
@@ -72,7 +105,7 @@ void centroid_test(){
   Dual* dual = new Dual(core, A, bl, bu, c, l, u);
   print(dual->x);
 
-  MatrixXd BA = dual->Binv * dual->A;
+  MatrixXd BA = -dual->Binv * dual->A;
   cout << BA << endl;
   cout << endl;
   cout << dual->Binv << endl;
@@ -81,6 +114,7 @@ void centroid_test(){
   cout << endl;
 
   if (dual->status == LS_FOUND){
+    VectorXd norms (m+n); norms.fill(0);
     VectorXd centroid_dir (n); centroid_dir.fill(0);
     VectorXd r0 (n);
     VectorXd stay_r0 (n);
@@ -102,6 +136,32 @@ void centroid_test(){
       }
       #pragma omp atomic
       stay_count += local_stay_count;
+      #pragma omp for nowait
+      for (int i = 0; i < m+n; i ++){
+        if (!dual->inv_bhead[i]){
+          double norm = 0;
+          if (i < n){
+            norm ++;
+            for (int j = 0; j < m; j ++){
+              if (dual->bhead(j) < n){
+                double val = 0;
+                for (int k = 0; k < m; k ++){
+                  val += dual->Binv(j, k) * dual->A(k, i);
+                }
+                norm += val*val;
+              }
+            }
+          } else{
+            int index = i - n;
+            for (int j = 0; j < m; j ++){
+              if (dual->bhead(j) < n){
+                norm += dual->Binv(j, index)*dual->Binv(j, index);
+              }
+            }
+          }
+          norms(i) = sqrt(norm);
+        }
+      }
       #pragma omp barrier
       for (int j = 0; j < m; j ++){
         double local_sum_row = 0;
@@ -110,13 +170,13 @@ void centroid_test(){
           if (!dual->inv_bhead[i]){
             // Non-basic
             if (i < n){
-              if (isEqual(dual->x(i), dual->l(i))) local_sum_row -= dual->A(j, i);
-              else local_sum_row += dual->A(j, i);
+              if (isEqual(dual->x(i), dual->l(i))) local_sum_row += dual->A(j, i) / norms(i);
+              else local_sum_row -= dual->A(j, i) / norms(i);
             } else{
               int index = i - n;
               if (index == j){
-                if (isEqual(dual->x(i), dual->bl(index))) local_sum_row --;
-                else local_sum_row ++;
+                if (isEqual(dual->x(i), dual->bl(index))) local_sum_row -= 1.0 / norms(i);
+                else local_sum_row += 1.0 / norms(i);
               }
             }
           }
@@ -128,15 +188,15 @@ void centroid_test(){
       for (int i = 0; i < n; i ++){
         if (!dual->inv_bhead[i]){
           // Non-basic
-          if (isEqual(dual->x(i), dual->l(i))) centroid_dir(i) = 1.0/n;
-          else centroid_dir(i) = -1.0/n;
+          if (isEqual(dual->x(i), dual->l(i))) centroid_dir(i) = 1.0/norms(i)/n;
+          else centroid_dir(i) = -1.0/norms(i)/n;
         }
       }
       #pragma omp barrier
       #pragma omp master
       {
-        cout << "SUM ROW" << endl;
-        print(sum_row);
+        // cout << "SUM ROW" << endl;
+        // print(sum_row);
         for (int i = 0; i < m; i ++){
           if (dual->bhead(i) < n){
             double val = 0;
@@ -156,11 +216,32 @@ void centroid_test(){
   }
 }
 
+bool verify(VectorXd x, const MatrixXd& A, const VectorXd& bl, const VectorXd& bu, const VectorXd& c, const VectorXd& l, const VectorXd& u){
+  int n = l.size();
+  VectorXd sol = x(seqN(0, n));
+  int m = bl.size();
+  for (int i = 0; i < n; i ++){
+    if (isLess(sol(i), l(i)) || isGreater(sol(i),u(i))){
+      cout << "N:" << i << " VIOLATIONS" << endl;
+      return false;
+    }
+  }
+  VectorXd b = A * sol;
+  for (int i = 0; i < m; i ++){
+    if (isLess(b(i), bl(i)) || isGreater(b(i), bu(i))){
+      cout << "M:" << i << " VIOLATIONS" << endl;
+      return false;
+    }
+  }
+  return true;
+}
+
 void quickRun(){
-  int n = 1000000;
+  int n = 10000;
   MatrixXd A;
   VectorXd bl, bu, c;
-  generateBoundedProlem(10, 0.9, 4, n, A, bl, bu, c);
+  generateBoundedProlem(500, 0.7, 1, n, A, bl, bu, c);
+  //generateNormalProlem(15, 0.8, 4, n, A, bl, bu, c);
   VectorXd u (n); u.fill(1);
   VectorXd l (n); l.fill(0);
 
@@ -179,23 +260,36 @@ void quickRun(){
   cout << gs.exe_relaxed << " " << gs.iteration_count << endl;
   cout << gs.relaxed_cscore << endl;
 
-  cout << "-------------------" << endl;
-  DualReducer dr = DualReducer(8, &A, &bl, &bu, &c, &l, &u);
+  // cout << "-------------------" << endl;
+  DualReducer dr2 = DualReducer(8, &A, &bl, &bu, &c, &l, &u, 1);
+  for (auto oi : dr2.original_indices){
+    cout << oi->size() << " ";
+  }
+  cout << endl;
+  cout << solMessage(dr2.status) << " " << dr2.exe_solve << " " << dr2.duals[0]->exe_solve << endl;
+  
+  DualReducer dr = DualReducer(8, &A, &bl, &bu, &c, &l, &u, 0);
   for (auto oi : dr.original_indices){
     cout << oi->size() << " ";
   }
   cout << endl;
-  cout << solMessage(dr.status) << " " << dr.exe_solve << endl;
+  cout << solMessage(dr.status) << " " << dr.exe_solve << " " << dr.duals[0]->exe_solve << endl;
   double r0_obj = dr.duals[0]->score;
   double gap = (r0_obj - dr.best_score) / r0_obj * 100;
   cout << dr.best_score << " " << r0_obj << " " << gap << "%" << endl;
-  cout << solCombination(dr.best_x) << endl;
+  //cout << solCombination(dr.best_x) << endl;
+  verify(dr.best_x, A, bl, bu, c, l, u);
 
-  // GurobiSolver igs = GurobiSolver(A, bl, bu, c, l, u);
-  // igs.solveIlp();
-  // double gap2 = (igs.ilp_cscore - dr.best_score) / igs.ilp_cscore * 100;
-  // cout << igs.ilp_cscore << " " << gap2 << "%" << endl;
-  // cout << igs.exe_ilp + igs.exe_init << endl;
+  double gap2 = (r0_obj - dr2.best_score) / r0_obj * 100;
+  cout << dr2.best_score << " " << r0_obj << " " << gap2 << "%" << endl;
+  //cout << solCombination(dr2.best_x) << endl;
+  verify(dr2.best_x, A, bl, bu, c, l, u);
+  GurobiSolver igs = GurobiSolver(A, bl, bu, c, l, u);
+  igs.solveIlp();
+  double gap3 = (igs.ilp_cscore - dr.best_score) / igs.ilp_cscore * 100;
+  double gap4 = (igs.ilp_cscore - dr2.best_score) / igs.ilp_cscore * 100;
+  cout << igs.ilp_cscore << " " << gap3 << "%" << " " << gap4 << "%" << endl;
+  cout << igs.exe_ilp + igs.exe_init << endl;
 
   // int n = 2;
   // int m = 4;
@@ -224,7 +318,122 @@ void quickRun(){
   // }
 }
 
+void L3cache(){
+  int core = 8;
+  int L3 = 8 * 1024 * 1024;
+  int max_double = (int)floor(L3 / 8);
+  vector<string> names = {"0", "1", "2", "3", "4", "5", "6", "7"};
+  Profiler pro = Profiler(names);
+  int m = 4;
+  int n = max_double * 10;
+  default_random_engine gen {static_cast<long unsigned int>(time(0))};
+  uniform_real_distribution u_dist(0.0, 1.0);
+  vector<VectorXd> arr (m);
+  for (int i = 0; i < m; i ++) arr[i].resize(n);
+  for (int i = 0; i < m; i ++){
+    #pragma omp parallel for num_threads(core)
+    for (int j = 0; j < n; j ++) arr[i](j) = u_dist(gen);
+  }
+  pro.clock(0);
+  #pragma omp parallel for num_threads(core)
+  for (int i = 0; i < n; i ++){
+    for (int j = 0; j < m; j ++){
+      arr[j](i) *= 2;
+      arr[j](i) /= 3;
+    }
+  }
+  pro.stop(0);
+  pro.clock(1);
+  #pragma omp parallel num_threads(core)
+  {
+    for (int j = 0; j < m; j ++){
+      #pragma omp for nowait
+      for (int i = 0; i < n; i ++){
+        arr[j](i) *= 2;
+        arr[j](i) /= 3;
+      }
+    }
+  }
+  pro.stop(1);
+  pro.clock(2);
+  #pragma omp parallel for num_threads(core)
+  for (int i = 0; i < n; i ++){
+    for (int j = 1; j < m; j ++){
+      arr[j](i) *= 2;
+      arr[j](i) -= arr[0](i);
+    }
+  }
+  pro.stop(2);
+  pro.clock(3);
+  #pragma omp parallel num_threads(core)
+  {
+    for (int j = 1; j < m; j ++){
+      #pragma omp for nowait
+      for (int i = 0; i < n; i ++){
+        arr[j](i) *= 2;
+        arr[j](i) -= arr[0](i);
+      }
+    }
+  }
+  pro.stop(3);
+  pro.print();
+}
+
+void testL3Cache(){
+  chrono::high_resolution_clock::time_point start, end;
+  int N = 100000000; int r = 10;
+  VectorXd u (N); u.fill(0.24);
+  VectorXd g1 (N); VectorXd g2 (N); VectorXd g3 (N);
+  start = chrono::high_resolution_clock::now();
+  // for (int i = 0; i < r; i ++){
+  //   VectorXd g1 = u;
+  //   VectorXd g2 = u+u;
+  //   VectorXd g3 = u+u+u;
+  // }
+  // L3 Effect
+  #pragma omp parallel num_threads(16)
+  {
+    #pragma omp for nowait
+    for (int i = 0; i < N; i ++){
+      g1(i) = u(i)+u(i);
+    }
+    // #pragma omp for nowait
+    // for (int i = 0; i < N; i ++){
+    //   g2(i) = u(i) + u(i);
+    // }
+    #pragma omp for nowait
+    for (int i = 0; i < N; i ++){
+      g3(i) = u(i) + u(i) + u(i);
+    }
+  }
+  end = chrono::high_resolution_clock::now();
+  double exe = chrono::duration_cast<chrono::nanoseconds>(end - start).count() / 1000000.0;
+  cout << exe << endl;
+
+  VectorXd l1 (N); VectorXd l2 (N); VectorXd l3 (N);
+  cout << "START" << endl;
+  start = chrono::high_resolution_clock::now();
+  VectorXd uu = u+u;
+  VectorXd uuu = u+u+u;
+  // #pragma omp parallel num_threads(16)
+  // {
+  //   #pragma omp for
+  //   for (int i = 0; i < N; i ++){
+  //     for (int j = 0; j < r; j ++){
+  //       l1(i) = u(i);
+  //       l2(i) = u(i)+u(i);
+  //       l3(i) = u(i)+u(i)+u(i);
+  //     }
+  //   }
+  // }
+  end = chrono::high_resolution_clock::now();
+  double exe2 = chrono::duration_cast<chrono::nanoseconds>(end - start).count() / 1000000.0;
+  cout << exe2 << endl;
+}
+
 int main(){
   quickRun();
   //centroid_test();
+  //L3cache();
+  //testL3Cache();
 }

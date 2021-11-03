@@ -11,7 +11,7 @@
 
 using namespace std;
 
-// bool verify2(VectorXd x, const MatrixXd& A, const VectorXd& bl, const VectorXd& bu, const VectorXd& c, const VectorXd& l, const VectorXd& u){
+// bool verify2(VectorXd x, const RMatrixXd& A, const VectorXd& bl, const VectorXd& bu, const VectorXd& c, const VectorXd& l, const VectorXd& u){
 //   int n = l.size();
 //   VectorXd sol = x(seqN(0, n));
 //   int m = bl.size();
@@ -106,7 +106,7 @@ Dual::~Dual(){
 
 // Maximizing cc 
 // Dual minimizing c
-Dual::Dual(int core, const MatrixXd& A, const VectorXd& bbl, const VectorXd& bbu,  const VectorXd& c, const VectorXd& l, const VectorXd& u): A(A), bbl(bbl), bbu(bbu), c(c), l(l), u(u){
+Dual::Dual(int core, const RMatrixXd& A, const VectorXd& bbl, const VectorXd& bbu,  const VectorXd& c, const VectorXd& l, const VectorXd& u): A(A), bbl(bbl), bbu(bbu), c(c), l(l), u(u){
   // vector<string> names = {"Copy", "RestInit", "BoundStricten", "InitXBound", "Compute XB", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18"};
   // Profiler pro = Profiler(names);
   chrono::high_resolution_clock::time_point start;
