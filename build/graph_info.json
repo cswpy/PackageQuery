@@ -281,6 +281,18 @@
    "True"
   ],
   [
+   "libpq:shared",
+   "False"
+  ],
+  [
+   "libpq:with_openssl",
+   "False"
+  ],
+  [
+   "libpqxx:shared",
+   "False"
+  ],
+  [
    "zlib:minizip",
    "deprecated"
   ],

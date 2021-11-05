@@ -100,6 +100,8 @@ DualReducer::DualReducer(int core, RMatrixXd* AA, VectorXd* bbl, VectorXd* bbu, 
       VectorXd sum_row(m); sum_row.fill(0);
       RMatrixXd BinvA (m, n+m);
       int stay_count = 0;
+      bool is_conservative = true;
+      int horizon = (int)ceil(n / log2(n) * kStepTolerance);
       #pragma omp parallel num_threads(core)
       {
         // pro.clock(2);
@@ -113,7 +115,7 @@ DualReducer::DualReducer(int core, RMatrixXd* AA, VectorXd* bbl, VectorXd* bbu, 
         for (int i = 0; i < n; i ++){
           r0(i) = dual->x(i);
           frac = modf(dual->x(i), &whole);
-          if (isEqual(frac, 0)) stay_r0(i) = whole;
+          if (isEqual(frac, 0) && whole == 0) stay_r0(i) = whole;
           else{
             stay_r0(i) = -1;
             local_stay_count ++;
@@ -121,93 +123,140 @@ DualReducer::DualReducer(int core, RMatrixXd* AA, VectorXd* bbl, VectorXd* bbu, 
         }
         #pragma omp atomic
         stay_count += local_stay_count;
-        for (int j = 0; j < m; j ++){
-          #pragma omp for nowait
-          for (int i = 0; i < n+m; i ++){
-            if (!dual->inv_bhead[i]){
-              if (i < n){
-                double val = 0;
-              } else{
-
-              }
-            }
-          }
-        }
-        #pragma omp for nowait
-        for (int i = 0; i < m+n; i ++){
-          if (!dual->inv_bhead[i]){
-            double norm = 0;
-            if (i < n){
-              norm ++;
-              for (int j = 0; j < m; j ++){
-                if (dual->bhead(j) < n){
-                  double val = 0;
-                  for (int k = 0; k < m; k ++){
-                    val += dual->Binv(j, k) * dual->A(k, i);
-                  }
-                  norm += val*val;
-                }
-              }
-            } else{
-              int index = i - n;
-              for (int j = 0; j < m; j ++){
-                if (dual->bhead(j) < n){
-                  norm += dual->Binv(j, index)*dual->Binv(j, index);
-                }
-              }
-            }
-            norms(i) = sqrt(norm);
-          }
-        }
-        #pragma omp barrier
-        for (int j = 0; j < m; j ++){
-          double local_sum_row = 0;
+        // #pragma omp barrier
+        // #pragma omp master
+        // {
+        //   if (stay_count > horizon) is_conservative = false;
+        //   stay_count = 0;
+        // }
+        // #pragma omp barrier
+        // if (!is_conservative){
+        //   #pragma omp for nowait
+        //   for (int i = 0; i < n; i ++){
+        //     if (stay_r0(i) == -1){
+        //       frac = modf(dual->x(i), &whole);
+        //       if (isEqual(frac, 0)){
+        //         stay_r0(i) = whole;
+        //         local_stay_count --;
+        //       }
+        //     }
+        //   }
+        //   #pragma omp atomic
+        //   stay_count += local_stay_count;
+        // }
+        // for (int j = 0; j < m; j ++){
+        //   #pragma omp for nowait
+        //   for (int i = 0; i < n+m; i ++){
+        //     if (!dual->inv_bhead[i]){
+        //       if (i < n){
+        //         double val = 0;
+        //         for (int k = 0; k < m; k ++) val += dual->Binv(j, k) * dual->A(k, i);
+        //         BinvA(j, i) = val;
+        //       } else{
+        //         int index = i - n;
+        //         BinvA(j, i) = dual->Binv(j, index);
+        //       }
+        //     }
+        //   }
+        // }
+        // #pragma omp barrier
+        // #pragma omp master
+        // {
+        //   for (int i = 0; i < m; i ++){
+        //     int basic_col = dual->bhead(i);
+        //     if (basic_col < n){
+        //       //cout << basic_col << " " << dual->x(basic_col) << " " << dual->l(basic_col) << " " << dual->u(basic_col) << endl;
+        //       if (isEqual(dual->x(basic_col), dual->l(basic_col)) || isEqual(dual->x(basic_col), dual->u(basic_col))){
+        //         cout << "DENGERACY DETECTED AT " << basic_col << endl;
+        //       }
+        //     } else{
+        //       int index = basic_col - n;
+        //       //cout << basic_col << " " << dual->x(basic_col) << " " << dual->bl(index) << " " << dual->bu(index) << endl;
+        //       if (isEqual(dual->x(basic_col), dual->bl(index)) || isEqual(dual->x(basic_col), dual->bu(index))){
+        //         cout << "DENGERACY DETECTED AT " << basic_col << endl;
+        //       }
+        //     }
+        //   }
+        // }
+        // #pragma omp barrier
+        if (opt == 0){
           #pragma omp for nowait
           for (int i = 0; i < m+n; i ++){
             if (!dual->inv_bhead[i]){
-              // Non-basic
+              double norm = 0;
               if (i < n){
-                if (isEqual(dual->x(i), dual->l(i))) local_sum_row += dual->A(j, i) / norms(i);
-                else local_sum_row -= dual->A(j, i) / norms(i);
+                norm ++;
+                for (int j = 0; j < m; j ++){
+                  if (dual->bhead(j) < n){
+                    double val = 0;
+                    for (int k = 0; k < m; k ++){
+                      val += dual->Binv(j, k) * dual->A(k, i);
+                    }
+                    norm += val*val;
+                  }
+                }
               } else{
                 int index = i - n;
-                if (index == j){
-                  if (isEqual(dual->x(i), dual->bl(index))) local_sum_row -= 1.0 / norms(i);
-                  else local_sum_row += 1.0 / norms(i);
+                for (int j = 0; j < m; j ++){
+                  if (dual->bhead(j) < n){
+                    norm += dual->Binv(j, index)*dual->Binv(j, index);
+                  }
+                }
+              }
+              norms(i) = sqrt(norm);
+            }
+          }
+          #pragma omp barrier
+          for (int j = 0; j < m; j ++){
+            double local_sum_row = 0;
+            #pragma omp for nowait
+            for (int i = 0; i < m+n; i ++){
+              if (!dual->inv_bhead[i]){
+                // Non-basic
+                if (i < n){
+                  if (isEqual(dual->x(i), dual->l(i))) local_sum_row += dual->A(j, i) / norms(i);
+                  else local_sum_row -= dual->A(j, i) / norms(i);
+                } else{
+                  int index = i - n;
+                  if (index == j){
+                    if (isEqual(dual->x(i), dual->bl(index))) local_sum_row -= 1.0 / norms(i);
+                    else local_sum_row += 1.0 / norms(i);
+                  }
                 }
               }
             }
+            #pragma omp atomic
+            sum_row(j) += local_sum_row;
           }
-          #pragma omp atomic
-          sum_row(j) += local_sum_row;
-        }
-        #pragma omp for nowait
-        for (int i = 0; i < n; i ++){
-          if (!dual->inv_bhead[i]){
-            // Non-basic
-            if (isEqual(dual->x(i), dual->l(i))) centroid_dir(i) = 1.0/norms(i)/n;
-            else centroid_dir(i) = -1.0/norms(i)/n;
-          }
-        }
-        #pragma omp barrier
-        #pragma omp master
-        {
-          //cout << "A1 " << layer_count << endl;
-          for (int i = 0; i < m; i ++){
-            if (dual->bhead(i) < n){
-              double val = 0;
-              for (int j = 0; j < m; j ++){
-                val += dual->Binv(i, j) * sum_row(j);
-              }
-              //cout << "HERE " << i << " " << dual->bhead(i) << " VAL:" << val << endl;
-              centroid_dir(dual->bhead(i)) = val / n;
+          #pragma omp for nowait
+          for (int i = 0; i < n; i ++){
+            if (!dual->inv_bhead[i]){
+              // Non-basic
+              if (isEqual(dual->x(i), dual->l(i))) centroid_dir(i) = 1.0/norms(i)/n;
+              else centroid_dir(i) = -1.0/norms(i)/n;
             }
           }
+          #pragma omp barrier
+          #pragma omp master
+          {
+            //cout << "A1 " << layer_count << endl;
+            for (int i = 0; i < m; i ++){
+              if (dual->bhead(i) < n){
+                double val = 0;
+                for (int j = 0; j < m; j ++){
+                  val += dual->Binv(i, j) * sum_row(j);
+                }
+                //cout << "HERE " << i << " " << dual->bhead(i) << " VAL:" << val << endl;
+                centroid_dir(dual->bhead(i)) = val / n;
+              }
+            }
+          }
+          // pro.stop(2);
         }
-        // pro.stop(2);
       }
       // pro.clock(3, false);
       //cout << "A2 " << layer_count << endl;
+      //cout << is_conservative << " " << stay_count << endl;
       if (opt == 0){
         PseudoWalker walker = PseudoWalker(centroid_dir, true, core);
         // pro.stop(3, false);
@@ -223,7 +272,6 @@ DualReducer::DualReducer(int core, RMatrixXd* AA, VectorXd* bbl, VectorXd* bbu, 
         // print(centroid_dir);
         
         // pro.clock(4, false);
-        int step_horizon = (int)ceil(n / log2(n) * kStepTolerance);
         while (true){
           int step = walker.step();
           int index = abs(step)-1;
@@ -240,15 +288,19 @@ DualReducer::DualReducer(int core, RMatrixXd* AA, VectorXd* bbl, VectorXd* bbu, 
           // }
           // cout << endl;
 
-          if (walker.step_count == step_horizon){
+          // if (stay_count == n/2){
+          //   break;
+          // }
+
+          if (walker.step_count == horizon){
             break;
           }
 
-          // if (((*l)(index)-r0(index) >= 1) || (r0(index)-(*u)(index) >= 1) || walker.step_count == step_horizon){
+          // if (((*l)(index)-r0(index) >= 1) || (r0(index)-(*u)(index) >= 1) || walker.step_count == horizon){
           //   break;
           // }
         }
-        //cout << "LAYER: " << layer_count << " STEP COUNT: " << walker.step_count << endl;
+        // cout << "LAYER: " << layer_count << " STEP COUNT: " << walker.step_count << " STAY:" << stay_count << endl;
       }
 
       // pro.stop(4, false);
@@ -330,6 +382,16 @@ DualReducer::DualReducer(int core, RMatrixXd* AA, VectorXd* bbl, VectorXd* bbu, 
         //cout << "B2 " << layer_count << endl;
       }
       layer_count ++;
+      if (stay_count >= horizon){
+        A = As[layer_count];
+        bl = bls[layer_count];
+        bu = bus[layer_count];
+        c = cs[layer_count];
+        l = ls[layer_count];
+        u = us[layer_count];
+        original_index = original_indices[layer_count];
+        break;
+      }
       //cout << "B3 " << layer_count << endl;
     } else{
       status = dual->status;

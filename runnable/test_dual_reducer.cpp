@@ -71,12 +71,13 @@ void generateQuery(int qi, int n, RMatrixXd& A, VectorXd& bl, VectorXd& bu, Vect
 void testAccuracy(){
   int T = 3;
   vector<int> szs = {1000, 10000, 100000};
-  vector<int> repeats = {100, 50, 25};
+  vector<int> repeats = {1000, 50, 25};
   RMatrixXd A;
   VectorXd bl, bu, c;
   VectorXd u;
   VectorXd l;
   for (int qi = 0; qi < 8; qi ++){
+    if (qi > 3) continue;
     for (int i = 0; i < T; i ++){
       if (i != 0) continue;
       int fail0 = 0;
@@ -91,8 +92,11 @@ void testAccuracy(){
         generateQuery(qi, n, A, bl, bu, c);
         u.resize(n); u.fill(1);
         l.resize(n); l.fill(0);
-        DualReducer dr0 = DualReducer(16, &A, &bl, &bu, &c, &l, &u, 0);
-        DualReducer dr1 = DualReducer(16, &A, &bl, &bu, &c, &l, &u, 1);
+        //cout << "HERE " << endl;
+        DualReducer dr0 = DualReducer(8, &A, &bl, &bu, &c, &l, &u, 0);
+        //cout << "HERE2 " << endl;
+        DualReducer dr1 = DualReducer(8, &A, &bl, &bu, &c, &l, &u, 1);
+        //cout << "HERE3 " << endl;
         double base_score = dr0.duals[0]->score;
         if (dr0.status != LS_FOUND || dr1.status != LS_FOUND){
           if (dr0.status != LS_FOUND) fail0 ++;
@@ -106,9 +110,9 @@ void testAccuracy(){
           ap0 += base_score / dr0.best_score;
           ap1 += base_score / dr1.best_score;
         }
+        fmt::print("At ({},{},{}) fail_prob({:.2Lf},{:.2Lf}) avg_obj_gap({:.10Lf},{:.10Lf}) avg_ap({:.10Lf},{:.10Lf})\n", qi, i, r, fail0/(double)repeats[i], fail1/(double)repeats[i], obj_gap0/succ, obj_gap1/succ, ap0/succ, ap1/succ);
       }
-      fmt::print("{},{},{:.2Lf},{:.2Lf},{:.10Lf},{:.10Lf},{:.10Lf},{:.10Lf}\n", qi, n, fail0/(double)repeats[i], fail1/(double)repeats[i], obj_gap0/succ, obj_gap1/succ, ap0/succ, ap1/succ);
-      //fmt::print("At ({},{},{}) fail_prob({:.2Lf},{:.2Lf}) avg_obj_gap({:.10Lf},{:.10Lf}) avg_ap({:.10Lf},{:.10Lf})\n", qi, i, r, fail0/(double)repeats[i], fail1/(double)repeats[i], obj_gap0/succ, obj_gap1/succ, ap0/succ, ap1/succ);
+      //fmt::print("{},{},{:.2Lf},{:.2Lf},{:.10Lf},{:.10Lf},{:.10Lf},{:.10Lf}\n", qi, n, fail0/(double)repeats[i], fail1/(double)repeats[i], obj_gap0/succ, obj_gap1/succ, ap0/succ, ap1/succ);
     }
   }
 }
@@ -144,15 +148,15 @@ void testReducer(){
   VectorXd l;
   for (int qi = 0; qi < 8; qi ++){
     for (int i = 0; i < T; i ++){
-      if (i != 1) continue;
+      // if (i != 1) continue;
       int n = szs[i];
       generateQuery(qi, n, A, bl, bu, c);
       u.resize(n); u.fill(1);
       l.resize(n); l.fill(0);
-      DualReducer dr = DualReducer(8, &A, &bl, &bu, &c, &l, &u, 0);
+      DualReducer dr = DualReducer(8, &A, &bl, &bu, &c, &l, &u, 1);
       double r0_obj = dr.duals[0]->score;
-      double gap = (r0_obj - dr.best_score) / r0_obj;
-      fmt::print("{},{},{:.2Lf},{:.2Lf},{:.5Lf}\n", qi, n, dr.exe_solve, dr.duals[0]->exe_solve, gap);
+      double gap = (r0_obj - dr.best_score) / r0_obj * 100;
+      fmt::print("{},{},{:.2Lf},{:.2Lf},{:.10Lf}\n", qi, n, dr.exe_solve, dr.duals[0]->exe_solve, gap);
     }
   }
 }
@@ -219,8 +223,8 @@ void testMajorMatrix(){
 }
 
 int main(){
-  testAccuracy();
+  //testAccuracy();
   //testDual();
-  //testReducer();
+  testReducer();
   //testMajorMatrix();
 }

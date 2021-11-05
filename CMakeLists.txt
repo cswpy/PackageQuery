@@ -63,6 +63,7 @@ install(
 #set(MAIN_NAME "main_reducer")
 #set(MAIN_NAME "main_dual")
 #set(MAIN_NAME "main_dual_reducer")
+set(MAIN_NAME "main_pqxx")
 
 # TEST
 #set(MAIN_NAME "test_accuracy_lattice_walk")
@@ -71,7 +72,7 @@ install(
 #set(MAIN_NAME "test_lattice_solver")
 #set(MAIN_NAME "test_ppq")
 #set(MAIN_NAME "test_plot")
-set(MAIN_NAME "test_dual_reducer")
+#set(MAIN_NAME "test_dual_reducer")
 
 message("PROJECT NAME: " ${PROJECT_NAME})
 message("SOURCE FOLDER: " ${CMAKE_SOURCE_DIR})
@@ -105,7 +106,7 @@ if(CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "-Wall -Wextra")
   set(CMAKE_CXX_FLAGS_DEBUG "-g")
 endif(CMAKE_COMPILER_IS_GNUCXX)
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 
 # Conan
 include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)

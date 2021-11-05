@@ -233,6 +233,28 @@ void MeanVar::add(const VectorXd& x){
   var = M2 / sample_count;
 }
 
+ScalarMeanVar::ScalarMeanVar(){
+  mean = 0;
+  M2 = 0;
+  var = 0;
+  sample_count = 0;
+}
+
+void ScalarMeanVar::reset(){
+  mean = 0;
+  M2 = 0;
+  var = 0;
+  sample_count = 0;
+}
+
+void ScalarMeanVar::add(double x){
+  sample_count ++;
+  double delta = x - mean;
+  mean += delta / sample_count;
+  M2 += delta * (x - mean);
+  var = M2 / sample_count;
+}
+
 int getNumRows(string file_name){
   fitsfile *fptr;
   int status = 0;

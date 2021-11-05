@@ -120,6 +120,16 @@ public:
   void add(const VectorXd& x);
 };
 
+class ScalarMeanVar{
+public:
+  double mean, M2, var;
+  int sample_count;
+public:
+  ScalarMeanVar();
+  void add(double x);
+  void reset();
+};
+
 constexpr double kGalaxyOutlierProb = 0.6;
 
 class GalaxyDB{
