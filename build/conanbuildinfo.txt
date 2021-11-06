@@ -3,20 +3,18 @@ C:/Users/xuana/.conan/data/fmt/8.0.1/_/_/package/2be90237c5e294c2f30bf6b043d0476
 C:/Users/xuana/.conan/data/eigen/3.4.0/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/include/eigen3
 C:/.conan/aa76de/1/include
 C:/Users/xuana/.conan/data/ccfits/2.6/_/_/package/2240fa56643d33176b0c23292cf3312b768ee50c/include
-C:/Users/xuana/.conan/data/libpqxx/7.6.0/_/_/package/7bca871f7de67ed3a5792cfcaf5a172a1e952c6e/include
+C:/Users/xuana/.conan/data/libpq/13.4/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/include
 C:/Users/xuana/.conan/data/bzip2/1.0.8/_/_/package/d16a91eadaaf5829b928b12d2f836ff7680d3df5/include
 C:/Users/xuana/.conan/data/cfitsio/3.490/_/_/package/d140711d95cc16a85766a8fc3a551dfafe84cf63/include
-C:/Users/xuana/.conan/data/libpq/12.2/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/include
 C:/Users/xuana/.conan/data/zlib/1.2.11/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/include
 
 [libdirs]
 C:/Users/xuana/.conan/data/fmt/8.0.1/_/_/package/2be90237c5e294c2f30bf6b043d047624b893db3/lib
 C:/.conan/aa76de/1/lib
 C:/Users/xuana/.conan/data/ccfits/2.6/_/_/package/2240fa56643d33176b0c23292cf3312b768ee50c/lib
-C:/Users/xuana/.conan/data/libpqxx/7.6.0/_/_/package/7bca871f7de67ed3a5792cfcaf5a172a1e952c6e/lib
+C:/Users/xuana/.conan/data/libpq/13.4/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/lib
 C:/Users/xuana/.conan/data/bzip2/1.0.8/_/_/package/d16a91eadaaf5829b928b12d2f836ff7680d3df5/lib
 C:/Users/xuana/.conan/data/cfitsio/3.490/_/_/package/d140711d95cc16a85766a8fc3a551dfafe84cf63/lib
-C:/Users/xuana/.conan/data/libpq/12.2/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/lib
 C:/Users/xuana/.conan/data/zlib/1.2.11/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/lib
 
 [bindirs]
@@ -30,11 +28,10 @@ C:/Users/xuana/.conan/data/fmt/8.0.1/_/_/package/2be90237c5e294c2f30bf6b043d0476
 C:/Users/xuana/.conan/data/eigen/3.4.0/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/
 C:/.conan/aa76de/1/
 C:/Users/xuana/.conan/data/ccfits/2.6/_/_/package/2240fa56643d33176b0c23292cf3312b768ee50c/
-C:/Users/xuana/.conan/data/libpqxx/7.6.0/_/_/package/7bca871f7de67ed3a5792cfcaf5a172a1e952c6e/
+C:/Users/xuana/.conan/data/libpq/13.4/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/
 C:/Users/xuana/.conan/data/bzip2/1.0.8/_/_/package/d16a91eadaaf5829b928b12d2f836ff7680d3df5/
 C:/Users/xuana/.conan/data/bzip2/1.0.8/_/_/package/d16a91eadaaf5829b928b12d2f836ff7680d3df5/lib/cmake
 C:/Users/xuana/.conan/data/cfitsio/3.490/_/_/package/d140711d95cc16a85766a8fc3a551dfafe84cf63/
-C:/Users/xuana/.conan/data/libpq/12.2/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/
 C:/Users/xuana/.conan/data/zlib/1.2.11/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/
 
 [libs]
@@ -79,19 +76,17 @@ libboost_atomic
 libboost_wserialization
 libboost_serialization
 CCfits
-pqxx
-bz2
-cfitsio
 libpq
 libpgcommon
 libpgport
+bz2
+cfitsio
 zlib
 
 [system_libs]
 ole32
 dbgeng
 bcrypt
-wsock32
 ws2_32
 secur32
 advapi32
@@ -435,68 +430,75 @@ pkg_config=CCfits
 
 
 
-[includedirs_libpqxx]
-C:/Users/xuana/.conan/data/libpqxx/7.6.0/_/_/package/7bca871f7de67ed3a5792cfcaf5a172a1e952c6e/include
+[includedirs_libpq]
+C:/Users/xuana/.conan/data/libpq/13.4/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/include
 
-[libdirs_libpqxx]
-C:/Users/xuana/.conan/data/libpqxx/7.6.0/_/_/package/7bca871f7de67ed3a5792cfcaf5a172a1e952c6e/lib
+[libdirs_libpq]
+C:/Users/xuana/.conan/data/libpq/13.4/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/lib
 
-[bindirs_libpqxx]
-
-
-[resdirs_libpqxx]
+[bindirs_libpq]
 
 
-[builddirs_libpqxx]
-C:/Users/xuana/.conan/data/libpqxx/7.6.0/_/_/package/7bca871f7de67ed3a5792cfcaf5a172a1e952c6e/
+[resdirs_libpq]
 
-[libs_libpqxx]
-pqxx
 
-[system_libs_libpqxx]
-wsock32
+[builddirs_libpq]
+C:/Users/xuana/.conan/data/libpq/13.4/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/
+
+[libs_libpq]
+libpq
+libpgcommon
+libpgport
+
+[system_libs_libpq]
 ws2_32
+secur32
+advapi32
+shell32
+crypt32
+wldap32
 
-[defines_libpqxx]
-
-
-[cppflags_libpqxx]
-
-
-[cxxflags_libpqxx]
-
-
-[cflags_libpqxx]
+[defines_libpq]
 
 
-[sharedlinkflags_libpqxx]
+[cppflags_libpq]
 
 
-[exelinkflags_libpqxx]
+[cxxflags_libpq]
 
 
-[sysroot_libpqxx]
+[cflags_libpq]
 
 
-[frameworks_libpqxx]
+[sharedlinkflags_libpq]
 
 
-[frameworkdirs_libpqxx]
+[exelinkflags_libpq]
 
 
-[rootpath_libpqxx]
-C:/Users/xuana/.conan/data/libpqxx/7.6.0/_/_/package/7bca871f7de67ed3a5792cfcaf5a172a1e952c6e
-
-[name_libpqxx]
-libpqxx
-
-[version_libpqxx]
-7.6.0
-
-[generatornames_libpqxx]
+[sysroot_libpq]
 
 
-[generatorfilenames_libpqxx]
+[frameworks_libpq]
+
+
+[frameworkdirs_libpq]
+
+
+[rootpath_libpq]
+C:/Users/xuana/.conan/data/libpq/13.4/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab
+
+[name_libpq]
+libpq
+
+[version_libpq]
+13.4
+
+[generatornames_libpq]
+cmake_find_package=PostgreSQL
+cmake_find_package_multi=PostgreSQL
+
+[generatorfilenames_libpq]
 
 
 
@@ -630,78 +632,6 @@ pkg_config=cfitsio
 
 
 
-[includedirs_libpq]
-C:/Users/xuana/.conan/data/libpq/12.2/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/include
-
-[libdirs_libpq]
-C:/Users/xuana/.conan/data/libpq/12.2/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/lib
-
-[bindirs_libpq]
-
-
-[resdirs_libpq]
-
-
-[builddirs_libpq]
-C:/Users/xuana/.conan/data/libpq/12.2/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/
-
-[libs_libpq]
-libpq
-libpgcommon
-libpgport
-
-[system_libs_libpq]
-ws2_32
-secur32
-advapi32
-shell32
-crypt32
-wldap32
-
-[defines_libpq]
-
-
-[cppflags_libpq]
-
-
-[cxxflags_libpq]
-
-
-[cflags_libpq]
-
-
-[sharedlinkflags_libpq]
-
-
-[exelinkflags_libpq]
-
-
-[sysroot_libpq]
-
-
-[frameworks_libpq]
-
-
-[frameworkdirs_libpq]
-
-
-[rootpath_libpq]
-C:/Users/xuana/.conan/data/libpq/12.2/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab
-
-[name_libpq]
-libpq
-
-[version_libpq]
-12.2
-
-[generatornames_libpq]
-cmake_find_package=PostgreSQL
-cmake_find_package_multi=PostgreSQL
-
-[generatorfilenames_libpq]
-
-
-
 [includedirs_zlib]
 C:/Users/xuana/.conan/data/zlib/1.2.11/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/include
 
@@ -775,17 +705,15 @@ stacktrace_addr2line_available=False
 [USER_eigen]
 [USER_fmt]
 [USER_libpq]
-[USER_libpqxx]
 [USER_zlib]
 [ENV_fmt]
 [ENV_eigen]
 [ENV_boost]
 BOOST_ROOT=C:\.conan\aa76de\1
 [ENV_ccfits]
-[ENV_libpqxx]
+[ENV_libpq]
+PostgreSQL_ROOT=C:\Users\xuana\.conan\data\libpq\13.4\_\_\package\3fb49604f9c2f729b85ba3115852006824e72cab
 [ENV_bzip2]
 PATH=["C:\Users\xuana\.conan\data\bzip2\1.0.8\_\_\package\d16a91eadaaf5829b928b12d2f836ff7680d3df5\bin"]
 [ENV_cfitsio]
-[ENV_libpq]
-PostgreSQL_ROOT=C:\Users\xuana\.conan\data\libpq\12.2\_\_\package\3fb49604f9c2f729b85ba3115852006824e72cab
 [ENV_zlib]

@@ -11,7 +11,7 @@
     ccfits/2.Y.Z
     eigen/3.Y.Z
     fmt/8.Y.Z
-    libpqxx/7.Y.Z
+    libpq/13.Y.Z
 
 [options]
 
@@ -33,8 +33,7 @@
     cfitsio/3.490:d140711d95cc16a85766a8fc3a551dfafe84cf63
     eigen/3.4.0:5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9
     fmt/8.0.1:2be90237c5e294c2f30bf6b043d047624b893db3
-    libpq/12.2:3fb49604f9c2f729b85ba3115852006824e72cab
-    libpqxx/7.6.0:7bca871f7de67ed3a5792cfcaf5a172a1e952c6e
+    libpq/13.4:3fb49604f9c2f729b85ba3115852006824e72cab
     zlib/1.2.11:3fb49604f9c2f729b85ba3115852006824e72cab
 
 [full_options]
@@ -110,7 +109,6 @@
     fmt:with_os_api=True
     libpq:shared=False
     libpq:with_openssl=False
-    libpqxx:shared=False
     zlib:minizip=deprecated
     zlib:shared=False
 

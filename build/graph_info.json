@@ -289,10 +289,6 @@
    "False"
   ],
   [
-   "libpqxx:shared",
-   "False"
-  ],
-  [
    "zlib:minizip",
    "deprecated"
   ],

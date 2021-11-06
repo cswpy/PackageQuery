@@ -233,6 +233,17 @@ void MeanVar::add(const VectorXd& x){
   var = M2 / sample_count;
 }
 
+void MeanVar::add(double* start, int cycle){
+  sample_count ++;
+  for (int i = 0; i < attr_count; i ++){
+    double x = start[i*cycle];
+    double delta = x - mean(i);
+    mean(i) += delta / sample_count;
+    M2(i) += delta * (x - mean(i));
+    var(i) = M2(i) / sample_count;
+  }
+}
+
 ScalarMeanVar::ScalarMeanVar(){
   mean = 0;
   M2 = 0;

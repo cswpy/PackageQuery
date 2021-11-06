@@ -13,7 +13,8 @@
               "C:/Users/xuana/.conan/data/eigen/3.4.0/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/include/eigen3",
               "C:/Users/xuana/.conan/data/fmt/8.0.1/_/_/package/2be90237c5e294c2f30bf6b043d047624b893db3/include",
               "C:/Users/xuana/.conan/data/zlib/1.2.11/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/include",
-              "C:/Users/xuana/.conan/data/libpqxx/7.6.0/_/_/package/7bca871f7de67ed3a5792cfcaf5a172a1e952c6e/include"
+              "C:/Users/xuana/.conan/data/libpqxx/7.6.0/_/_/package/7bca871f7de67ed3a5792cfcaf5a172a1e952c6e/include",
+              "C:/Users/xuana/.conan/data/libpq/13.4/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab/include"
           ],
           "defines": [],
           "compilerPath": "C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Tools/MSVC/14.29.30133/bin/Hostx64/x64/cl.exe",

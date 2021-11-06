@@ -9,7 +9,6 @@
 #include <chrono>
 #include <typeinfo>
 #include <numeric>
-#include <pqxx/pqxx>
 
 #include "map_sort.h"
 #include "utility.h"
@@ -27,10 +26,10 @@
 #include "reducer.h"
 #include "fmt/core.h"
 #include "config.h"
+#include "libpq-fe.h"
 
 using namespace std;
 using namespace Eigen;
-using namespace pqxx;
 
 void generateQuery(int qi, int n, RMatrixXd& A, VectorXd& bl, VectorXd& bu, VectorXd& c){
   double outlier_prob = 0.6;
@@ -135,82 +134,76 @@ void partitionTest(){
   showHistogram(a, 20, 0, 0);
 }
 
-void createSyntheticData(connection& C, int n, int type, double var){
-  try{
-    work W(C);
-    string table_name = fmt::format("N{}_T{}_V{}", n, type, (int)var);
+// void createSyntheticData(connection& C, int n, int type, double var){
+//   try{
+//     work W(C);
+//     string table_name = fmt::format("N{}_T{}_V{}", n, type, (int)var);
 
-    string clear_sql = fmt::format("DROP TABLE IF EXISTS {};", table_name);
-    W.exec(clear_sql);
+//     string clear_sql = fmt::format("DROP TABLE IF EXISTS {};", table_name);
+//     W.exec(clear_sql);
 
-    string create_sql = fmt::format("CREATE TABLE IF NOT EXISTS {} ("\
-    "id SERIAL PRIMARY KEY,"\
-    "a1 DOUBLE PRECISION,"\
-    "a2 DOUBLE PRECISION,"\
-    "a3 DOUBLE PRECISION,"\
-    "a4 DOUBLE PRECISION"\
-    ");", table_name);
-    W.exec(create_sql);
+//     string create_sql = fmt::format("CREATE TABLE IF NOT EXISTS {} ("\
+//     "id SERIAL PRIMARY KEY,"\
+//     "a1 DOUBLE PRECISION,"\
+//     "a2 DOUBLE PRECISION,"\
+//     "a3 DOUBLE PRECISION,"\
+//     "a4 DOUBLE PRECISION"\
+//     ");", table_name);
+//     W.exec(create_sql);
 
-    double left, right;
-    if (type == 1){
-      left = -sqrt(3*var);
-      right = sqrt(3*var);
-    } else if (type == 2){
-      left = 0;
-      right = 2*sqrt(3*var);
-    }
-    W.commit();
+//     double left, right;
+//     if (type == 1){
+//       left = -sqrt(3*var);
+//       right = sqrt(3*var);
+//     } else if (type == 2){
+//       left = 0;
+//       right = 2*sqrt(3*var);
+//     }
+//     W.commit();
 
-    default_random_engine gen {static_cast<long unsigned int>(time(0))};
-    uniform_real_distribution u_dist(left, right);
-    string insert_sql = fmt::format("INSERT INTO {}(a1,a2,a3,a4) VALUES ", table_name);
-    int bulk = 1000000;
-    for (int i = 0; i < n/bulk; i ++){
-      work Wi (C);
-      string bulk_sql = insert_sql;
-      for (int j = 0; j < bulk-1; j ++){
-        bulk_sql += fmt::format("({:.16Lf},{:.16Lf},{:.16Lf},{:.16Lf}),", u_dist(gen), u_dist(gen), u_dist(gen), u_dist(gen));
-      }
-      bulk_sql += fmt::format("({:.16Lf},{:.16Lf},{:.16Lf},{:.16Lf});", u_dist(gen), u_dist(gen), u_dist(gen), u_dist(gen));
-      Wi.exec(bulk_sql);
-      Wi.commit();
-      fmt::print("{}%\n", 100.0*(i+1)*bulk/n);
-    }
-  } catch (const exception& e){
-    cerr << e.what() << endl;
-  }
-}
+//     default_random_engine gen {static_cast<long unsigned int>(time(0))};
+//     uniform_real_distribution u_dist(left, right);
+//     string insert_sql = fmt::format("INSERT INTO {}(a1,a2,a3,a4) VALUES ", table_name);
+//     int bulk = 1000000;
+//     for (int i = 0; i < n/bulk; i ++){
+//       work Wi (C);
+//       string bulk_sql = insert_sql;
+//       for (int j = 0; j < bulk-1; j ++){
+//         bulk_sql += fmt::format("({:.16Lf},{:.16Lf},{:.16Lf},{:.16Lf}),", u_dist(gen), u_dist(gen), u_dist(gen), u_dist(gen));
+//       }
+//       bulk_sql += fmt::format("({:.16Lf},{:.16Lf},{:.16Lf},{:.16Lf});", u_dist(gen), u_dist(gen), u_dist(gen), u_dist(gen));
+//       Wi.exec(bulk_sql);
+//       Wi.commit();
+//       fmt::print("{}%\n", 100.0*(i+1)*bulk/n);
+//     }
+//   } catch (const exception& e){
+//     cerr << e.what() << endl;
+//   }
+// }
 
-void postgresql(){
-  try{
-    string dbname = "synthetic";
-    connection C (fmt::format("dbname={} user={} password={} hostaddr={} port={}", dbname, user, password, hostaddr, port));
-    assert(C.is_open());
-    createSyntheticData(C, 10000000, 1, 100.0);
-  } catch (const exception& e){
-    cerr << e.what() << endl;
-  }
-}
+// void postgresql(){
+//   try{
+//     string dbname = "synthetic";
+//     connection C (fmt::format("dbname={} user={} password={} hostaddr={} port={}", dbname, user, password, hostaddr, port));
+//     assert(C.is_open());
+//     createSyntheticData(C, 10000000, 1, 100.0);
+//   } catch (const exception& e){
+//     cerr << e.what() << endl;
+//   }
+// }
+
+#define at(row, col) (m*(col)+(row))
+double kGroupTolerance = 2;
 
 struct IndexComp{
-  const RMatrixXd& mat;
-  int j;
-  IndexComp(const RMatrixXd& mat, int j): mat(mat), j(j){
+  const double* mat;
+  int j, m;
+  IndexComp(const double* mat, int j, int m): mat(mat), j(j), m(m){
   }
   inline bool operator()(int i1, int i2){
-    return mat(j, i1) < mat(j, i2);
+    return mat[at(j, i1)] < mat[at(j, i2)];
   }
 };
-
-double kGroupTolerance = 10;
-
-work* getTransaction(connection* C, string dbname){
-  if (C) delete C;
-  C = new connection(fmt::format("dbname={} user={} password={} hostaddr={} port={}", dbname, user, password, hostaddr, port));
-  work* W = new work(*C);
-  return W;
-}
 
 // ID in POSTGRES is BASED-1
 // ID-1 corresponding to the index in C++
@@ -218,65 +211,66 @@ void dynamic_kd_partition(int pindex, string dbname, string table_name, int n, v
   vector<string> names = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"};
   Profiler pro = Profiler(names);
   pro.clock(0);
-  int db_chunk = n / db_logical_core;
+  pro.clock(8);
   int m = cols.size();
-  RMatrixXd A (m, n);
+  double* A = new double[m*n];
   int nS = 0;
   VectorXd mean (m); mean.fill(0);
   VectorXd M2 (m); M2.fill(0);
   string col_names = "";
   for (int i = 0; i < cols.size()-1; i++) col_names += cols[i] + ",";
   col_names += cols[cols.size()-1];
-  #pragma omp parallel num_threads(db_logical_core)
+  string g_name = fmt::format("{}_G{}", table_name, pindex);
+  string p_name = fmt::format("{}_P{}", table_name, pindex);
+  pair<double, int>* pis = new pair<double, int>[n];
+  int partition_index = -1;
+  #pragma omp parallel num_threads(db_physical_core)
   {
-    try{
-      connection C (fmt::format("dbname={} user={} password={} hostaddr={} port={}", dbname, user, password, hostaddr, port));
-      assert(C.is_open());
-      nontransaction N (C);
-      MeanVar mv = MeanVar(m);
-      #pragma omp for nowait
-      for (int i = 0; i < db_logical_core; i ++){
-        int left = i * db_chunk;
-        int right = (i+1)*db_chunk;
-        string select_sql = fmt::format("SELECT {} FROM {} WHERE id BETWEEN {} and {};", col_names, table_name, left+1, right);
-        result R (N.exec(select_sql));
-        C.close();
-        for (int j = 0; j < R.size(); j ++){
-          const auto& tup = R[j];
-          for (int k = 0; k < m; k ++){
-            string str_val (tup[k].view());
-            A(k, j+left) = stod(str_val);
-          }
-          mv.add(A.col(j+left));
+    int db_chunk = n / omp_get_num_threads();
+    string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", user, hostaddr, port, dbname, password);
+    PGconn* conn = PQconnectdb(conninfo.c_str());
+    assert(PQstatus(conn) == CONNECTION_OK);
+    MeanVar mv = MeanVar(m);
+    int tn = omp_get_thread_num();
+    int left = tn * db_chunk;
+    int right = (tn+1)*db_chunk;
+    PGresult *res = NULL;
+    string select_sql = fmt::format("SELECT {} FROM {} WHERE {}.id BETWEEN {} AND {}", col_names, table_name, table_name, left+1, right);
+    res = PQexec(conn, select_sql.c_str());
+    for (int i = 0; i < PQntuples(res); i ++){
+      int index = i+left;
+      for (int j = 0; j < m; j ++) A[at(j, index)] = atof(PQgetvalue(res, i, j));
+      mv.add(A+at(0, index));
+    }
+    PQclear(res);
+    PQfinish(conn);
+    #pragma omp critical
+    {
+      int tmp_nS = nS + mv.sample_count;
+      VectorXd delta = mv.mean - mean;
+      mean = (nS*mean + mv.sample_count*mv.mean) / tmp_nS;
+      M2 += mv.M2 + delta.cwiseProduct(delta) * (nS * mv.sample_count / (double) (tmp_nS));
+      nS = tmp_nS;
+    }
+    #pragma omp barrier
+    // Phase-1
+    #pragma omp master
+    {
+      double max_var = -1;
+      for (int i = 0; i < m; i ++){
+        double var = M2(i) / (nS - 1);
+        if (max_var < var){
+          max_var = var;
+          partition_index = i;
         }
       }
-      #pragma omp critical
-      {
-        int tmp_nS = nS + mv.sample_count;
-        VectorXd delta = mv.mean - mean;
-        mean = (nS*mean + mv.sample_count*mv.mean) / tmp_nS;
-        M2 += mv.M2 + delta.cwiseProduct(delta) * (nS * mv.sample_count / (double) (tmp_nS));
-        nS = tmp_nS;
-      }
-    } catch (const exception& e){
-      cerr << e.what() << endl;
     }
+    #pragma omp barrier
+    #pragma omp for
+    for (int i = 0; i < n; i ++) pis[i] = {A[at(partition_index, i)], i};
   }
   pro.stop(0);
   pro.clock(1);
-  // Phase-1
-  int partition_index = -1;
-  double max_var = -1;
-  for (int i = 0; i < m; i ++){
-    double var = M2(i) / (nS - 1);
-    if (max_var < var){
-      max_var = var;
-      partition_index = i;
-    }
-  }
-  pair<double, int>* pis = new pair<double, int>[n];
-  #pragma omp parallel for num_threads(db_physical_core)
-  for (int i = 0; i < n; i ++) pis[i] = {A(partition_index, i), i};
   map_sort::Sort(pis, n, db_physical_core);
   pro.stop(1);
   int soft_group_lim = (int) ceil(n * group_ratio);
@@ -291,35 +285,32 @@ void dynamic_kd_partition(int pindex, string dbname, string table_name, int n, v
   pro.clock(2);
   int chunk = n / db_physical_core + (n % db_physical_core != 0);
   string insert_sql, g_col_names;
-
   #pragma omp parallel num_threads(db_physical_core)
   {
-    #pragma omp for nowait
-    for (int i = 0; i < db_physical_core; i ++){
-      // pro.clock(6);
+    {
+      int i = omp_get_thread_num();
       int left = i * chunk;
       int right = min((i+1) * chunk, n);
       groups[i] = new VectorXi(right-left);
-      if (i > 0) lows[partition_index][i] = A(partition_index, pis[left].second);
-      if (i < db_physical_core-1) highs[partition_index][i] = A(partition_index, pis[right].second);
+      if (i > 0) lows[partition_index][i] = A[at(partition_index, pis[left].second)];
+      if (i < db_physical_core-1) highs[partition_index][i] = A[at(partition_index, pis[right].second)];
+      
       MeanVar mv = MeanVar(m);
       for (int j = left; j < right; j ++){
         int col_index = pis[j].second;
         (*groups[i])(j-left) = col_index;
-        mv.add(A.col(col_index));
+        mv.add(A+at(0, col_index));
       }
-      // pro.stop(6);
-      // pro.clock(7);
       int local_pindex = -1;
       double max_var = -1;
       for (int j = 0; j < m; j ++){
-        if (max_var < mv.var(j)){
-          max_var = mv.var(j);
+        double total_var = mv.var(j) * mv.sample_count;
+        if (max_var < total_var){
+          max_var = total_var;
           local_pindex = j;
         }
       }
       max_heap[i] = {max_var, local_pindex, i};
-      // pro.stop(7);
     }
     #pragma omp barrier
     pro.stop(2);
@@ -347,14 +338,15 @@ void dynamic_kd_partition(int pindex, string dbname, string table_name, int n, v
       }
       if (gi == -1) break;
       auto& g = *groups[gi];
-      sort(g.begin(), g.end(), IndexComp(A, mi));
+      sort(g.begin(), g.end(), IndexComp(A, mi, m));
       int delim_sz = soft_partition_lim;
       vector<int> delims (delim_sz);
       int delim_count = 0;
       ScalarMeanVar smv = ScalarMeanVar();
+      double reduced_var = max_var / g.size() * var_ratio;
       for (int i = 0; i < g.size(); i ++){
-        smv.add(A(mi, g(i)));
-        if (smv.var > max_var*var_ratio){
+        smv.add(A[at(mi, g(i))]);
+        if (smv.var > reduced_var){
           if (delim_count < delim_sz) delims[delim_count] = i;
           else{
             delim_sz += soft_partition_lim;
@@ -363,7 +355,7 @@ void dynamic_kd_partition(int pindex, string dbname, string table_name, int n, v
           }
           delim_count ++;
           smv.reset();
-          smv.add(A(mi, g(i)));
+          smv.add(A[at(mi, g(i))]);
         }
       }
       if (delim_count < delim_sz) delims[delim_count] = g.size();
@@ -375,6 +367,7 @@ void dynamic_kd_partition(int pindex, string dbname, string table_name, int n, v
       {
         g_start_index = group_count;
         group_count += delim_count-1;
+        // cout << group_count << endl;
         if (group_count > hard_group_lim){
           hard_group_lim += db_physical_core * soft_partition_lim;
           for (int i = 0; i < m; i ++){
@@ -396,20 +389,21 @@ void dynamic_kd_partition(int pindex, string dbname, string table_name, int n, v
           lows[j][g_index] = lows[j][gi];
           highs[j][g_index] = highs[j][gi];
         }
-        lows[mi][g_index] = A(mi, g(delims[i]));
-        if (i < delim_count-2) highs[mi][g_index] = A(mi, g(delims[i+1]));
+        lows[mi][g_index] = A[at(mi, g(delims[i]))];
+        if (i < delim_count-2) highs[mi][g_index] = A[at(mi, g(delims[i+1]))];
         else highs[mi][g_index] = highs[mi][gi];
 
         // Begin Repeatable code 
         MeanVar mv = MeanVar(m);
         for (int j = 0; j < group_sz; j ++){
-          mv.add(A.col((*gptr)(j)));
+          mv.add(A+at(0, (*gptr)(j)));
         }
         int m_index = -1;
         double m_var = 0;
         for (int j = 0; j < m; j ++){
-          if (m_var < mv.var(j)){
-            m_var = mv.var(j);
+          double total_var = mv.var(j) * mv.sample_count;
+          if (m_var < total_var){
+            m_var = total_var;
             m_index = j;
           }
         }
@@ -426,20 +420,21 @@ void dynamic_kd_partition(int pindex, string dbname, string table_name, int n, v
 
       {
         // lows is good no need to change
-        if (delim_count != 1) highs[mi][gi] = A(mi, g(delims[0]));
+        if (delim_count != 1) highs[mi][gi] = A[at(mi, g(delims[0]))];
         g.conservativeResize(delims[0]);
 
         int group_sz = delims[0];
         // Begin Repeatable code 
         MeanVar mv = MeanVar(m);
         for (int j = 0; j < group_sz; j ++){
-          mv.add(A.col(g(j)));
+          mv.add(A+at(0, g(j)));
         }
         int m_index = -1;
         double m_var = 0;
         for (int j = 0; j < m; j ++){
-          if (m_var < mv.var(j)){
-            m_var = mv.var(j);
+          double total_var = mv.var(j) * mv.sample_count;
+          if (m_var < total_var){
+            m_var = total_var;
             m_index = j;
           }
         }
@@ -454,127 +449,148 @@ void dynamic_kd_partition(int pindex, string dbname, string table_name, int n, v
         // End Repeatable code 
       }
     }
-    pro.stop(4);
+  }
+  pro.stop(4);
+  #pragma omp parallel num_threads(db_physical_core)
+  {
     pro.clock(5);
-    #pragma omp barrier
     // Phase-3
     #pragma omp master
     {
-      try{
-        // int cnt = 0;
-        // for (int i = 0; i < m; i ++){
-        //   for (int j = 0; j < group_count; j ++){
-        //     if (lows[i][j] == -DBL_MAX) cnt ++;
-        //     if (highs[i][j] == DBL_MAX) cnt ++;
-        //   }
-        // }
-        // cout << m << " " << group_count << " " << cnt << endl;
-        connection* wC = NULL;
-        connection C (fmt::format("dbname={} user={} password={} hostaddr={} port={}", dbname, user, password, hostaddr, port));
-        assert(C.is_open());
-        string g_name = fmt::format("{}_G{}", table_name, pindex);
-        string p_name = fmt::format("{}_P{}", table_name, pindex);
-        // Create kd_partition table
-        work* create_kdW = getTransaction(wC, dbname);
-        string create_kd = fmt::format("CREATE TABLE IF NOT EXISTS {} ("\
-        "pindex INT UNIQUE NOT NULL,"\
-        "table_name VARCHAR(64),"\
-        "col_names VARCHAR(512),"\
-        "group_ratio DOUBLE PRECISION,"\
-        "var_ratio DOUBLE PRECISION"\
-        ");", kd_summary_table);
-        create_kdW->exec(create_kd);
-        create_kdW->commit();
-        delete create_kdW;
-
-        // Check if partition exists
-        nontransaction N(C);
-        string exist_sql = fmt::format("SELECT COUNT(*) FROM {} as kd WHERE kd.pindex={} AND kd.table_name='{}';", kd_summary_table, pindex, table_name);
-        result r (N.exec(exist_sql));
-        int exists = stoi(string(r[0][0].view()));
-        if (exists){
-          work* drop_kdW = getTransaction(wC, dbname);
-          string drop_sql = fmt::format("DROP TABLE IF EXISTS {};", p_name);
-          drop_kdW->exec(drop_sql);
-          drop_sql = fmt::format("DROP TABLE IF EXISTS {};", g_name);
-          drop_kdW->exec(drop_sql);
-          string delete_sql = fmt::format("DELETE FROM {} as kd WHERE kd.pindex={} AND kd.table_name='{}';", kd_summary_table, pindex, table_name);
-          drop_kdW->exec(delete_sql);
-          drop_kdW->commit();
-          delete drop_kdW;
-        }
-        string insert_kd_sql = fmt::format("INSERT INTO {} (pindex, table_name, col_names, group_ratio, var_ratio) VALUES ({}, '{}', '{}', {:.16Lf}, {:.16Lf})", kd_summary_table, pindex, table_name, col_names, group_ratio, var_ratio);
-        work* insert_kdW = getTransaction(wC, dbname);
-        insert_kdW->exec(insert_kd_sql);
-        insert_kdW->commit();
-        delete insert_kdW;
-
-        // Create G table
-        g_col_names = "id,";
-        work* create_gW = getTransaction(wC, dbname);
-        string atts_names = "";
-        for (auto col : cols){
-          atts_names += fmt::format("low_{} DOUBLE PRECISION,"\
-          "high_{} DOUBLE PRECISION,"\
-          "mean_{} DOUBLE PRECISION,"\
-          "var_{} DOUBLE PRECISION,", col, col, col, col);
-          g_col_names += fmt::format("low_{},high_{},mean_{},var_{},", col, col, col, col);
-        }
-        insert_sql = fmt::format("INSERT INTO {}({}) VALUES ", g_name, g_col_names.substr(0, g_col_names.length()-1));
-
-        string create_g = fmt::format("CREATE TABLE IF NOT EXISTS {} ("\
-        "id INT PRIMARY KEY,"\
-        "{}"\
-        ");", g_name, atts_names.substr(0, atts_names.length()-1));
-        create_gW->exec(create_g);
-        create_gW->commit();
-        delete create_gW;
-        // Create P table
-        work* create_pW = getTransaction(wC, dbname);
-        string create_p = fmt::format("CREATE TABLE IF NOT EXISTS {} ("\
-        "tid INT UNIQUE REFERENCES {}(id),"\
-        "gid INT REFERENCES {}(id)"\
-        ");", p_name, table_name, g_name);
-        create_pW->exec(create_p);
-        create_pW->commit();
-        delete create_pW;
-      } catch (const exception& e){
-        cerr << e.what() << endl;
+    //   int cnt = 0;
+    //   for (int i = 0; i < m; i ++){
+    //     for (int j = 0; j < group_count; j ++){
+    //       if (lows[i][j] == -DBL_MAX) cnt ++;
+    //       if (highs[i][j] == DBL_MAX) cnt ++;
+    //     }
+    //   }
+    //   cout << m << " " << group_count << " " << cnt << endl;
+    //   vector<bool> a (n, false);
+    //   for (int j = 0; j < group_count; j ++){
+    //     auto& g = *groups[j];
+    //     for (auto k : g){
+    //       if (!a[k]){
+    //         a[k] = true;
+    //       } else{
+    //         cout << "WTF " << j << " " << k << endl;
+    //       }
+    //     }
+    //   }
+      string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", user, hostaddr, port, dbname, password);
+      PGconn* conn = PQconnectdb(conninfo.c_str());
+      assert(PQstatus(conn) == CONNECTION_OK);
+      PGresult *res = NULL;
+      string create_kd = fmt::format("CREATE TABLE IF NOT EXISTS {} ("\
+      "pindex INT,"\
+      "table_name VARCHAR(64),"\
+      "col_names VARCHAR(512),"\
+      "group_ratio DOUBLE PRECISION,"\
+      "var_ratio DOUBLE PRECISION"\
+      ");", kd_summary_table);
+      res = PQexec(conn, create_kd.c_str());
+      PQclear(res);
+      string exist_sql = fmt::format("SELECT COUNT(*) FROM {} as kd WHERE kd.pindex={} AND kd.table_name='{}';", kd_summary_table, pindex, table_name);
+      res = PQexec(conn, exist_sql.c_str());
+      int exists = atoi(PQgetvalue(res, 0, 0));
+      PQclear(res);
+      if (exists){
+        string drop_sql = fmt::format("DROP TABLE IF EXISTS {};", p_name);
+        res = PQexec(conn, drop_sql.c_str());
+        PQclear(res);
+        drop_sql = fmt::format("DROP TABLE IF EXISTS {};", g_name);
+        res = PQexec(conn, drop_sql.c_str());
+        PQclear(res);
+        string delete_sql = fmt::format("DELETE FROM {} as kd WHERE kd.pindex={} AND kd.table_name='{}';", kd_summary_table, pindex, table_name);
+        res = PQexec(conn, delete_sql.c_str());
+        PQclear(res);
       }
+      string insert_kd_sql = fmt::format("INSERT INTO {} (pindex, table_name, col_names, group_ratio, var_ratio) VALUES ({}, '{}', '{}', {:.16Lf}, {:.16Lf})", kd_summary_table, pindex, table_name, col_names, group_ratio, var_ratio);
+      res = PQexec(conn, insert_kd_sql.c_str());
+      PQclear(res);
+      // Create G table
+      g_col_names = "id,";
+      string atts_names = "";
+      for (auto col : cols){
+        atts_names += fmt::format("low_{} DOUBLE PRECISION,"\
+        "high_{} DOUBLE PRECISION,"\
+        "mean_{} DOUBLE PRECISION,"\
+        "var_{} DOUBLE PRECISION,", col, col, col, col);
+        g_col_names += fmt::format("low_{},high_{},mean_{},var_{},", col, col, col, col);
+      }
+      insert_sql = fmt::format("INSERT INTO {}({}) VALUES ", g_name, g_col_names.substr(0, g_col_names.length()-1));
+      string create_g = fmt::format("CREATE TABLE IF NOT EXISTS {} ("\
+      "id INT PRIMARY KEY,"\
+      "{}"\
+      ");", g_name, atts_names.substr(0, atts_names.length()-1));
+      res = PQexec(conn, create_g.c_str());
+      PQclear(res);
+      // Create P table
+      string create_p = fmt::format("CREATE TABLE IF NOT EXISTS {} ("\
+      "tid INT,"\
+      "gid INT"\
+      ");", p_name, table_name, g_name);
+      res = PQexec(conn, create_p.c_str());
+      PQclear(res);
+      PQfinish(conn);
     }
+    pro.stop(5);
+    pro.clock(6);
     #pragma omp barrier
     // Populate G table
-    try{
-      connection CC (fmt::format("dbname={} user={} password={} hostaddr={} port={}", dbname, user, password, hostaddr, port));
-      assert(CC.is_open());
-      work WW (CC);
-      string local_sql = insert_sql;
-      #pragma omp for nowait
-      for (int i = 0; i < group_count; i ++){
-        const auto& g = *groups[i];
-        MeanVar mv = MeanVar(m);
-        
-        string value_insert = to_string(i+1) + ",";
-        for (int j = 0; j < g.size(); j++){
-          mv.add(A.col(g(j)));
-        }
-        for (int j = 0; j < m; j ++){
-          value_insert += fmt::format("{:.20Lf},{:.20Lf},{:.20Lf},{:.20Lf},", lows[j][i], highs[j][i], mv.mean(j), mv.var(j));
-        }
-        local_sql += fmt::format("({}),", value_insert.substr(0, value_insert.length()-1));
+    string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", user, hostaddr, port, dbname, password);
+    PGconn* conn = PQconnectdb(conninfo.c_str());
+    assert(PQstatus(conn) == CONNECTION_OK);
+    string local_sql = insert_sql;
+    PGresult *res = NULL;
+    string g_copy = fmt::format("COPY {} FROM STDIN with(delimiter ',');", g_name);
+    res = PQexec(conn, g_copy.c_str());
+    assert(PQresultStatus(res) == PGRES_COPY_IN);
+    PQclear(res);
+    #pragma omp for nowait
+    for (int i = 0; i < group_count; i ++){
+      const auto& g = *groups[i];
+      MeanVar mv = MeanVar(m);
+      string value_insert = to_string(i+1) + ",";
+      for (int j = 0; j < g.size(); j++) mv.add(A+at(0, g(j)));
+      for (int j = 0; j < m; j ++){
+        value_insert += fmt::format("{:.16Lf},{:.16Lf},{:.16Lf},{:.16Lf},", lows[j][i], highs[j][i], mv.mean(j), mv.var(j));
       }
-      WW.exec(local_sql.substr(0, local_sql.length()-1) + ";");
-      WW.commit();
-    } catch (const exception& e){
-      cerr << e.what() << endl;
+      value_insert = value_insert.substr(0, value_insert.length()-1) + "\n";
+      assert(PQputCopyData(conn, value_insert.c_str(), value_insert.length()) == 1);
     }
+    assert(PQputCopyEnd(conn, NULL) == 1);
+    res = PQgetResult(conn);
+    assert(PQresultStatus(res) == PGRES_COMMAND_OK);
+    PQclear(res);
+    pro.stop(6);
+    pro.clock(7);
     #pragma omp barrier
     // Populate P table
+    string p_copy = fmt::format("COPY {} FROM STDIN with(delimiter ',');", p_name);
+    res = PQexec(conn, p_copy.c_str());
+    assert(PQresultStatus(res) == PGRES_COPY_IN);
+    PQclear(res);
+    #pragma omp for nowait
+    for (int i = 0; i < group_count; i ++){
+      const auto& g = *groups[i];
+      string value_insert = "";
+      for (const auto& j : g){
+        value_insert += fmt::format("{},{}\n", j+1, i+1);
+      }
+      assert(PQputCopyData(conn, value_insert.c_str(), value_insert.length()) == 1);
+    }
+    assert(PQputCopyEnd(conn, NULL) == 1);
+    res = PQgetResult(conn);
+    assert(PQresultStatus(res) == PGRES_COMMAND_OK);
+    PQclear(res);
+    PQfinish(conn);
     #pragma omp barrier
     #pragma omp for nowait
     for (int i = 0; i < group_count; i ++) delete groups[i];
   }
-  pro.stop(5);
+  delete[] A;
+  pro.stop(7);
+  pro.stop(8);
   pro.print();
 }
 
@@ -586,7 +602,7 @@ void customSort(){
   // print(b);
   // b.conservativeResize(3);
   print(b);
-  sort(b.begin(), b.end(), IndexComp(a,1));
+  // sort(b.begin(), b.end(), IndexComp(a,1));
   print(b);
   // tuple<double, double, double> a = {3,4,3};
   // tuple<double, double, double> b = {3,2,3};
@@ -613,6 +629,19 @@ void smvTest(){
 }
 
 void GPtest(){
+  RMatrixXd A(2,3); A << 1,2,3,4,5,6;
+  MatrixXd B(2,3); B << 1,2,3,4,5,6;
+  for (int i = 0; i < 6; i ++){
+    cout << *(&A(0,0)+i) << " ";
+  }
+  cout << endl;
+  MeanVar mv = MeanVar(2);
+  for (int i = 0; i < 3; i ++){
+    mv.add(&B(0, i));
+  }
+  print(mv.mean);
+  cout << endl;
+  cout << A << endl;
 }
 
 int main(){
@@ -622,8 +651,9 @@ int main(){
   //mapSort();
   //smvTest();
   vector<string> cols = {"a1", "a2", "a3", "a4"};
-  dynamic_kd_partition(0, "synthetic", "n1000000_t1_v1", 1000000, cols, 0.01, 0.1);
+  //dynamic_kd_partition(0, "synthetic", "n1000000_t1_v1", 1000000, cols, 0.01, 0.1);
   //dynamic_kd_partition(0, "synthetic", "n10000000_t1_v100", 10000000, cols, 0.01, 0.1);
+  dynamic_kd_partition(0, "synthetic", "n100000000_t1_v100", 100000000, cols, 0.01, 0.1);
   //customSort();
   //fmt::print("{:.16Lf}\n", -DBL_MAX);
 }

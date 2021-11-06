@@ -118,6 +118,7 @@ public:
   MeanVar();
   MeanVar(int attr_count);
   void add(const VectorXd& x);
+  void add(double* start, int cycle=1);
 };
 
 class ScalarMeanVar{
