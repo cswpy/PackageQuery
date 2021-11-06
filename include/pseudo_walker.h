@@ -23,6 +23,6 @@ private:
 
 public:
   ~PseudoWalker();
-  PseudoWalker(VectorXd p, bool enable_correction=true, int core=1);
+  PseudoWalker(VectorXd& p, bool enable_correction=true, int core=1);
   int step();
 };

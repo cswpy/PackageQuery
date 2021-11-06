@@ -11,7 +11,7 @@ PseudoWalker::~PseudoWalker(){
   if (ppq) delete ppq;
 }
 
-PseudoWalker::PseudoWalker(VectorXd p, bool enable_correction, int core){
+PseudoWalker::PseudoWalker(VectorXd& p, bool enable_correction, int core){
   ppq = NULL; // Very important to avoid deleting uninitialized non-null ptr
   n = (int) p.size();
   assert(n > 1);
