@@ -309,18 +309,6 @@ OpenMP_C_FLAGS:STRING=-openmp
 //C compiler libraries for OpenMP parallelization
 OpenMP_C_LIB_NAMES:STRING=
 
-//Path to a library.
-PYTHON_DEBUG_LIBRARY:FILEPATH=PYTHON_DEBUG_LIBRARY-NOTFOUND
-
-//Path to a file.
-PYTHON_INCLUDE_DIR:PATH=C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.9_3.9.2032.0_x64__qbz5n2kfra8p0/include
-
-//Path to a library.
-PYTHON_LIBRARY:FILEPATH=C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.9_3.9.2032.0_x64__qbz5n2kfra8p0/libs/python39.lib
-
-//Path to a library.
-PYTHON_LIBRARY_DEBUG:FILEPATH=PYTHON_LIBRARY_DEBUG-NOTFOUND
-
 //Value Computed by CMake
 PackageQuery_BINARY_DIR:STATIC=C:/Users/xuana/Desktop/VisualStudioCode/PackageQuery/build
 
@@ -515,8 +503,6 @@ FIND_PACKAGE_MESSAGE_DETAILS_OpenMP_C:INTERNAL=[-openmp][v2.0()]
 FIND_PACKAGE_MESSAGE_DETAILS_OpenMP_CXX:INTERNAL=[-openmp][v2.0()]
 //Details about finding Python3
 FIND_PACKAGE_MESSAGE_DETAILS_Python3:INTERNAL=[C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.9_3.9.2032.0_x64__qbz5n2kfra8p0/libs/python39.lib][C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.9_3.9.2032.0_x64__qbz5n2kfra8p0/include][C:/Users/xuana/AppData/Local/Packages/PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0/LocalCache/local-packages/Python39/site-packages/numpy/core/include][cfound components: NumPy Interpreter Development.Module ][v3.9.7()]
-//Details about finding PythonLibs
-FIND_PACKAGE_MESSAGE_DETAILS_PythonLibs:INTERNAL=[C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.9_3.9.2032.0_x64__qbz5n2kfra8p0/libs/python39.lib][C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.9_3.9.2032.0_x64__qbz5n2kfra8p0/include][v3.9.7()]
 //Result of TRY_COMPILE
 OpenMP_COMPILE_RESULT_CXX_openmp:INTERNAL=TRUE
 //Result of TRY_COMPILE
@@ -537,14 +523,6 @@ OpenMP_C_SPEC_DATE:INTERNAL=200203
 OpenMP_SPECTEST_CXX_:INTERNAL=TRUE
 //Result of TRY_COMPILE
 OpenMP_SPECTEST_C_:INTERNAL=TRUE
-//ADVANCED property for variable: PYTHON_DEBUG_LIBRARY
-PYTHON_DEBUG_LIBRARY-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: PYTHON_INCLUDE_DIR
-PYTHON_INCLUDE_DIR-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: PYTHON_LIBRARY
-PYTHON_LIBRARY-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: PYTHON_LIBRARY_DEBUG
-PYTHON_LIBRARY_DEBUG-ADVANCED:INTERNAL=1
 //CMAKE_INSTALL_PREFIX during last run
 _GNUInstallDirs_LAST_CMAKE_INSTALL_PREFIX:INTERNAL=C:/Program Files (x86)
 _Python3_DEVELOPMENT_MODULE_SIGNATURE:INTERNAL=62949b6d4cc416d5587adb74f9e065df

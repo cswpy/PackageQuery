@@ -10,7 +10,6 @@
 #include "fmt/core.h"
 #include "pseudo_walker.h"
 #include "gurobi_solver.h"
-#include "simplex.h"
 #include "utility.h"
 #include "dual_reducer.h"
 #include "dual.h"

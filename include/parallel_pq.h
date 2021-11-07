@@ -1,6 +1,6 @@
 #pragma once
 
-#include "coo_sparse.h"
+#include <vector>
 
 using namespace std;
 

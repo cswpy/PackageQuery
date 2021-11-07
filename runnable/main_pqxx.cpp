@@ -16,15 +16,10 @@
 #include "fmt/core.h"
 #include "fitsio.h"
 #include "omp.h"
-#include "lattice_solver.h"
 #include "pseudo_walker.h"
-#include "simplex.h"
-#include "gurobi_lattice_solver.h"
 #include "gurobi_solver.h"
 #include "dual.h"
 #include "dual_reducer.h"
-#include "reducer.h"
-#include "fmt/core.h"
 #include "config.h"
 #include "libpq-fe.h"
 
@@ -645,15 +640,15 @@ void GPtest(){
 }
 
 int main(){
-  //GPtest();
+  GPtest();
   //partitionTest();
   //postgresql();
   //mapSort();
   //smvTest();
-  vector<string> cols = {"a1", "a2", "a3", "a4"};
+  //vector<string> cols = {"a1", "a2", "a3", "a4"};
   //dynamic_kd_partition(0, "synthetic", "n1000000_t1_v1", 1000000, cols, 0.01, 0.1);
   //dynamic_kd_partition(0, "synthetic", "n10000000_t1_v100", 10000000, cols, 0.01, 0.1);
-  dynamic_kd_partition(0, "synthetic", "n100000000_t1_v100", 100000000, cols, 0.01, 0.1);
+  //dynamic_kd_partition(0, "synthetic", "n100000000_t1_v1", 100000000, cols, 0.01, 0.01);
   //customSort();
   //fmt::print("{:.16Lf}\n", -DBL_MAX);
 }
