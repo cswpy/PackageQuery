@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.21)
 
 option(CXX "enable C++ compilation" ON)
 if (CXX)
@@ -56,23 +56,17 @@ install(
 # link_directories( ${PYTHON_LIBRARIES})
 
 # MAIN
-#set(MAIN_NAME "main_simplex")
-#set(MAIN_NAME "main_mc_matrix")
-#set(MAIN_NAME "main_lattice_solver")
-#set(MAIN_NAME "main_ccfits")
-#set(MAIN_NAME "main_reducer")
 #set(MAIN_NAME "main_dual")
 #set(MAIN_NAME "main_dual_reducer")
-set(MAIN_NAME "main_pqxx")
+#set(MAIN_NAME "main_pqxx")
+#set(MAIN_NAME "main_reader")
+set(MAIN_NAME "main_postgres")
 
 # TEST
-#set(MAIN_NAME "test_accuracy_lattice_walk")
-#set(MAIN_NAME "test_speed_lattice_walk")
-#set(MAIN_NAME "test_speed_simplex")
-#set(MAIN_NAME "test_lattice_solver")
-#set(MAIN_NAME "test_ppq")
-#set(MAIN_NAME "test_plot")
+#set(MAIN_NAME "test_gurobi_solver")
+#set(MAIN_NAME "test_dual")
 #set(MAIN_NAME "test_dual_reducer")
+#set(MAIN_NAME "test_cplex_solver")
 
 message("PROJECT NAME: " ${PROJECT_NAME})
 message("SOURCE FOLDER: " ${CMAKE_SOURCE_DIR})
@@ -82,16 +76,19 @@ message("EXECUTABLE NAME: " ${MAIN_NAME})
 
 include_directories("${PROJECT_SOURCE_DIR}")
 include_directories(
-        ${PROJECT_SOURCE_DIR}/include
-        ${PROJECT_SOURCE_DIR}/src
+  ${PROJECT_SOURCE_DIR}/include
 )
 
 file(GLOB all_SRCS
   "${CMAKE_SOURCE_DIR}/runnable/${MAIN_NAME}.cpp"
-  "${PROJECT_SOURCE_DIR}/include/*.h"
-  "${PROJECT_SOURCE_DIR}/include/*.hpp"
-  "${PROJECT_SOURCE_DIR}/src/*.cpp"
-  "${PROJECT_SOURCE_DIR}/src/*.c"
+  "${PROJECT_SOURCE_DIR}/include/pb/util/*.h"
+  "${PROJECT_SOURCE_DIR}/include/pb/util/*.cpp"
+  "${PROJECT_SOURCE_DIR}/include/pb/core/*.h"
+  "${PROJECT_SOURCE_DIR}/include/pb/core/*.cpp"
+  "${PROJECT_SOURCE_DIR}/include/pb/det/*.h"
+  "${PROJECT_SOURCE_DIR}/include/pb/det/*.cpp"
+  "${PROJECT_SOURCE_DIR}/include/pb/sto/*.h"
+  "${PROJECT_SOURCE_DIR}/include/pb/sto/*.cpp"
 )
 
 #OpenMP for Windows

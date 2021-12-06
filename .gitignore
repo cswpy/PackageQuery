@@ -1,3 +1,5 @@
 build/*
 resource/*
 !build/conanfile.txt
+!resource/sql_script
+!resource/backup

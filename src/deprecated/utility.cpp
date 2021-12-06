@@ -54,6 +54,11 @@ void showHistogram(VectorXd x, int bucket_count, double start, double end){
   cout << endl;
 }
 
+long long ceilDiv(long long x, long long q){
+  lldiv_t d = lldiv(x, q);
+  return d.quot + (d.rem != 0LL);
+}
+
 bool isEqual(double x, double y, double eps){
   return fabs(x-y) < eps;
 }
@@ -98,6 +103,13 @@ string solCombination(VectorXd sol){
     else if (count > 1) combs += fmt::format("{}x{} ", to_string(i), count);
   }
   return combs;
+}
+
+string join(vector<string> names, string delim){
+  string res = "";
+  for (int i = 0; i < names.size()-1; i++) res += names[i] + delim;
+  res += names[names.size()-1];
+  return res;
 }
 
 const char* space = " \t\n\r\f\v";
@@ -220,7 +232,6 @@ MeanVar::MeanVar(){
 MeanVar::MeanVar(int attr_count){
   mean.resize(attr_count); mean.fill(0);
   M2.resize(attr_count); M2.fill(0);
-  var.resize(attr_count); var.fill(0);
   this->attr_count = attr_count;
   sample_count = 0;
 }
@@ -230,7 +241,6 @@ void MeanVar::add(const VectorXd& x){
   VectorXd delta = x - mean;
   mean += delta / sample_count;
   M2 += delta.cwiseProduct(x - mean);
-  var = M2 / sample_count;
 }
 
 void MeanVar::add(double* start, int cycle){
@@ -240,21 +250,27 @@ void MeanVar::add(double* start, int cycle){
     double delta = x - mean(i);
     mean(i) += delta / sample_count;
     M2(i) += delta * (x - mean(i));
-    var(i) = M2(i) / sample_count;
   }
+}
+
+VectorXd MeanVar::getMean(){
+  return mean;
+}
+
+VectorXd MeanVar::getVar(){
+  if (sample_count == 0) return M2;
+  return M2 / sample_count;
 }
 
 ScalarMeanVar::ScalarMeanVar(){
   mean = 0;
   M2 = 0;
-  var = 0;
   sample_count = 0;
 }
 
 void ScalarMeanVar::reset(){
   mean = 0;
   M2 = 0;
-  var = 0;
   sample_count = 0;
 }
 
@@ -263,7 +279,15 @@ void ScalarMeanVar::add(double x){
   double delta = x - mean;
   mean += delta / sample_count;
   M2 += delta * (x - mean);
-  var = M2 / sample_count;
+}
+
+double ScalarMeanVar::getMean(){
+  return mean;
+}
+
+double ScalarMeanVar::getVar(){
+  if (sample_count == 0) return 0;
+  return M2 / sample_count;
 }
 
 int getNumRows(string file_name){
@@ -353,11 +377,13 @@ void GalaxyDB::generateQuery(double percent, int c_att, vector<int> atts, int ex
   iota(index.begin(), index.end(), 0);
   shuffle(index.begin(), index.end(), std::mt19937{std::random_device{}()});
   VectorXd chebyshev (m);
+  VectorXd mean = mv.getMean();
+  VectorXd var = mv.getVar();
   double k = sqrt(1/kGalaxyOutlierProb);
   for (int i = 0; i < m-1; i ++){
     int att_index = abs(atts[i]) - 1;
-    double mu = expected_sol_size * mv.mean(att_index);
-    double dist = k * expected_sol_size * mv.var(att_index);
+    double mu = expected_sol_size * mean(att_index);
+    double dist = k * expected_sol_size * var(att_index);
     if (atts[i] > 0) b(i) = mu + dist;
     else b(i) = dist - mu;
   }
@@ -376,6 +402,9 @@ void GalaxyDB::generateQuery(double percent, int c_att, vector<int> atts, int ex
       }
     }
   }
+}
+
+Profiler::Profiler(){
 }
 
 Profiler::Profiler(vector<string> names): names(names){

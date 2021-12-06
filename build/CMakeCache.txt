@@ -318,6 +318,15 @@ PackageQuery_IS_TOP_LEVEL:STATIC=ON
 //Value Computed by CMake
 PackageQuery_SOURCE_DIR:STATIC=C:/Users/xuana/Desktop/VisualStudioCode/PackageQuery
 
+//Value Computed by CMake
+Project_BINARY_DIR:STATIC=C:/Users/xuana/Desktop/VisualStudioCode/PackageQuery/build
+
+//Value Computed by CMake
+Project_IS_TOP_LEVEL:STATIC=ON
+
+//Value Computed by CMake
+Project_SOURCE_DIR:STATIC=C:/Users/xuana/Desktop/VisualStudioCode/PackageQuery
+
 
 ########################
 # INTERNAL cache entries
@@ -502,7 +511,7 @@ FIND_PACKAGE_MESSAGE_DETAILS_OpenMP_C:INTERNAL=[-openmp][v2.0()]
 //Details about finding OpenMP_CXX
 FIND_PACKAGE_MESSAGE_DETAILS_OpenMP_CXX:INTERNAL=[-openmp][v2.0()]
 //Details about finding Python3
-FIND_PACKAGE_MESSAGE_DETAILS_Python3:INTERNAL=[C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.9_3.9.2032.0_x64__qbz5n2kfra8p0/libs/python39.lib][C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.9_3.9.2032.0_x64__qbz5n2kfra8p0/include][C:/Users/xuana/AppData/Local/Packages/PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0/LocalCache/local-packages/Python39/site-packages/numpy/core/include][cfound components: NumPy Interpreter Development.Module ][v3.9.7()]
+FIND_PACKAGE_MESSAGE_DETAILS_Python3:INTERNAL=[C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.9_3.9.2544.0_x64__qbz5n2kfra8p0/python3.9.exe][C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.9_3.9.2544.0_x64__qbz5n2kfra8p0/libs/python39.lib][C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.9_3.9.2544.0_x64__qbz5n2kfra8p0/include][cfound components: Interpreter Development Development.Module Development.Embed ][v3.9.9()]
 //Result of TRY_COMPILE
 OpenMP_COMPILE_RESULT_CXX_openmp:INTERNAL=TRUE
 //Result of TRY_COMPILE
@@ -525,20 +534,19 @@ OpenMP_SPECTEST_CXX_:INTERNAL=TRUE
 OpenMP_SPECTEST_C_:INTERNAL=TRUE
 //CMAKE_INSTALL_PREFIX during last run
 _GNUInstallDirs_LAST_CMAKE_INSTALL_PREFIX:INTERNAL=C:/Program Files (x86)
-_Python3_DEVELOPMENT_MODULE_SIGNATURE:INTERNAL=62949b6d4cc416d5587adb74f9e065df
-_Python3_EXECUTABLE:INTERNAL=C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.9_3.9.2032.0_x64__qbz5n2kfra8p0/python3.9.exe
+_Python3_DEVELOPMENT_MODULE_SIGNATURE:INTERNAL=b5685c71f8712a2532bb9dfd62632aee
+_Python3_EXECUTABLE:INTERNAL=C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.9_3.9.2544.0_x64__qbz5n2kfra8p0/python3.9.exe
 //Path to a file.
-_Python3_INCLUDE_DIR:INTERNAL=C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.9_3.9.2032.0_x64__qbz5n2kfra8p0/include
+_Python3_INCLUDE_DIR:INTERNAL=C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.9_3.9.2544.0_x64__qbz5n2kfra8p0/include
 //Python3 Properties
-_Python3_INTERPRETER_PROPERTIES:INTERNAL=Python;3;9;7;64;;cp39-win_amd64;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2032.0_x64__qbz5n2kfra8p0\Lib;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2032.0_x64__qbz5n2kfra8p0\Lib;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2032.0_x64__qbz5n2kfra8p0\Lib\site-packages;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2032.0_x64__qbz5n2kfra8p0\Lib\site-packages
-_Python3_INTERPRETER_SIGNATURE:INTERNAL=43a1782a820bc4d7a618096eef8f843d
+_Python3_INTERPRETER_PROPERTIES:INTERNAL=Python;3;9;9;64;;cp39-win_amd64;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2544.0_x64__qbz5n2kfra8p0\Lib;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2544.0_x64__qbz5n2kfra8p0\Lib;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2544.0_x64__qbz5n2kfra8p0\Lib\site-packages;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2544.0_x64__qbz5n2kfra8p0\Lib\site-packages
+_Python3_INTERPRETER_SIGNATURE:INTERNAL=f4fa2ed988e5c1a0d9a54ab6e3b787a5
 //Path to a library.
 _Python3_LIBRARY_DEBUG:INTERNAL=_Python3_LIBRARY_DEBUG-NOTFOUND
 //Path to a library.
-_Python3_LIBRARY_RELEASE:INTERNAL=C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.9_3.9.2032.0_x64__qbz5n2kfra8p0/libs/python39.lib
-_Python3_NUMPY_SIGNATURE:INTERNAL=23103485ecd8cc7a237d68c6e615839f
+_Python3_LIBRARY_RELEASE:INTERNAL=C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.9_3.9.2544.0_x64__qbz5n2kfra8p0/libs/python39.lib
 //Path to a file.
-_Python3_NumPy_INCLUDE_DIR:INTERNAL=C:/Users/xuana/AppData/Local/Packages/PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0/LocalCache/local-packages/Python39/site-packages/numpy/core/include
+_Python3_NumPy_INCLUDE_DIR:INTERNAL=_Python3_NumPy_INCLUDE_DIR-NOTFOUND
 //Path to a library.
 _Python3_RUNTIME_LIBRARY_RELEASE:INTERNAL=C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.9_3.9.2032.0_x64__qbz5n2kfra8p0/python39.dll
 

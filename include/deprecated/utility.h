@@ -15,7 +15,7 @@ constexpr char CPX_LESS_EQUAL = 'L';
 constexpr char CPX_GREATER_EQUAL = 'G';
 constexpr char CPX_RANGE = 'R';
 
-constexpr double kFloatEps = 1e-6;
+constexpr double kFloatEps = 1e-4;
 constexpr double kFeasTolerance = 1e-6;
 constexpr double kStubbornMultiplier = 2;
 constexpr double kSizeTol = 1e5;
@@ -46,6 +46,7 @@ bool isLess(double x, double y, double eps=kFloatEps);
 bool isGreater(double x, double y, double eps=kFloatEps);
 bool isLessEqual(double x, double y, double eps=kFloatEps);
 bool isGreaterEqual(double x, double y, double eps=kFloatEps);
+long long ceilDiv(long long x, long long q);
 
 void showHistogram(vector<int> x, int bucket_count, double start, double end);
 void showHistogram(VectorXd x, int bucket_count, double start, double end);
@@ -55,6 +56,7 @@ unordered_map<string, int> getProblemSizes();
 VectorXd bucketSort(vector<double> array);
 string solMessage(int sol_status);
 string solCombination(VectorXd sol);
+string join(vector<string> names, string delim=",");
 
 //ccfits
 MatrixXd readTable(string file_name, const vector<int>& cols, vector<string>& column_names);
@@ -112,23 +114,27 @@ double exeTime(F func, Args&&... args) {
 // C++ implementation of Welford's running mean-var algorithm
 class MeanVar{
 public:
-  VectorXd mean, M2, var;
+  VectorXd mean, M2;
   int sample_count, attr_count;
 public:
   MeanVar();
   MeanVar(int attr_count);
   void add(const VectorXd& x);
   void add(double* start, int cycle=1);
+  VectorXd getMean();
+  VectorXd getVar();
 };
 
 class ScalarMeanVar{
 public:
-  double mean, M2, var;
+  double mean, M2;
   int sample_count;
 public:
   ScalarMeanVar();
   void add(double x);
   void reset();
+  double getMean();
+  double getVar();
 };
 
 constexpr double kGalaxyOutlierProb = 0.6;
@@ -153,6 +159,7 @@ public:
   VectorXi count;
   vector<chrono::high_resolution_clock::time_point> eps;
   vector<string> names;
+  Profiler();
   Profiler(vector<string> names);
   void clock(int i, bool is_parallel=true);
   void stop(int i, bool is_parallel=true);

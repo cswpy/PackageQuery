@@ -42,7 +42,7 @@
 #include <climits>
 #include <algorithm>
 #include <utility>
-#include "utility.h"
+#include "pb/util/umisc.h"
 
 namespace map_sort {
 template<typename Type, size_t NumIntervals = 256>
@@ -174,9 +174,9 @@ void MapSort<Type, kNumIntervals>
   pos_bgn_[0] = 0;
   for (int i = 0; i < num_threads_ - 1; ++i) {
     const size_t t = (num_elems - pos_bgn_[i]) / (num_threads_ - i);
-    pos_bgn_[i + 1] = pos_end_[i] = pos_bgn_[i] + t;
+    pos_bgn_[i + 1] = pos_end_[i] = (int) (pos_bgn_[i] + t);
   }
-  pos_end_[num_threads_ - 1] = num_elems;
+  pos_end_[num_threads_ - 1] = (int) num_elems;
 }
 
 template<typename Type, size_t kNumIntervals>
@@ -200,7 +200,7 @@ void MapSort<Type, kNumIntervals>
 
     memset(my_histo, 0, sizeof(size_t) * kNumIntervals);
     for (size_t i = my_bgn; i < my_end; ++i) {
-      int k = std::lower_bound(piv_, piv_ + kNumPivots, src[i]) - piv_;
+      int k = (int) (std::lower_bound(piv_, piv_ + kNumPivots, src[i]) - piv_);
       rng_[i] = k;
       ++my_histo[k];
     }
@@ -232,7 +232,7 @@ void MapSort<Type, kNumIntervals>
     size_t *my_histo = histo_[my_id];
 
     for (size_t i = my_bgn; i < my_end; ++i) {
-      int k = rng_[i];
+      int k = (int) rng_[i];
       tmp_[my_histo[k]++] = src[i];
     }
   }

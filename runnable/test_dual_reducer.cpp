@@ -1,230 +1,132 @@
-#define FMT_HEADER_ONLY
+#include "pb/util/udeclare.h"
+#include "pb/util/udebug.h"
+#include "pb/util/uconfig.h"
+#include "pb/core/gurobi_solver.h"
+#include "pb/core/cplex_solver.h"
+#include "pb/det/dual_reducer.h"
+#include "pb/det/dual_reducer2.h"
+#include "pb/det/det_prob.h"
 
-#include <iostream>
-#include <Eigen/Dense>
-#include <iostream>
-#include <float.h>
-#include <queue>
-#include <random>
-#include <chrono>
-#include <numeric>
+using namespace pb;
 
-#include "map_sort.h"
-#include "utility.h"
-#include "parallel_pq.h"
-#include "fmt/core.h"
-#include "fitsio.h"
-#include "omp.h"
-#include "lattice_solver.h"
-#include "pseudo_walker.h"
-#include "simplex.h"
-#include "gurobi_lattice_solver.h"
-#include "gurobi_solver.h"
-#include "dual.h"
-#include "dual_reducer.h"
-#include "reducer.h"
-#include "fmt/core.h"
-
-using namespace std;
-using namespace Eigen;
-
-void generateQuery(int qi, int n, RMatrixXd& A, VectorXd& bl, VectorXd& bu, VectorXd& c){
-  double outlier_prob = 0.6;
-  vector<double> lbs = {-1, -1, -1, -1, 0, 0, 0, 0};
-  vector<int> expected_ns = {20, 20, 500, 500, 20, 20, 500, 500};
-  vector<double> att_vars = {1, 100, 1, 100, 1, 100, 1, 100};
-  int expected_n = expected_ns[qi];
-  double att_var = att_vars[qi];
-  A.resize(4, n); bl.resize(4); bu.resize(4); c.resize(n); 
-  default_random_engine gen {static_cast<long unsigned int>(time(0))};
-  double left = lbs[qi];
-  double right = 1.0;
-  uniform_real_distribution u_dist(left, right);
-  double multiplicity = att_var / (right-left) * 12;
-  //normal_distribution att_dist(10.0, att_var);
-  int expected_numvar = expected_n;
-  double mean = 0.5*multiplicity*expected_numvar;
-  double var = att_var*expected_numvar;
-  normal_distribution n_dist(0.0, var);
-  //normal_distribution n_dist_c(0.0, 1.0/12);
-  uniform_real_distribution n_dist_c(left, right);
-  #pragma omp parallel for num_threads(CORE_COUNT)
-  for (int i = 0; i < n; i ++){
-    A(0, i) = u_dist(gen)*multiplicity;
-    A(1, i) = u_dist(gen)*multiplicity;
-    A(2, i) = u_dist(gen)*multiplicity;
-    A(3, i) = 1;
-    c(i) = n_dist_c(gen)*multiplicity;
-    //c(i) = A(0, i) + A(1, i) + A(2, i);
+void benchmark(){
+  int n = 10000;
+  bool is_positive = true;
+  double outlier_prob = 10000;
+  int expected_n = 50;
+  double variance = 1000;
+  bool is_translate = true;
+  int rep = 100;
+  VectorXd res (14); res.fill(0);
+  for (int r = 0; r < rep; r++){
+    cout << "r " << r << endl;
+    DetProb prob; prob.uniformGenerate(n, expected_n, variance, outlier_prob, false, is_positive, is_translate);
+    GurobiSolver gs = GurobiSolver(prob);
+    DualReducer dr = DualReducer(kPCore, &prob);
+    if (dr.status == Timeout){
+      res(12) ++;
+      continue;
+    } else if (dr.status == Infeasible || dr.status == DualUnbounded){
+      gs.solveIlp(10.0);
+      if (gs.ilp_status == Infeasible) res(13) ++;
+      else if (gs.ilp_status == Timeout) res(13) ++;
+    }
+    int count = 0;
+    VectorXd sol = dr.getLpSol();
+    for (int i = 0; i < n; i ++){
+      if (sol(i) > 0) count ++;
+    }
+    res(0) += count;
+    //cout << "OK1" << endl;
+    double gs_obj = gs.getScore(dr.best_sol);
+    double lp_obj = gs.getScore(sol);
+    double lp_gap = (lp_obj - gs_obj) / lp_obj * 100;
+    res(1) += lp_gap;
+    for (int i = 0; i < 4; i ++){
+      DualReducer2 dr2 = DualReducer2(kPCore, &prob, i);
+      if (gs.checkIlpFeasibility(dr2.best_sol) == Feasibility){
+        double my_gap = (gs_obj - gs.getScore(dr2.best_sol)) / gs_obj * 100;
+        res(i+2) += my_gap;
+      } else{
+        res(i+7) ++;
+      }
+    }
+    //cout << "OK2" << endl;
+    if (gs.checkIlpFeasibility(dr.best_sol) == Feasibility){
+      double gap = (gs_obj - gs.getScore(dr.best_sol)) / gs_obj * 100;
+      res(6) += gap;
+    } else{
+      res(11) ++;
+    }
+    //cout << "OK4" << endl;
+    VectorXd ress = res;
+    double rr = r+1;
+    ress(0) /= rr;
+    ress(1) /= rr;
+    for (int i = 2; i <= 6; i ++){
+      if (rr-ress(12)-ress(i+5) > 0) ress(i) /= (rr -ress(12) -ress(i+5));
+    }
+    for (int i = 7; i < 12; i ++) ress(i) /= ((rr-ress(12))/100.0);
+    ress(12) /= (rr/100.0);
+    ress(13) /= (rr/100.0);
+    print(ress);
   }
-  double tol = var*sqrt(1/outlier_prob);
-  bl(0) = mean - tol;
-  bu(0) = mean + tol;
-  bl(1) = -DBL_MAX;
-  bu(1) = mean + tol;
-  bl(2) = mean- tol;
-  bu(2) = DBL_MAX;
-  bl(3) = expected_n*1.0/2;
-  bu(3) = expected_n*3.0/2;
+  res(0) /= rep;
+  res(1) /= rep;
+  for (int i = 2; i <= 6; i ++){
+    if (rep-res(12)-res(i+5) > 0) res(i) /= (rep - res(12) - res(i+5));
+  }
+  for (int i = 7; i < 12; i ++) res(i) /= ((rep-res(12))/100.0);
+  res(12) /= (rep/100.0);
+  res(13) /= (rep/100.0);
+  print(res);
 }
 
-void testAccuracy(){
-  int T = 3;
-  vector<int> szs = {1000, 10000, 100000};
-  vector<int> repeats = {1000, 50, 25};
-  RMatrixXd A;
-  VectorXd bl, bu, c;
-  VectorXd u;
-  VectorXd l;
-  for (int qi = 0; qi < 8; qi ++){
-    if (qi > 3) continue;
-    for (int i = 0; i < T; i ++){
-      if (i != 0) continue;
-      int fail0 = 0;
-      int fail1 = 0;
-      double obj_gap0 = 0;
-      double obj_gap1 = 0;
-      double ap0 = 0;
-      double ap1 = 0;
-      int succ = 0;
-      int n = szs[i];
-      for (int r = 0; r < repeats[i]; r++){
-        generateQuery(qi, n, A, bl, bu, c);
-        u.resize(n); u.fill(1);
-        l.resize(n); l.fill(0);
-        //cout << "HERE " << endl;
-        DualReducer dr0 = DualReducer(8, &A, &bl, &bu, &c, &l, &u, 0);
-        //cout << "HERE2 " << endl;
-        DualReducer dr1 = DualReducer(8, &A, &bl, &bu, &c, &l, &u, 1);
-        //cout << "HERE3 " << endl;
-        double base_score = dr0.duals[0]->score;
-        if (dr0.status != LS_FOUND || dr1.status != LS_FOUND){
-          if (dr0.status != LS_FOUND) fail0 ++;
-          if (dr1.status != LS_FOUND) fail1 ++;
-        } else{
-          succ ++;
-          double gap0 = (base_score - dr0.best_score) / base_score;
-          double gap1 = (base_score - dr1.best_score) / base_score;
-          obj_gap0 += gap0;
-          obj_gap1 += gap1;
-          ap0 += base_score / dr0.best_score;
-          ap1 += base_score / dr1.best_score;
-        }
-        fmt::print("At ({},{},{}) fail_prob({:.2Lf},{:.2Lf}) avg_obj_gap({:.10Lf},{:.10Lf}) avg_ap({:.10Lf},{:.10Lf})\n", qi, i, r, fail0/(double)repeats[i], fail1/(double)repeats[i], obj_gap0/succ, obj_gap1/succ, ap0/succ, ap1/succ);
-      }
-      //fmt::print("{},{},{:.2Lf},{:.2Lf},{:.10Lf},{:.10Lf},{:.10Lf},{:.10Lf}\n", qi, n, fail0/(double)repeats[i], fail1/(double)repeats[i], obj_gap0/succ, obj_gap1/succ, ap0/succ, ap1/succ);
-    }
+void compareGs(){
+  DetProb prob; prob.uniformGenerate(10000, 500, 1, 10000, false, true, true);
+  DualReducer dr = DualReducer(kPCore, &prob);
+  GurobiSolver gs = GurobiSolver(prob);
+  CplexSolver cs = CplexSolver(prob);
+  for (int i = 0; i < 4; i ++){
+    DualReducer2 dr2 = DualReducer2(kPCore, &prob, i);
+    cout << dr2.exe_solve << " " << solMessage(dr2.status) << " " << cs.getScore(dr2.best_sol) << " " << feasMessage(cs.checkIlpFeasibility(dr2.best_sol)) << endl;
   }
+  gs.solveLp();
+  gs.solveIlp();
+  // cs.solveLp();
+  // cs.solveIlp();
+  if (dr.status == Found) showHistogram(dr.best_sol, 10, 0, 0);
+  if (gs.lp_status == Found) showHistogram(gs.lp_sol, 10, 0, 0);
+  if (gs.ilp_status == Found) showHistogram(gs.ilp_sol, 10, 0, 0);
+  // if (cs.lp_status == Found) showHistogram(gs.lp_sol, 10, 0, 0);
+  // if (cs.ilp_status == Found) showHistogram(gs.ilp_sol, 10, 0, 0);
+  // if (dr.status == Found) cout << solCombination(dr.best_sol) << endl;
+  // cout << solCombination(gs.lp_sol) << endl;
+  // cout << solCombination(gs.ilp_sol) << endl;
+  fmt::print("{:.10Lf} {:.10Lf} {:.10Lf} {:.10Lf} {:.10Lf}\n", dr.best_score, gs.lp_score, gs.ilp_score, cs.lp_score, cs.ilp_score);
+  fmt::print("{:.4Lf} {:.4Lf} {:.4Lf} {:.4Lf} {:.4Lf}\n", dr.exe_solve, gs.getLpTime(), gs.getIlpTime(), cs.getLpTime(), cs.getIlpTime());
+  fmt::print("DRG Obj:{:.10Lf} SolStatus:{} LPStatus:{} ILPStatus:{}\n", gs.getScore(dr.best_sol), solMessage(dr.status), feasMessage(gs.checkLpFeasibility(dr.best_sol)), feasMessage(gs.checkIlpFeasibility(dr.best_sol)));
+  fmt::print("DRC Obj:{:.10Lf} SolStatus:{} LPStatus:{} ILPStatus:{}\n", cs.getScore(dr.best_sol), solMessage(dr.status), feasMessage(cs.checkLpFeasibility(dr.best_sol)), feasMessage(cs.checkIlpFeasibility(dr.best_sol)));
+  fmt::print("GLP Obj:{:.10Lf} SolStatus:{} LPStatus:{} ILPStatus:{}\n", gs.getScore(gs.lp_sol), solMessage(gs.lp_status), feasMessage(gs.checkLpFeasibility(gs.lp_sol)), feasMessage(gs.checkIlpFeasibility(gs.lp_sol)));
+  fmt::print("GILP Obj:{:.10Lf} SolStatus:{} LPStatus:{} ILPStatus:{}\n", gs.getScore(gs.ilp_sol), solMessage(gs.ilp_status), feasMessage(gs.checkLpFeasibility(gs.ilp_sol)), feasMessage(gs.checkIlpFeasibility(gs.ilp_sol)));
+  // fmt::print("CLP Obj:{:.10Lf} SolStatus:{} LPStatus:{} ILPStatus:{}\n", cs.getScore(cs.lp_sol), solMessage(cs.lp_status), feasMessage(cs.checkLpFeasibility(cs.lp_sol)), feasMessage(cs.checkIlpFeasibility(cs.lp_sol)));
+  // fmt::print("CILP Obj:{:.10Lf} SolStatus:{} LPStatus:{} ILPStatus:{}\n", cs.getScore(cs.ilp_sol), solMessage(cs.ilp_status), feasMessage(cs.checkLpFeasibility(cs.ilp_sol)), feasMessage(cs.checkIlpFeasibility(cs.ilp_sol)));
 }
 
-void testDual(){
-  int T = 5;
-  vector<int> szs = {1000, 10000, 100000, 1000000, 10000000};
-  RMatrixXd A;
-  VectorXd bl, bu, c;
-  VectorXd u;
-  VectorXd l;
-  for (int qi = 0; qi < 8; qi ++){
-    if (qi != 4) continue;
-    for (int i = 0; i < T; i ++){
-      int n = szs[i];
-      generateQuery(qi, n, A, bl, bu, c);
-      u.resize(n); u.fill(1);
-      l.resize(n); l.fill(0);
-      Dual dual = Dual(8, A, bl, bu, c, l, u);
-      GurobiSolver gs = GurobiSolver(A, bl, bu, c, l, u);
-      gs.solveRelaxed();
-      fmt::print("{},{},{:.2Lf},{:.2Lf}\n", qi, n, dual.exe_solve, gs.exe_relaxed+gs.exe_init);
-    }
-  }
-}
-
-void testReducer(){
-  int T = 4;
-  vector<int> szs = {1000, 10000, 100000, 1000000};
-  RMatrixXd A;
-  VectorXd bl, bu, c;
-  VectorXd u;
-  VectorXd l;
-  for (int qi = 0; qi < 8; qi ++){
-    for (int i = 0; i < T; i ++){
-      // if (i != 1) continue;
-      int n = szs[i];
-      generateQuery(qi, n, A, bl, bu, c);
-      u.resize(n); u.fill(1);
-      l.resize(n); l.fill(0);
-      DualReducer dr = DualReducer(8, &A, &bl, &bu, &c, &l, &u, 1);
-      double r0_obj = dr.duals[0]->score;
-      double gap = (r0_obj - dr.best_score) / r0_obj * 100;
-      fmt::print("{},{},{:.2Lf},{:.2Lf},{:.10Lf}\n", qi, n, dr.exe_solve, dr.duals[0]->exe_solve, gap);
-    }
-  }
-}
-
-void testMajorMatrix(){
-  vector<string> names = {"0", "1", "2", "3", "4", "5"};
-  Profiler pro = Profiler(names);
-  int m = 25;
-  int N = 10000000;
-  Matrix<double, Dynamic, Dynamic, ColMajor> mat1 (m, N); mat1.fill(2);
-  RMatrixXd mat2 (m, N); mat2.fill(2);
-  RMatrixXd mat3 (m, N); mat3.fill(2);
-  int core = 8;
-  #pragma omp parallel num_threads(core)
-  {
-    pro.clock(0);
-    for (int i = 0; i < m; i ++){
-      #pragma omp for nowait
-      for (int j = 0; j < N; j ++){
-        mat1(i, j) *= 2;
-      }
-    }
-    #pragma omp barrier
-    pro.stop(0);
-    pro.clock(1);
-    for (int i = 0; i < m; i ++){
-      #pragma omp for nowait
-      for (int j = 0; j < N; j ++){
-        mat2(i, j) *= 2;
-      }
-    }
-    #pragma omp barrier
-    pro.stop(1);
-    pro.clock(2);
-    #pragma omp for nowait
-    for (int j = 0; j < N; j ++){
-      for (int i = 0; i < m; i ++){
-        mat1(i, j) *= 2;
-      }
-    }
-    #pragma omp barrier
-    pro.stop(2);
-    pro.clock(3);
-    #pragma omp for nowait
-    for (int j = 0; j < N; j ++){
-      for (int i = 0; i < m; i ++){
-        mat2(i, j) *= 2;
-      }
-    }
-    #pragma omp barrier
-    pro.stop(3);
-  }
-  pro.clock(4);
-  mat3 *= 2;
-  pro.stop(4);
-  // pro.clock(5);
-  // for (int i = 0; i < m; i ++){
-  //   for (int j = 0; j < N; j ++){
-  //     mat3(i, j) *= 2;
-  //   }
-  // }
-  // pro.stop(5);
-  pro.print();
+void selfCompare(){
+  DetProb prob; prob.uniformGenerate(10000, 50, 1, false, false);
+  DualReducer dr = DualReducer(kPCore, &prob);
+  VectorXd lp_sol = dr.getLpSol();
+  Checker ch = Checker(prob);
+  showHistogram(lp_sol, 10, 0, 0);
+  fmt::print("{:.10Lf} {:.10Lf}\n", dr.best_score, dr.getLpScore());
+  fmt::print("{:.4Lf} {:.4Lf}\n", dr.exe_solve, dr.getLpTime());
+  fmt::print("SolStatus:{} LPStatus:{} ILPStatus:{}\n", solMessage(dr.status), feasMessage(ch.checkLpFeasibility(dr.best_sol)), feasMessage(ch.checkIlpFeasibility(dr.best_sol)));
+  fmt::print("LPStatus:{} ILPStatus:{}\n", feasMessage(ch.checkLpFeasibility(lp_sol)), feasMessage(ch.checkIlpFeasibility(lp_sol)));
 }
 
 int main(){
-  //testAccuracy();
-  //testDual();
-  testReducer();
-  //testMajorMatrix();
+  //selfCompare();
+  //compareGs();
+  benchmark();
 }
