@@ -14,3 +14,8 @@ constexpr int kPgPort = 5432;
 const string kPgUser = "postgres";
 const string kPgPassword = "postgres";
 const string kPgHostaddr = "127.0.0.1";
+
+const string kId = "id";
+const string kStatTable = "dlv_stats";
+const string kPartitionTable = "dlv_partitions";
+

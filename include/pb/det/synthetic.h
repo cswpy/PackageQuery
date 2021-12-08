@@ -11,9 +11,10 @@ public:
   Profiler pro;
 private:
   void init();
-  void create(string method, long long N, vector<double> args);
+  void create(long long N, int ucount, int ncount, vector<double> means, vector<double> vars);
 public:
   Synthetic(string dbname);
-  void createUniform(long long N, double mean, double var);
-  void createNormal(long long N, double mean, double var);
+  void createUniform(long long N, int count, double mean, double var);
+  void createNormal(long long N, int count, double mean, double var);
+  void createMixed(long long N, int ucount, int ncount, double mean, double var);
 };

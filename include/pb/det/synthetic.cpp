@@ -5,11 +5,14 @@
 #include "libpq-fe.h"
 #include "pb/util/uconfig.h"
 #include "pb/util/unumeric.h"
+#include "pb/util/udeclare.h"
 
-using std::min;
+using namespace pb;
 
 string Synthetic::table_name = "test_data";
 int Synthetic::in_memory_chunk = 1000000;
+
+const string kGenerateFunc = "generate_table";
 
 Synthetic::Synthetic(string dbname): dbname(dbname){
   vector<string> names = {"Init", "Create table", "Generate data", "Create index"};
@@ -19,15 +22,26 @@ Synthetic::Synthetic(string dbname): dbname(dbname){
   pro.stop(0);
 }
 
-void Synthetic::createUniform(long long N, double mean, double var){
-  create("uniform_4col", N, {mean-sqrt(3*var), mean+sqrt(3*var)});
+void Synthetic::createUniform(long long N, int count, double mean, double var){
+  vector<double> means (count, mean);  
+  vector<double> vars (count, var);
+  create(N, count, 0, means, vars);
 }
 
-void Synthetic::createNormal(long long N, double mean, double var){
-  create("normal_4col", N, {mean, sqrt(var)});
+void Synthetic::createNormal(long long N, int count, double mean, double var){
+  vector<double> means (count, mean);  
+  vector<double> vars (count, var);
+  create(N, 0, count, means, vars);
 }
 
-void Synthetic::create(string method, long long N, vector<double> args){
+void Synthetic::createMixed(long long N, int ucount, int ncount, double mean, double var){
+  int count = ucount + ncount;
+  vector<double> means (count, mean);  
+  vector<double> vars (count, var);
+  create(N, ucount, ncount, means, vars);
+}
+
+void Synthetic::create(long long N, int ucount, int ncount, vector<double> means, vector<double> vars){
   long long chunk = ceilDiv(N, kPCore);
   pro.clock(1);
   {
@@ -37,18 +51,57 @@ void Synthetic::create(string method, long long N, vector<double> args){
     assert(PQstatus(conn) == CONNECTION_OK);
     PGresult *res = NULL;
 
+    sql = fmt::format("SET client_min_messages = warning;");
+    res = PQexec(conn, sql.c_str());
+    PQclear(res);
+
+    sql = fmt::format("DROP FUNCTION IF EXISTS {};", kGenerateFunc);
+    res = PQexec(conn, sql.c_str());
+    PQclear(res);
+
+    string inject1 = ", u{} DOUBLE PRECISION";
+    string inject2 = ", n{} DOUBLE PRECISION";
+    string declare_inject = "";
+    for (int i = 1; i <= ucount; i ++) declare_inject += fmt::format(inject1, i);
+    for (int i = 1; i <= ncount; i ++) declare_inject += fmt::format(inject2, i);
+
+    inject1 = ", UNNEST(ARRAY(SELECT {:.20Lf} + {:.20Lf} * RANDOM() FROM GENERATE_SERIES(0, end_id-start_id))) AS u{}";
+    inject2 = ", UNNEST(ARRAY(SELECT * FROM NORMAL_RAND((end_id-start_id+1)::Integer, {:.20Lf}, {:.20Lf}))) AS n{}";
+    string query_inject = "";
+    for (int i = 0; i < ucount; i ++){
+      double tmp = sqrt(3*vars[i]);
+      query_inject += fmt::format(inject1, means[i]-tmp, 2*tmp, i+1);
+    }
+    for (int i = 0; i < ncount; i ++) query_inject += fmt::format(inject2, means[i+ucount], sqrt(vars[i+ucount]), i+1);
+    sql = fmt::format(""
+      "CREATE OR REPLACE FUNCTION {}( "
+      "	start_id BIGINT, "
+      "	end_id BIGINT "
+      ") "
+      "RETURNS TABLE( "
+      "{} BIGINT"
+      "{}"
+      ") "
+      "LANGUAGE plpgsql AS "
+      "$$ "
+      "BEGIN "
+      "	RETURN QUERY SELECT "
+      "	UNNEST(ARRAY(SELECT GENERATE_SERIES FROM GENERATE_SERIES(start_id, end_id))) AS {}"
+      " {};"
+      "END; "
+      "$$; ", kGenerateFunc, kId, declare_inject, kId, query_inject);
+    res = PQexec(conn, sql.c_str());
+    PQclear(res);
+
     sql = fmt::format("DROP TABLE IF EXISTS {} CASCADE;", Synthetic::table_name);
     res = PQexec(conn, sql.c_str());
     PQclear(res);
 
     sql = fmt::format(""
       "CREATE TABLE IF NOT EXISTS {} ("
-      "	id BIGINT,"
-      "	a1 DOUBLE PRECISION,"
-      "	a2 DOUBLE PRECISION,"
-      "	a3 DOUBLE PRECISION,"
-      "	a4 DOUBLE PRECISION"
-      ");", Synthetic::table_name);
+      "	{} BIGINT"
+      " {}"
+      ");", Synthetic::table_name, kId, declare_inject);
     res = PQexec(conn, sql.c_str());
     PQclear(res);
 
@@ -70,7 +123,7 @@ void Synthetic::create(string method, long long N, vector<double> args){
     for (int i = 0; i < in_memory_count; i ++){
       long long left = start_count + i * Synthetic::in_memory_chunk;
       long long right = min(left + Synthetic::in_memory_chunk - 1, end_count);
-      sql = fmt::format("INSERT INTO {} SELECT * FROM {}({}, {}, {}, {});", Synthetic::table_name, method, left, right, args[0], args[1]);
+      sql = fmt::format("INSERT INTO {} SELECT * FROM {}({}, {});", Synthetic::table_name, kGenerateFunc, left, right);
       res = PQexec(conn, sql.c_str());
       PQclear(res);
     }
@@ -85,7 +138,7 @@ void Synthetic::create(string method, long long N, vector<double> args){
     assert(PQstatus(conn) == CONNECTION_OK);
     PGresult *res = NULL;
 
-    sql = fmt::format("ALTER TABLE {} ADD PRIMARY KEY (id);", Synthetic::table_name);
+    sql = fmt::format("ALTER TABLE {} ADD PRIMARY KEY ({});", Synthetic::table_name, kId);
     res = PQexec(conn, sql.c_str());
     PQclear(res);
 
@@ -100,64 +153,12 @@ void Synthetic::init(){
   PGconn* conn = PQconnectdb(conninfo.c_str());
   assert(PQstatus(conn) == CONNECTION_OK);
   PGresult *res = NULL;
-
-  sql = ""
-    "CREATE OR REPLACE FUNCTION uniform_4col("
-    "	start_count BIGINT DEFAULT 1,"
-    "    end_count BIGINT DEFAULT 1,"
-    "    min DOUBLE PRECISION DEFAULT 0.0,"
-    "    max DOUBLE PRECISION DEFAULT 1.0"
-    ") "
-    "RETURNS TABLE ("
-    "	id BIGINT,"
-    "	a1 DOUBLE PRECISION,"
-    "	a2 DOUBLE PRECISION,"
-    "	a3 DOUBLE PRECISION,"
-    "	a4 DOUBLE PRECISION"
-    ")"
-    "RETURNS NULL ON NULL INPUT AS "
-    "$$"
-    "BEGIN"
-    "	RETURN QUERY SELECT "
-    "		UNNEST(ARRAY(SELECT GENERATE_SERIES FROM GENERATE_SERIES(start_count, end_count))) AS id,"
-    "		UNNEST(ARRAY(SELECT min + (max - min) * RANDOM() FROM GENERATE_SERIES(0, end_count-start_count))) AS a1,"
-    "		UNNEST(ARRAY(SELECT min + (max - min) * RANDOM() FROM GENERATE_SERIES(0, end_count-start_count))) AS a2,"
-    "		UNNEST(ARRAY(SELECT min + (max - min) * RANDOM() FROM GENERATE_SERIES(0, end_count-start_count))) AS a3,"
-    "		UNNEST(ARRAY(SELECT min + (max - min) * RANDOM() FROM GENERATE_SERIES(0, end_count-start_count))) AS a4;"
-    "END;"
-    "$$ LANGUAGE plpgsql;";
+  
+  sql = fmt::format("SET client_min_messages = warning;");
   res = PQexec(conn, sql.c_str());
   PQclear(res);
 
-  sql = ""
-    "CREATE OR REPLACE FUNCTION normal_4col("
-    "	start_count BIGINT DEFAULT 1,"
-    "    end_count BIGINT DEFAULT 1,"
-    "    mean DOUBLE PRECISION DEFAULT 0.0,"
-    "    stddev DOUBLE PRECISION DEFAULT 1.0"
-    ") "
-    "RETURNS TABLE ("
-    "	id BIGINT,"
-    "	a1 DOUBLE PRECISION,"
-    "	a2 DOUBLE PRECISION,"
-    "	a3 DOUBLE PRECISION,"
-    "	a4 DOUBLE PRECISION"
-    ")"
-    "RETURNS NULL ON NULL INPUT AS "
-    "$$"
-    "BEGIN"
-    "	RETURN QUERY SELECT "
-    "		UNNEST(ARRAY(SELECT GENERATE_SERIES FROM GENERATE_SERIES(start_count, end_count))) AS id,"
-    "		UNNEST(ARRAY(SELECT * FROM NORMAL_RAND((end_count-start_count+1)::Integer, mean, stddev))) AS a1,"
-    "		UNNEST(ARRAY(SELECT * FROM NORMAL_RAND((end_count-start_count+1)::Integer, mean, stddev))) AS a2,"
-    "		UNNEST(ARRAY(SELECT * FROM NORMAL_RAND((end_count-start_count+1)::Integer, mean, stddev))) AS a3,"
-    "		UNNEST(ARRAY(SELECT * FROM NORMAL_RAND((end_count-start_count+1)::Integer, mean, stddev))) AS a4;"
-    "END;"
-    "$$ LANGUAGE plpgsql;";
-  res = PQexec(conn, sql.c_str());
-  PQclear(res);
-
-  sql = "SET random_page_cost=1.1;";
+  sql = "CREATE EXTENSION IF NOT EXISTS tablefunc;";
   res = PQexec(conn, sql.c_str());
   PQclear(res);
 

@@ -8,8 +8,7 @@ void create_table(){
   string dbname = "benchmark";
   Synthetic syn = Synthetic(dbname);
   long long N = 1000000;
-  double var = 100;
-  syn.createUniform(N, sqrt(3*var), var);
+  syn.createMixed(N, 2, 2, 20, 100);
   syn.pro.print();
 } 
 
@@ -20,6 +19,6 @@ void test_dlv(){
 }
 
 int main(){
-  // create_table();
-  test_dlv();
+  create_table();
+  //test_dlv();
 }
