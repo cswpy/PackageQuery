@@ -3,6 +3,13 @@
 #include <omp.h>
 #include "fmt/core.h"
 #include "umisc.h"
+#include "boost/algorithm/string.hpp"
+
+using boost::split;
+using boost::is_any_of;
+using std::stod;
+
+const string kPgDelim = ",";
 
 string join(vector<string> names, string delim){
   string res = "";
@@ -28,14 +35,30 @@ string& trim(string& s, const char *t){
   return ltrim(rtrim(s, t), t);
 }
 
-string pgJoin(vector<string> names, string delim){
-  return fmt::format("'{{{}}}'", join(names, delim));
+string pgJoin(vector<string> names){
+  return fmt::format("'{{{}}}'", join(names, kPgDelim));
 }
 
 string pgJoin(VectorXd vals, int precision){
   vector<string> str_vals;
   for (double v : vals) str_vals.push_back(fmt::format("{:.{}Lf}", v, precision));
-  return fmt::format("'{{{}}}'", join(str_vals, ","));
+  return fmt::format("'{{{}}}'", join(str_vals, kPgDelim));
+}
+
+vector<string> pgStringSplit(char *s){
+  string sub (s+1, strlen(s)-2);
+  vector<string> res;
+  split(res, sub, is_any_of(kPgDelim));
+  return res;
+}
+
+VectorXd pgValueSplit(char *s){
+  string sub (s+1, strlen(s)-2);
+  vector<string> res;
+  split(res, sub, is_any_of(kPgDelim));
+  VectorXd vals (res.size());
+  for (int i = 0; i < res.size(); i ++) vals(i) = stod(res[i]);
+  return vals;
 }
 
 

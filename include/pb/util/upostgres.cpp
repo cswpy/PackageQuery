@@ -1,5 +1,6 @@
 #define FMT_HEADER_ONLY
 
+#include <iostream>
 #include "fmt/core.h"
 #include "upostgres.h"
 #include "pb/util/uconfig.h"
@@ -7,6 +8,14 @@
 #include "pb/util/unumeric.h"
 
 using std::min;
+using std::cout;
+using std::endl;
+
+void showError(PGconn *conn){
+  string error (PQerrorMessage(conn));
+  if (error.length()) cout << error << endl;
+  else cout << "No errors" << endl;
+}
 
 PgManager::~PgManager(){
   PQfinish(_conn);
@@ -150,9 +159,15 @@ Stat::Stat(vector<string> cols): cols(cols){
 }
 
 void Stat::add(long long size, VectorXd &mean, VectorXd &M2){
-  long long tmp_size = this->size + size; 
-  VectorXd delta = mean - this->mean;
-  this->mean = (this->size * this->mean + size * mean) / tmp_size;
-  this->M2 += M2 + delta.cwiseProduct(delta) * (this->size * size / (long double) (tmp_size));
-  this->size = tmp_size;
+  if (!this->size){
+    this->size = size;
+    this->mean = mean;
+    this->M2 = M2;
+  } else{
+    long long tmp_size = this->size + size; 
+    VectorXd delta = mean - this->mean;
+    this->mean = (this->size * this->mean + size * mean) / tmp_size;
+    this->M2 += M2 + delta.cwiseProduct(delta) * (this->size * size / (long double) (tmp_size));
+    this->size = tmp_size;
+  }
 }

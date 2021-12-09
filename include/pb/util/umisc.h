@@ -14,8 +14,10 @@ static const char* space = " \t\n\r\f\v";
 
 string join(vector<string> names, string delim);
 string& trim(string& s, const char *t=space);
-string pgJoin(vector<string> names, string delim);
+string pgJoin(vector<string> names);
 string pgJoin(VectorXd vals, int precision);
+vector<string> pgStringSplit(char *s);
+VectorXd pgValueSplit(char *s);
 
 // Return the number of threads that would be executed in parallel regions
 int GetMaxThreads();

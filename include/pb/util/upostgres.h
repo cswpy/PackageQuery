@@ -7,6 +7,8 @@ using std::string;
 using std::vector;
 using Eigen::VectorXd;
 
+void showError(PGconn *conn);
+
 class Stat{
 public:
   long long size;
