@@ -15,10 +15,11 @@ void create_table(){
 void test_dlv(){
   string dbname = "benchmark";
   DynamicLowVariance dlv = DynamicLowVariance(dbname);
+  dlv.partition(Synthetic::table_name);
   dlv.pro.print();
 }
 
 int main(){
-  create_table();
-  //test_dlv();
+  //create_table();
+  test_dlv();
 }

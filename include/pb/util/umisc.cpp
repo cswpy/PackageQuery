@@ -1,5 +1,7 @@
-#include <omp.h>
+#define FMT_HEADER_ONLY
 
+#include <omp.h>
+#include "fmt/core.h"
 #include "umisc.h"
 
 string join(vector<string> names, string delim){
@@ -24,6 +26,16 @@ string& ltrim(string& s, const char *t){
 // trim from both ends of string (right then left)
 string& trim(string& s, const char *t){
   return ltrim(rtrim(s, t), t);
+}
+
+string pgJoin(vector<string> names, string delim){
+  return fmt::format("'{{{}}}'", join(names, delim));
+}
+
+string pgJoin(VectorXd vals, int precision){
+  vector<string> str_vals;
+  for (double v : vals) str_vals.push_back(fmt::format("{:.{}Lf}", v, precision));
+  return fmt::format("'{{{}}}'", join(str_vals, ","));
 }
 
 

@@ -4,14 +4,18 @@
 #include <string>
 #include <chrono>
 #include <utility>
+#include "Eigen/Dense"
 
 using std::vector;
 using std::string;
+using Eigen::VectorXd;
 
 static const char* space = " \t\n\r\f\v";
 
 string join(vector<string> names, string delim);
-string& trim(string& s, const char* t  = space);
+string& trim(string& s, const char *t=space);
+string pgJoin(vector<string> names, string delim);
+string pgJoin(VectorXd vals, int precision);
 
 // Return the number of threads that would be executed in parallel regions
 int GetMaxThreads();

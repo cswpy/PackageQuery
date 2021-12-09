@@ -10,6 +10,7 @@ const string kProjectHome = "C:/Users/xuana/Desktop/VisualStudioCode/PackageQuer
 constexpr int kPCore = 8;
 constexpr int kLCore = 16;
 constexpr int kPgPort = 5432;
+constexpr int kPrecision = 20;
 
 const string kPgUser = "postgres";
 const string kPgPassword = "postgres";

@@ -65,14 +65,14 @@ void Synthetic::create(long long N, int ucount, int ncount, vector<double> means
     for (int i = 1; i <= ucount; i ++) declare_inject += fmt::format(inject1, i);
     for (int i = 1; i <= ncount; i ++) declare_inject += fmt::format(inject2, i);
 
-    inject1 = ", UNNEST(ARRAY(SELECT {:.20Lf} + {:.20Lf} * RANDOM() FROM GENERATE_SERIES(0, end_id-start_id))) AS u{}";
-    inject2 = ", UNNEST(ARRAY(SELECT * FROM NORMAL_RAND((end_id-start_id+1)::Integer, {:.20Lf}, {:.20Lf}))) AS n{}";
+    inject1 = ", UNNEST(ARRAY(SELECT {:.{}Lf} + {:.{}Lf} * RANDOM() FROM GENERATE_SERIES(0, end_id-start_id))) AS u{}";
+    inject2 = ", UNNEST(ARRAY(SELECT * FROM NORMAL_RAND((end_id-start_id+1)::Integer, {:.{}Lf}, {:.{}Lf}))) AS n{}";
     string query_inject = "";
     for (int i = 0; i < ucount; i ++){
       double tmp = sqrt(3*vars[i]);
-      query_inject += fmt::format(inject1, means[i]-tmp, 2*tmp, i+1);
+      query_inject += fmt::format(inject1, means[i]-tmp, kPrecision, 2*tmp, kPrecision, i+1);
     }
-    for (int i = 0; i < ncount; i ++) query_inject += fmt::format(inject2, means[i+ucount], sqrt(vars[i+ucount]), i+1);
+    for (int i = 0; i < ncount; i ++) query_inject += fmt::format(inject2, means[i+ucount], kPrecision, sqrt(vars[i+ucount]), kPrecision, i+1);
     sql = fmt::format(""
       "CREATE OR REPLACE FUNCTION {}( "
       "	start_id BIGINT, "
