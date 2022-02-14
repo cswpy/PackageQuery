@@ -11,6 +11,8 @@ using std::min;
 using std::cout;
 using std::endl;
 
+const string kComputeStatFunction = "compute_stat";
+
 void showError(PGconn *conn){
   string error (PQerrorMessage(conn));
   if (error.length()) cout << error << endl;
@@ -32,14 +34,8 @@ PgManager::PgManager(string dbname): dbname(dbname){
   PQclear(_res);
 }
 
-void PgManager::createExtention(string extension){
-  _sql = fmt::format("CREATE EXTENSION IF NOT EXISTS {};", extension);
-  _res = PQexec(_conn, _sql.c_str());
-  PQclear(_res);
-}
-
 long long PgManager::getSize(string table_name){
-  _sql = fmt::format("SELECT {} FROM {} ORDER BY {} DESC LIMIT 1;", kId, table_name, kId);
+  _sql = fmt::format("SELECT {} FROM \"{}\" ORDER BY {} DESC LIMIT 1;", kId, table_name, kId);
   _res = PQexec(_conn, _sql.c_str());
   long long size = atoll(PQgetvalue(_res, 0, 0));
   PQclear(_res);
@@ -48,7 +44,7 @@ long long PgManager::getSize(string table_name){
 
 vector<string> PgManager::getNumericCols(string table_name){
   vector<string> cols;
-  _sql = fmt::format("SELECT * FROM {} LIMIT 1;", table_name);
+  _sql = fmt::format("SELECT * FROM \"{}\" LIMIT 1;", table_name);
   _res = PQexec(_conn, _sql.c_str());
   int col_count = PQnfields(_res);
   PGresult *res = NULL;
@@ -66,15 +62,7 @@ vector<string> PgManager::getNumericCols(string table_name){
   return cols;
 }
 
-Stat* PgManager::computeStats(string table_name){
-  return computeStats(table_name, getNumericCols(table_name));
-}
-
 Stat* PgManager::computeStats(string table_name, const vector<string> &cols){
-  _sql = fmt::format("DROP FUNCTION IF EXISTS compute_stat;");
-  _res = PQexec(_conn, _sql.c_str());
-  PQclear(_res);
-
   string inject = ""
     "		delta := rec.{} - means[{}];"
     "		means[{}] := means[{}] + delta / count;"
@@ -87,7 +75,7 @@ Stat* PgManager::computeStats(string table_name, const vector<string> &cols){
   }
 
   _sql = fmt::format(""
-    "CREATE OR REPLACE FUNCTION compute_stat("
+    "CREATE OR REPLACE FUNCTION {}("
     "	start_id BIGINT,"
     "	end_id BIGINT"
     ")"
@@ -99,7 +87,7 @@ Stat* PgManager::computeStats(string table_name, const vector<string> &cols){
     "$$"
     "DECLARE"
     "	rec record;"
-    "	query text := 'SELECT {} FROM {} WHERE {} BETWEEN %L AND %L;';"
+    "	query text := 'SELECT {} FROM \"{}\" WHERE {} BETWEEN %L AND %L;';"
     "	count BIGINT := 0;"
     "	means double precision[] := array_fill(0, ARRAY[{}]);"
     "	M2s double precision[] := array_fill(0, ARRAY[{}]);"
@@ -115,7 +103,7 @@ Stat* PgManager::computeStats(string table_name, const vector<string> &cols){
     "		RETURN NEXT;"
     "	END LOOP;"
     "END;"
-    "$$;", join(cols, ","), table_name, kId, cols.size(), cols.size(), injects, cols.size());
+    "$$;", kComputeStatFunction, join(cols, ","), table_name, kId, cols.size(), cols.size(), injects, cols.size());
   _res = PQexec(_conn, _sql.c_str());
   PQclear(_res);
 
@@ -133,7 +121,7 @@ Stat* PgManager::computeStats(string table_name, const vector<string> &cols){
     int seg = omp_get_thread_num();
     long long start_id = seg * chunk + 1;
     long long end_id = min((seg + 1) * chunk, size);
-    sql = fmt::format("SELECT * FROM compute_stat({}, {});", start_id, end_id);
+    sql = fmt::format("SELECT * FROM {}({}, {});", kComputeStatFunction, start_id, end_id);
     res = PQexec(conn, sql.c_str());
     VectorXd local_mean (cols.size());
     VectorXd local_M2 (cols.size());
@@ -170,4 +158,17 @@ void Stat::add(long long size, VectorXd &mean, VectorXd &M2){
     this->M2 += M2 + delta.cwiseProduct(delta) * (this->size * size / (long double) (tmp_size));
     this->size = tmp_size;
   }
+}
+
+double Stat::getVar(string col){
+  if (!size) return 0;
+  for (int i = 0; i < cols.size(); i ++){
+    if (!cols[i].compare(col)) return M2(i) / size;
+  }
+  return 0;
+}
+
+double Stat::getVar(int i){
+  assert(0 <= i && i < cols.size());
+  return M2(i) / size;
 }

@@ -18,6 +18,9 @@ string pgJoin(vector<string> names);
 string pgJoin(VectorXd vals, int precision);
 vector<string> pgStringSplit(char *s);
 VectorXd pgValueSplit(char *s);
+string nextGName(string table_name);
+string nextPName(string table_name);
+int getLayerIndex(string table_name);
 
 // Return the number of threads that would be executed in parallel regions
 int GetMaxThreads();

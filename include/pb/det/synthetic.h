@@ -7,7 +7,6 @@ private:
   string dbname;
 public:
   static string table_name;
-  static int in_memory_chunk;
   Profiler pro;
 private:
   void init();

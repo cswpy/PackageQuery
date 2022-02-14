@@ -9,8 +9,10 @@ const string kProjectHome = "C:/Users/xuana/Desktop/VisualStudioCode/PackageQuer
 
 constexpr int kPCore = 8;
 constexpr int kLCore = 16;
+constexpr int kMaxMultiColumnIndexes = 32;
 constexpr int kPgPort = 5432;
 constexpr int kPrecision = 20;
+constexpr int kInMemorySize = 1000000;
 
 const string kPgUser = "postgres";
 const string kPgPassword = "postgres";
@@ -19,4 +21,4 @@ const string kPgHostaddr = "127.0.0.1";
 const string kId = "id";
 const string kStatTable = "dlv_stats";
 const string kPartitionTable = "dlv_partitions";
-
+const string kNullLiteral = "null";

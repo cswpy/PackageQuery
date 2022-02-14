@@ -32,7 +32,9 @@ using Eigen::VectorXd;
 class MeanVar{
 private:
   VectorXd mean, M2;
-  int sample_count, attr_count;
+  int attr_count;
+public:
+  int sample_count;
 public:
   MeanVar();
   MeanVar(int attr_count);
@@ -46,6 +48,7 @@ public:
 class ScalarMeanVar{
 private:
   double mean, M2;
+public:
   int sample_count;
 public:
   ScalarMeanVar();

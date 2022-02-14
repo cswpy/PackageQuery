@@ -1,6 +1,7 @@
 #define FMT_HEADER_ONLY
 
 #include <omp.h>
+#include <regex>
 #include "fmt/core.h"
 #include "umisc.h"
 #include "boost/algorithm/string.hpp"
@@ -8,6 +9,8 @@
 using boost::split;
 using boost::is_any_of;
 using std::stod;
+using std::regex;
+using std::smatch;
 
 const string kPgDelim = ",";
 
@@ -59,6 +62,38 @@ VectorXd pgValueSplit(char *s){
   VectorXd vals (res.size());
   for (int i = 0; i < res.size(); i ++) vals(i) = stod(res[i]);
   return vals;
+}
+
+#include "iostream"
+using std::cout;
+using std::endl;
+
+string nextName(string table_name, string symbol){
+  regex expr ("^\\[([0-9]+).+\\](.+)");
+  smatch m;
+  regex_search(table_name, m, expr);
+  if (m.size() == 0) return fmt::format("[1{}]", symbol) + table_name;
+  else{
+    int index = stoi(m[1]) + 1;
+    string name (m[2]);
+    return fmt::format("[{}{}]{}", index, symbol, name);
+  }
+}
+
+string nextGName(string table_name){
+  return nextName(table_name, "G");
+}
+
+string nextPName(string table_name){
+  return nextName(table_name, "P");
+}
+
+int getLayerIndex(string table_name){
+  regex expr ("^\\[([0-9]+).+\\].+");
+  smatch m;
+  regex_search(table_name, m, expr);
+  if (m.size() == 0) return 0;
+  else return stoi(m[1]);
 }
 
 

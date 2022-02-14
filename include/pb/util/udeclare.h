@@ -22,6 +22,7 @@ typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> R
 
 enum SolStatus { NotFound, Found, Feasible, Infeasible, Unbounded, DualUnbounded, Timeout};
 enum FeasStatus { Unsolved, Feasibility, Infeasibility, LbConstraint, UbConstraint, LbVariable, UbVariable, Integrality};
+enum GroupStatus { Unitialized, Unlocked, Locked};
 
 namespace pb{
   using std::cout;
@@ -33,6 +34,8 @@ namespace pb{
   using std::vector;
   using std::string;
   using std::pair;
+  using std::tuple;
+  using std::tie;
   
   using std::to_string;
   using std::iota;

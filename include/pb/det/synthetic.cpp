@@ -10,7 +10,6 @@
 using namespace pb;
 
 string Synthetic::table_name = "test_data";
-int Synthetic::in_memory_chunk = 1000000;
 
 const string kGenerateFunc = "generate_table";
 
@@ -119,10 +118,10 @@ void Synthetic::create(long long N, int ucount, int ncount, vector<double> means
     int seg = omp_get_thread_num();
     long long start_count = seg * chunk + 1;
     long long end_count = min((seg + 1) * chunk, N);
-    int in_memory_count = (int) ceilDiv(end_count-start_count+1, Synthetic::in_memory_chunk);
-    for (int i = 0; i < in_memory_count; i ++){
-      long long left = start_count + i * Synthetic::in_memory_chunk;
-      long long right = min(left + Synthetic::in_memory_chunk - 1, end_count);
+    long long in_memory_count = ceilDiv(end_count-start_count+1, kInMemorySize);
+    for (long long i = 0; i < in_memory_count; i ++){
+      long long left = start_count + i * kInMemorySize;
+      long long right = min(left + kInMemorySize - 1, end_count);
       sql = fmt::format("INSERT INTO {} SELECT * FROM {}({}, {});", Synthetic::table_name, kGenerateFunc, left, right);
       res = PQexec(conn, sql.c_str());
       PQclear(res);

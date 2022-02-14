@@ -11,17 +11,17 @@ private:
   PGconn *_conn;
   PGresult *_res;
 public:
-  static double kGroupRatio;
-  static int kMinPartitionSize;
-  static int kInitialSize;
+  static double kGroupRatio, kVarScale;
+  static int kMaxSize, kInitialSize;
   Profiler pro;
 private:
   void init();
   void writeStats(string table_name, Stat *stat);
   Stat* readStats(string table_name);
+  void doPartition(string table_name, string suffix, const vector<string> &cols);
 public:
   ~DynamicLowVariance();
   DynamicLowVariance(string dbname);
-  void partition(string table_name);
-  void partition(string table_name, vector<string> cols);
+  void partition(string table_name, string partition_name);
+  void partition(string table_name, string partition_name, const vector<string> &cols);
 };

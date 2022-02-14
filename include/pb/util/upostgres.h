@@ -18,6 +18,8 @@ public:
 public:
   Stat(vector<string> cols);
   void add(long long size, VectorXd &mean, VectorXd &M2);
+  double getVar(string col);
+  double getVar(int i);
 };
 
 class PgManager{
@@ -28,9 +30,7 @@ private:
 public:
   ~PgManager();
   PgManager(string dbname);
-  void createExtention(string extension);
   long long getSize(string table_name);
   vector<string> getNumericCols(string table_name);
-  Stat* computeStats(string table_name);
   Stat* computeStats(string table_name, const vector<string> &cols);
 };
