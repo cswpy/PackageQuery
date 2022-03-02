@@ -1,10 +1,10 @@
 [settings]
     arch=x86_64
     build_type=Release
-    compiler=Visual Studio
-    compiler.runtime=MD
-    compiler.version=16
-    os=Windows
+    compiler=gcc
+    compiler.libcxx=libstdc++
+    compiler.version=9
+    os=Linux
 
 [requires]
     boost/1.Y.Z
@@ -20,23 +20,25 @@
     arch=x86_64
     arch_build=x86_64
     build_type=Release
-    compiler=Visual Studio
-    compiler.runtime=MD
-    compiler.version=16
-    os=Windows
-    os_build=Windows
+    compiler=gcc
+    compiler.libcxx=libstdc++
+    compiler.version=9
+    os=Linux
+    os_build=Linux
 
 [full_requires]
-    boost/1.77.0:37050c911e5419517ec6e0761c16c6e262b3e2a3
-    bzip2/1.0.8:d16a91eadaaf5829b928b12d2f836ff7680d3df5
-    ccfits/2.6:2240fa56643d33176b0c23292cf3312b768ee50c
-    cfitsio/3.490:d140711d95cc16a85766a8fc3a551dfafe84cf63
+    boost/1.77.0:adf48b8e4446dcb68f440fe42ff08878d5c7feed
+    bzip2/1.0.8:da606cf731e334010b0bf6e85a2a6f891b9f36b0
+    ccfits/2.6:6092f179cf2ff7a710089a30e907ff9685c1f839
+    cfitsio/3.490:f99afdbf2a1cc98ba2029817b35103455b6a9b77
     eigen/3.4.0:5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9
-    fmt/8.0.1:2be90237c5e294c2f30bf6b043d047624b893db3
-    libpq/13.4:3fb49604f9c2f729b85ba3115852006824e72cab
-    zlib/1.2.11:3fb49604f9c2f729b85ba3115852006824e72cab
+    fmt/8.0.1:30a9781670e6fb2f17b8355b17a15cf916045317
+    libbacktrace/cci.20210118:6af9cc7cb931c5ad942174fd7838eb655717c709
+    libpq/13.4:6af9cc7cb931c5ad942174fd7838eb655717c709
+    zlib/1.2.11:6af9cc7cb931c5ad942174fd7838eb655717c709
 
 [full_options]
+    boost:addr2line_location=/usr/bin/addr2line
     boost:asio_no_deprecated=False
     boost:buildid=None
     boost:bzip2=True
@@ -44,10 +46,11 @@
     boost:diagnostic_definitions=False
     boost:error_code_header_only=False
     boost:extra_b2_flags=None
+    boost:fPIC=True
     boost:filesystem_no_deprecated=False
     boost:header_only=False
     boost:i18n_backend=deprecated
-    boost:i18n_backend_iconv=off
+    boost:i18n_backend_iconv=libc
     boost:i18n_backend_icu=False
     boost:layout=system
     boost:lzma=False
@@ -63,6 +66,7 @@
     boost:shared=False
     boost:system_no_deprecated=False
     boost:visibility=hidden
+    boost:with_stacktrace_backtrace=True
     boost:without_atomic=False
     boost:without_chrono=False
     boost:without_container=False
@@ -97,19 +101,29 @@
     boost:zlib=True
     boost:zstd=False
     bzip2:build_executable=True
+    bzip2:fPIC=True
     bzip2:shared=False
+    ccfits:fPIC=True
     ccfits:shared=False
+    cfitsio:fPIC=True
     cfitsio:shared=False
     cfitsio:simd_intrinsics=None
     cfitsio:threadsafe=False
+    cfitsio:with_bzip2=False
+    cfitsio:with_curl=False
     eigen:MPL2_only=False
+    fmt:fPIC=True
     fmt:header_only=False
     fmt:shared=False
     fmt:with_fmt_alias=False
     fmt:with_os_api=True
+    libbacktrace:fPIC=True
+    libbacktrace:shared=False
+    libpq:disable_rpath=False
+    libpq:fPIC=True
     libpq:shared=False
     libpq:with_openssl=False
-    zlib:minizip=deprecated
+    zlib:fPIC=True
     zlib:shared=False
 
 [recipe_hash]

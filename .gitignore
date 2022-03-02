@@ -1,5 +1,5 @@
-build/*
 resource/*
+build/*
 !build/conanfile.txt
 !resource/sql_script
 !resource/backup

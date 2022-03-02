@@ -1,6 +1,7 @@
 #define FMT_HEADER_ONLY
 
 #include <iostream>
+#include <omp.h>
 #include "fmt/core.h"
 #include "upostgres.h"
 #include "pb/util/uconfig.h"
@@ -69,7 +70,7 @@ Stat* PgManager::computeStats(string table_name, const vector<string> &cols){
     "		M2s[{}] := M2s[{}] + delta * (rec.{} - means[{}]);"
     "";
   string injects = "";
-  for (int i = 1; i <= cols.size(); i ++){
+  for (int i = 1; i <= (int) cols.size(); i ++){
     string col = cols[i-1];
     injects += fmt::format(inject, col, i, i, i, i, i, col, i);
   }
@@ -125,13 +126,12 @@ Stat* PgManager::computeStats(string table_name, const vector<string> &cols){
     res = PQexec(conn, sql.c_str());
     VectorXd local_mean (cols.size());
     VectorXd local_M2 (cols.size());
-    for (int i = 0; i < cols.size(); i ++){
+    for (int i = 0; i < (int) cols.size(); i ++){
       local_mean(i) = atof(PQgetvalue(res, i, 0));
       local_M2(i) = atof(PQgetvalue(res, i, 1));
     }
     PQclear(res);
     PQfinish(conn);
-    long long local_count = end_id - start_id + 1;
     #pragma omp critical
     {
       stat->add(end_id-start_id+1, local_mean, local_M2);
@@ -146,7 +146,7 @@ Stat::Stat(vector<string> cols): cols(cols){
   M2.resize(cols.size()); M2.fill(0);
 }
 
-void Stat::add(long long size, VectorXd &mean, VectorXd &M2){
+void Stat::add(long long size, VectorXd mean, VectorXd M2){
   if (!this->size){
     this->size = size;
     this->mean = mean;
@@ -162,13 +162,13 @@ void Stat::add(long long size, VectorXd &mean, VectorXd &M2){
 
 double Stat::getVar(string col){
   if (!size) return 0;
-  for (int i = 0; i < cols.size(); i ++){
+  for (int i = 0; i < (int) cols.size(); i ++){
     if (!cols[i].compare(col)) return M2(i) / size;
   }
   return 0;
 }
 
 double Stat::getVar(int i){
-  assert(0 <= i && i < cols.size());
+  assert(0 <= i && i < (int) cols.size());
   return M2(i) / size;
 }

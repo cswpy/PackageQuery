@@ -10,7 +10,8 @@
 #  CPLEX_LIBRARIES          - library files
 
 # set(CPLEX_ROOT_DIR "/home/alm818/cplex")
-set(CPLEX_ROOT_DIR "C:/Program Files/IBM/ILOG/CPLEX_Studio201")
+set(CPLEX_ROOT_DIR "/home/alm818/downloads/CPLEX_Studio201")
+# set(CPLEX_ROOT_DIR "C:/Program Files/IBM/ILOG/CPLEX_Studio201")
 
 if(WIN32)
     execute_process(COMMAND cmd /C set CPLEX_STUDIO_DIR OUTPUT_VARIABLE CPLEX_STUDIO_DIR_VAR ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)

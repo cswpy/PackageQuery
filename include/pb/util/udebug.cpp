@@ -76,9 +76,7 @@ string feasMessage(int feas_status){
 
 string solCombination(VectorXd sol){
   string combs = "";
-  double frac, whole;
   for (int i = 0; i < sol.size(); i ++){
-    frac = modf(sol(i), &whole);
     int count = (int) ceil(sol(i));
     if (count == 1) combs += to_string(i) + " ";
     else if (count > 1) combs += fmt::format("{}x{} ", to_string(i), count);

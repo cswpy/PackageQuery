@@ -9,9 +9,9 @@ double DualReducer::kEpsilon = 1e-8;
 enum StayStatus {NotStay, LikelyStay, Stay};
 
 DualReducer::~DualReducer(){
-  for (int i = 1; i < probs.size(); i ++) delete probs[i];
-  for (int i = 0; i < duals.size(); i ++) delete duals[i];
-  for (int i = 0; i < indices.size(); i ++) delete indices[i];
+  for (int i = 1; i < (int) probs.size(); i ++) delete probs[i];
+  for (int i = 0; i < (int) duals.size(); i ++) delete duals[i];
+  for (int i = 0; i < (int) indices.size(); i ++) delete indices[i];
 }
 
 void DualReducer::filterStay(int core, Dual* dual, DetProb* prob, VectorXi* cur_index, int stay_mode, int stay_count, const VectorXi& stay){

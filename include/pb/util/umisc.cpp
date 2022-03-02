@@ -16,7 +16,7 @@ const string kPgDelim = ",";
 
 string join(vector<string> names, string delim){
   string res = "";
-  for (int i = 0; i < names.size()-1; i++) res += names[i] + delim;
+  for (int i = 0; i < (int)(names.size()-1); i++) res += names[i] + delim;
   res += names[names.size()-1];
   return res;
 }
@@ -60,7 +60,7 @@ VectorXd pgValueSplit(char *s){
   vector<string> res;
   split(res, sub, is_any_of(kPgDelim));
   VectorXd vals (res.size());
-  for (int i = 0; i < res.size(); i ++) vals(i) = stod(res[i]);
+  for (int i = 0; i < (int) res.size(); i ++) vals(i) = stod(res[i]);
   return vals;
 }
 

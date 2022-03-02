@@ -17,7 +17,7 @@ public:
   vector<string> cols;
 public:
   Stat(vector<string> cols);
-  void add(long long size, VectorXd &mean, VectorXd &M2);
+  void add(long long size, VectorXd mean, VectorXd M2);
   double getVar(string col);
   double getVar(int i);
 };

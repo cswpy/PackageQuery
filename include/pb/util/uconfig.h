@@ -4,18 +4,18 @@
 
 using std::string;
 
-//const string kProjectHome = "/home/alm818/package_query";
-const string kProjectHome = "C:/Users/xuana/Desktop/VisualStudioCode/PackageQuery";
+const string kProjectHome = "/home/alm818/PackageQuery";
+//const string kProjectHome = "C:/Users/xuana/Desktop/VisualStudioCode/PackageQuery";
 
-constexpr int kPCore = 8;
-constexpr int kLCore = 16;
+constexpr int kPCore = 80;
+constexpr int kLCore = 160;
 constexpr int kMaxMultiColumnIndexes = 32;
-constexpr int kPgPort = 5432;
+constexpr int kPgPort = 5433;
 constexpr int kPrecision = 20;
 constexpr int kInMemorySize = 1000000;
 
-const string kPgUser = "postgres";
-const string kPgPassword = "postgres";
+const string kPgUser = "alm818";
+const string kPgPassword = "";
 const string kPgHostaddr = "127.0.0.1";
 
 const string kId = "id";

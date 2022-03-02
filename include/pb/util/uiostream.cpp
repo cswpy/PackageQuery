@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <cfloat>
 
 #include "Eigen/Dense"
 #include "uiostream.h"

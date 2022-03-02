@@ -20,28 +20,28 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 set(EXECUTABLE_NAME "main")
 
 # Matplotlib
-include(GNUInstallDirs)
-set(PACKAGE_NAME matplotlib_cpp)
-set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/${PACKAGE_NAME}/cmake)
+# include(GNUInstallDirs)
+# set(PACKAGE_NAME matplotlib_cpp)
+# set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/${PACKAGE_NAME}/cmake)
 
-add_library(matplotlib_cpp INTERFACE)
-find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
-target_link_libraries(matplotlib_cpp INTERFACE
-  Python3::Python
-  Python3::Module
-)
-find_package(Python3 COMPONENTS NumPy)
-if(Python3_NumPy_FOUND)
-  target_link_libraries(matplotlib_cpp INTERFACE
-    Python3::NumPy
-  )
-else()
-  target_compile_definitions(matplotlib_cpp INTERFACE WITHOUT_NUMPY)
-endif()
-install(
-  TARGETS matplotlib_cpp
-  EXPORT install_targets
-)
+# add_library(matplotlib_cpp INTERFACE)
+# find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+# target_link_libraries(matplotlib_cpp INTERFACE
+#   Python3::Python
+#   Python3::Module
+# )
+# find_package(Python3 COMPONENTS NumPy)
+# if(Python3_NumPy_FOUND)
+#   target_link_libraries(matplotlib_cpp INTERFACE
+#     Python3::NumPy
+#   )
+# else()
+#   target_compile_definitions(matplotlib_cpp INTERFACE WITHOUT_NUMPY)
+# endif()
+# install(
+#   TARGETS matplotlib_cpp
+#   EXPORT install_targets
+# )
 
 # For window
 # set(PYTHONPACKAGE "C:/Users/xuana/AppData/Local/Packages/PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0/LocalCache/local-packages/Python39/site-packages")
@@ -51,9 +51,9 @@ install(
 # link_directories(${PYTHONHOME}/libs)
 # add_definitions(-DMATPLOTLIBCPP_PYTHON_HEADER=Python.h)
 
-# find_package(PythonLibs REQUIRED)
-# INCLUDE_DIRECTORIES( ${PYTHON_INCLUDE_DIRS} )
-# link_directories( ${PYTHON_LIBRARIES})
+find_package(PythonLibs REQUIRED)
+INCLUDE_DIRECTORIES( ${PYTHON_INCLUDE_DIRS} )
+link_directories( ${PYTHON_LIBRARIES})
 
 # MAIN
 #set(MAIN_NAME "main_dual")
@@ -92,12 +92,12 @@ file(GLOB all_SRCS
 )
 
 #OpenMP for Windows
-find_package(OpenMP)
-if (OPENMP_FOUND)
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-    set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
-endif()
+# find_package(OpenMP)
+# if (OPENMP_FOUND)
+#     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+#     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+#     set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+# endif()
 
 if(CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "-Wall -Wextra")
@@ -120,10 +120,10 @@ include_directories(${CPLEX_INCLUDE_DIRS})
 add_executable(${EXECUTABLE_NAME} ${all_SRCS})
 
 # OpenMP for Ubuntu
-# find_package(OpenMP)
-# if(OpenMP_CXX_FOUND)
-#     target_link_libraries(${EXECUTABLE_NAME} PRIVATE OpenMP::OpenMP_CXX)
-# endif()
+find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(${EXECUTABLE_NAME} PRIVATE OpenMP::OpenMP_CXX)
+endif()
 
 if(CXX)
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE optimized ${GUROBI_CXX_LIBRARY} debug ${GUROBI_CXX_DEBUG_LIBRARY})
@@ -132,34 +132,34 @@ endif()
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE ${CONAN_LIBS} ${GUROBI_LIBRARY} ${CMAKE_DL_LIBS})
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE ${CPLEX_LIBRARIES})
 
-target_link_libraries(${EXECUTABLE_NAME} PRIVATE matplotlib_cpp)
-set_target_properties(${EXECUTABLE_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/resource/matplotlib")
+# target_link_libraries(${EXECUTABLE_NAME} PRIVATE matplotlib_cpp)
+# set_target_properties(${EXECUTABLE_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/resource/matplotlib")
 
 # Matplotlib
-install(FILES
-  "${PROJECT_SOURCE_DIR}/include/matplotlibcpp.h"
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+# install(FILES
+#   "${PROJECT_SOURCE_DIR}/include/matplotlibcpp.h"
+#   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-install(EXPORT install_targets
-  FILE
-    ${PACKAGE_NAME}Targets.cmake
-  NAMESPACE
-    ${PACKAGE_NAME}::
-  DESTINATION
-    ${INSTALL_CONFIGDIR}
-)
+# install(EXPORT install_targets
+#   FILE
+#     ${PACKAGE_NAME}Targets.cmake
+#   NAMESPACE
+#     ${PACKAGE_NAME}::
+#   DESTINATION
+#     ${INSTALL_CONFIGDIR}
+# )
 
 message("CMAKE CURRENT SOURCE DIR: " ${CMAKE_CURRENT_SOURCE_DIR})
 message("CMAKE CURRENT BINARY DIR: " ${CMAKE_CURRENT_BINARY_DIR})
 message("INSTALL CONFIGDIR: " ${INSTALL_CONFIGDIR})
 
-include(CMakePackageConfigHelpers)
-configure_package_config_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/cmake/${PACKAGE_NAME}Config.cmake.in
-  ${CMAKE_CURRENT_BINARY_DIR}/${PACKAGE_NAME}Config.cmake
-  INSTALL_DESTINATION ${INSTALL_CONFIGDIR}
-)
-install(FILES
-  ${CMAKE_CURRENT_BINARY_DIR}/${PACKAGE_NAME}Config.cmake
-  DESTINATION ${INSTALL_CONFIGDIR}
-)
+# include(CMakePackageConfigHelpers)
+# configure_package_config_file(
+#   ${CMAKE_CURRENT_SOURCE_DIR}/cmake/${PACKAGE_NAME}Config.cmake.in
+#   ${CMAKE_CURRENT_BINARY_DIR}/${PACKAGE_NAME}Config.cmake
+#   INSTALL_DESTINATION ${INSTALL_CONFIGDIR}
+# )
+# install(FILES
+#   ${CMAKE_CURRENT_BINARY_DIR}/${PACKAGE_NAME}Config.cmake
+#   DESTINATION ${INSTALL_CONFIGDIR}
+# )
