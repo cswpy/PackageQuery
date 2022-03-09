@@ -62,7 +62,7 @@ public:
 public:
   Profiler();
   Profiler(vector<string> names);
-  void clock(int i, bool is_parallel=true);
-  void stop(int i, bool is_parallel=true);
+  void clock(int i, bool is_parallel=false);
+  void stop(int i, bool is_parallel=false);
   void print();
 };

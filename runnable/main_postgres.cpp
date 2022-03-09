@@ -7,7 +7,7 @@ using namespace pb;
 void create_table(){
   string dbname = "benchmark";
   Synthetic syn = Synthetic(dbname);
-  long long N = 1000000;
+  long long N = 10000000;
   syn.createMixed(N, 2, 2, 20, 100);
   syn.pro.print();
 } 

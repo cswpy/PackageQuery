@@ -61,6 +61,7 @@ link_directories( ${PYTHON_LIBRARIES})
 #set(MAIN_NAME "main_pqxx")
 #set(MAIN_NAME "main_reader")
 set(MAIN_NAME "main_postgres")
+#set(MAIN_NAME "main_quick_select")
 
 # TEST
 #set(MAIN_NAME "test_gurobi_solver")

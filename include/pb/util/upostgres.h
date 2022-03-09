@@ -12,11 +12,11 @@ void showError(PGconn *conn);
 class Stat{
 public:
   long long size;
-  VectorXd mean;
-  VectorXd M2;
+  VectorXd mean, M2, amin, amax;
   vector<string> cols;
 public:
   Stat(vector<string> cols);
+  void add(long long size, VectorXd mean, VectorXd M2, VectorXd amin, VectorXd amax);
   void add(long long size, VectorXd mean, VectorXd M2);
   double getVar(string col);
   double getVar(int i);

@@ -9,10 +9,10 @@ const string kProjectHome = "/home/alm818/PackageQuery";
 
 constexpr int kPCore = 80;
 constexpr int kLCore = 160;
-constexpr int kMaxMultiColumnIndexes = 32;
+constexpr int kMaxMultiColumnIndexes = 2;
 constexpr int kPgPort = 5433;
 constexpr int kPrecision = 20;
-constexpr int kInMemorySize = 1000000;
+constexpr long long kInMemorySize = 1000000; // In Memory Size for all cores in term of number of tuples
 
 const string kPgUser = "alm818";
 const string kPgPassword = "";

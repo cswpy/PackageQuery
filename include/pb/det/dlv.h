@@ -18,6 +18,7 @@ private:
   void init();
   void writeStats(string table_name, Stat *stat);
   Stat* readStats(string table_name);
+  void quickPartition(string table_name, Stat *stat, const vector<string> &cols);
   void doPartition(string table_name, string suffix, const vector<string> &cols);
 public:
   ~DynamicLowVariance();

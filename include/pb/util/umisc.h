@@ -13,6 +13,7 @@ using Eigen::VectorXd;
 static const char* space = " \t\n\r\f\v";
 
 string join(vector<string> names, string delim);
+string join(VectorXd vals, int precision);
 string& trim(string& s, const char *t=space);
 string pgJoin(vector<string> names);
 string pgJoin(VectorXd vals, int precision);

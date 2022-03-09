@@ -21,6 +21,12 @@ string join(vector<string> names, string delim){
   return res;
 }
 
+string join(VectorXd vals, int precision){
+  vector<string> str_vals;
+  for (double v : vals) str_vals.push_back(fmt::format("{:.{}Lf}", v, precision));
+  return join(str_vals, kPgDelim);
+}
+
 // trim from end of string (right)
 string& rtrim(string &s, const char *t){
   s.erase(s.find_last_not_of(t) + 1);
@@ -43,9 +49,7 @@ string pgJoin(vector<string> names){
 }
 
 string pgJoin(VectorXd vals, int precision){
-  vector<string> str_vals;
-  for (double v : vals) str_vals.push_back(fmt::format("{:.{}Lf}", v, precision));
-  return fmt::format("'{{{}}}'", join(str_vals, kPgDelim));
+  return fmt::format("'{{{}}}'", join(vals, precision));
 }
 
 vector<string> pgStringSplit(char *s){
@@ -63,10 +67,6 @@ VectorXd pgValueSplit(char *s){
   for (int i = 0; i < (int) res.size(); i ++) vals(i) = stod(res[i]);
   return vals;
 }
-
-#include "iostream"
-using std::cout;
-using std::endl;
 
 string nextName(string table_name, string symbol){
   regex expr ("^\\[([0-9]+).+\\](.+)");
