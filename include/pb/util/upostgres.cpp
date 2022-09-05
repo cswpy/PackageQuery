@@ -27,7 +27,7 @@ PgManager::~PgManager(){
 }
 
 PgManager::PgManager(string dbname): dbname(dbname){
-  string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
+  conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
   _conn = PQconnectdb(conninfo.c_str());
   assert(PQstatus(_conn) == CONNECTION_OK);
   _res = NULL;
@@ -72,7 +72,6 @@ Stat* PgManager::computeStats(string table_name, const vector<string> &cols){
   #pragma omp parallel num_threads(kPCore)
   {
     string sql;
-    string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
     PGconn* conn = PQconnectdb(conninfo.c_str());
     assert(PQstatus(conn) == CONNECTION_OK);
     PGresult *res = NULL;
@@ -102,6 +101,20 @@ Stat* PgManager::computeStats(string table_name, const vector<string> &cols){
     }
   }
   return stat;
+}
+
+bool PgManager::existTable(string table_name){
+  _sql = fmt::format("SELECT * FROM pg_tables WHERE tablename='{}' AND schemaname='public'", table_name);
+  _res = PQexec(_conn, _sql.c_str());
+  bool exists = PQntuples(_res) > 0;
+  PQclear(_res);
+  return exists;
+}
+
+void PgManager::dropTable(string table_name){
+  _sql = fmt::format("DROP TABLE IF EXISTS \"{}\";", table_name);
+  _res = PQexec(_conn, _sql.c_str());
+  PQclear(_res);
 }
 
 // Deprecated since Postgres does not allow inter-multithreaded
@@ -232,12 +245,11 @@ void Stat::add(long long size, VectorXd mean, VectorXd M2, VectorXd amin, Vector
   add(size, mean, M2);
 }
 
-double Stat::getVar(string col){
-  if (!size) return 0;
+int Stat::getIndex(string col){
   for (int i = 0; i < (int) cols.size(); i ++){
-    if (!cols[i].compare(col)) return M2(i) / size;
+    if (!cols[i].compare(col)) return i;
   }
-  return 0;
+  return -1;
 }
 
 double Stat::getVar(int i){

@@ -10,6 +10,7 @@
 #include <string>
 #include <numeric>
 #include <algorithm>
+#include <map>
 #include <random>
 #include <float.h>
 #include <omp.h>
@@ -44,6 +45,7 @@ namespace pb{
   using std::sort;
   using std::min;
   using std::max;
+  using std::map;
 
   using Eigen::VectorXd;
   using Eigen::VectorXi;

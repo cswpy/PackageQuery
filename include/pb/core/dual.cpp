@@ -69,7 +69,7 @@ void pushHeap(const VectorXd &u, const VectorXd &l, const VectorXd &bu, const Ve
 Dual::~Dual(){
 }
 
-// Maximizing cc 
+// Maximizing prob.c 
 // Dual minimizing c
 Dual::Dual(int core, const DetProb &prob){
   // vector<string> names = {"Copy", "RestInit", "BoundStricten", "InitXBound", "Compute XB", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18"};
@@ -591,7 +591,9 @@ Dual::Dual(int core, const DetProb &prob){
       }
       if (status == DualUnbounded) break;
     } else break;
+    delete[] init; init = nullptr;
   }
+  if (init) delete[] init;
   // pro.print();
   exe_solve = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start).count() / 1000000.0;
 }

@@ -34,12 +34,14 @@ private:
   VectorXd mean, M2;
   int attr_count;
 public:
-  int sample_count;
+  long long sample_count;
 public:
   MeanVar();
   MeanVar(int attr_count);
-  void add(const VectorXd& x);
+  void add(const VectorXd &x);
   void add(double *start, int cycle=1);
+  void add(MeanVar &mv);
+  void reset();
   VectorXd getMean();
   VectorXd getVar();
   VectorXd getM2();
@@ -49,10 +51,11 @@ class ScalarMeanVar{
 private:
   double mean, M2;
 public:
-  int sample_count;
+  long long sample_count;
 public:
   ScalarMeanVar();
   void add(double x);
+  void add(ScalarMeanVar &smv);
   void reset();
   double getMean();
   double getVar();

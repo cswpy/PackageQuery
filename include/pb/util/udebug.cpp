@@ -129,7 +129,7 @@ void Profiler::stop(int i, bool is_parallel){
 void Profiler::print(){
   for (int i = 0; i < n; i ++){
     if (count(i) > 0){
-      fmt::print("{} Total:{:.4Lf}ms Count:{} Average:{:.4Lf}ms\n", names[i], time(i), count(i), time(i)/count(i));
+      fmt::print("{}-{} Total:{:.4Lf}ms Count:{} Average:{:.4Lf}ms\n", i, names[i], time(i), count(i), time(i)/count(i));
     }
   }
 }

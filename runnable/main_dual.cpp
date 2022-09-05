@@ -9,20 +9,17 @@
 #include <chrono>
 #include <numeric>
 
-#include "map_sort.h"
-#include "utility.h"
-#include "parallel_pq.h"
 #include "fmt/core.h"
 #include "fitsio.h"
 #include "omp.h"
-#include "lattice_solver.h"
-#include "pseudo_walker.h"
-#include "simplex.h"
-#include "gurobi_lattice_solver.h"
-#include "gurobi_solver.h"
-#include "dual.h"
-#include "reducer.h"
-#include "fmt/core.h"
+#include "pb/util/udeclare.h"
+#include "pb/util/unumeric.h"
+#include "pb/util/udebug.h"
+#include "pb/core/map_sort.h"
+#include "pb/det/det_prob.h"
+#include "pb/core/gurobi_solver.h"
+#include "pb/core/pseudo_walker.h"
+#include "pb/core/dual.h"
 
 #define CORE_COUNT2 16
 
@@ -31,7 +28,7 @@ using namespace Eigen;
 
 #define ta(row, col) (primal.tableau[primal.numcols*(row)+(col)])
 
-void generateBoundedProlem2(int expected_n, double outlier_prob, double att_var, int n, MatrixXd& A, VectorXd& bl, VectorXd& bu, VectorXd& c){
+void generateBoundedProlem2(int expected_n, double outlier_prob, double att_var, int n, RMatrixXd& A, VectorXd& bl, VectorXd& bu, VectorXd& c){
   A.resize(4, n); bl.resize(4); bu.resize(4); c.resize(n); 
   default_random_engine gen {static_cast<long unsigned int>(time(0))};
   uniform_real_distribution u_dist(0.0, 1.0);
@@ -188,8 +185,8 @@ void testL3Cache(){
 }
 
 void quickRun(){
-  int n = 1000000;
-  MatrixXd A;
+  int n = 10000000;
+  RMatrixXd A;
   VectorXd bl, bu, c;
   generateBoundedProlem2(20, 0.9, 4, n, A, bl, bu, c);
   VectorXd u (n); u.fill(100);
@@ -224,28 +221,35 @@ void quickRun(){
   // Dual dual1 = Dual(1, A, bl, bu, c, l, u);
   // cout << dual1.exe_solve << endl;
   cout << "START" << endl;
-  Dual dual = Dual(8, A, bl, bu, c, l, u);
+  int m = bl.size();
+  DetProb db = DetProb(m, n);
+  db.A = A;
+  db.bl = bl;
+  db.bu = bu;
+  db.c = c;
+  db.l = l;
+  db.u = u;
+  Dual dual = Dual(8, db);
   cout << solMessage(dual.status) << endl;
-  cout << dual.exe_solve << " " << dual.iteration_count << " " << dual.mini_iteration_count << endl;
+  cout << dual.exe_solve << endl;
   fmt::print("{:.10Lf}\n", dual.score);
-  shortPrint(dual.x);
-  print(dual.bhead);
+  shortPrint(dual.sol);
   cout << "----------------------" << endl;
-  GurobiSolver gs = GurobiSolver(A, bl, bu, c, l, u);
-  gs.solveRelaxed();
-  cout << gs.exe_relaxed+gs.exe_init << " " << gs.iteration_count << endl;
+  GurobiSolver gs = GurobiSolver(db);
+  gs.solveLp();
+  cout << gs.getLpTime() << endl;
   // cout << "AMDA1:" << 8.0/7.0 * (1 - dual.exe_solve / dual1.exe_solve) << endl;
   // cout << "AMDA2:" << 8.0/7.0 * (1 - (gs.exe_relaxed+gs.exe_init) / dual1.exe_solve) << endl;
-  // shortPrint(gs.r0);
-  // fmt::print("{:.10Lf}\n", gs.relaxed_cscore);
+  fmt::print("{:.10Lf}\n", gs.lp_score);
+  shortPrint(gs.lp_sol);
   // // print(dual.x);
   // // print(gs.r0);
-  // cout << verify(dual.x, A, bl, bu, c, l, u) << " " << verify(gs.r0, A, bl, bu, c, l, u) << endl;
-  // if (gs.relaxed_status == LS_FOUND && !isEqual(gs.relaxed_cscore, dual.score, 1e-4)){
-  //   for (int i = 0; i < n; i ++){
-  //     assert(isEqual(dual.x(i), gs.r0(i), 1e-6));
-  //   }
-  // }
+  // cout << verify(dual.x, A, bl, bu, c, l, u) << " " << verify(gs., A, bl, bu, c, l, u) << endl;
+  if (gs.lp_status == Found && !isEqual(gs.lp_score, dual.score, 1e-4)){
+    for (int i = 0; i < n; i ++){
+      assert(isEqual(dual.sol(i), gs.lp_sol(i), 1e-6));
+    }
+  }
 }
 
 void mapSort(){

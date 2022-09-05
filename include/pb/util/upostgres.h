@@ -18,7 +18,7 @@ public:
   Stat(vector<string> cols);
   void add(long long size, VectorXd mean, VectorXd M2, VectorXd amin, VectorXd amax);
   void add(long long size, VectorXd mean, VectorXd M2);
-  double getVar(string col);
+  int getIndex(string col);
   double getVar(int i);
 };
 
@@ -28,9 +28,12 @@ private:
   PGconn *_conn;
   PGresult *_res;
 public:
+  string conninfo;
   ~PgManager();
   PgManager(string dbname);
   long long getSize(string table_name);
+  bool existTable(string table_name);
+  void dropTable(string table_name);
   vector<string> getNumericCols(string table_name);
   Stat* computeStats(string table_name, const vector<string> &cols);
 };

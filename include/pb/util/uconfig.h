@@ -18,7 +18,7 @@ const string kPgUser = "alm818";
 const string kPgPassword = "";
 const string kPgHostaddr = "127.0.0.1";
 
-const string kId = "id";
+const string kId = "id"; // Must not equal to "tid"
 const string kStatTable = "dlv_stats";
 const string kPartitionTable = "dlv_partitions";
 const string kNullLiteral = "null";

@@ -12,7 +12,7 @@ using namespace pb;
 
 const string kIntervalType = "floatrange";
 const string kTempTable = "tmp";
-const double eps = 1e-16;
+const double kSizeBias = 0.5;
 const int kTempReserveSize = 1000;
 // const string kTraverseFunction = "traverse";
 // const string kClearLockFunction = "clear_lock";
@@ -33,8 +33,7 @@ struct IndexComp{
 
 double DynamicLowVariance::kGroupRatio = 0.01;
 double DynamicLowVariance::kVarScale = 2.5;
-int DynamicLowVariance::kMaxSize = 100000;
-// int DynamicLowVariance::kInitialSize = (int) ceil(kPCore / (kGroupRatio * kGroupRatio));
+long long DynamicLowVariance::kLpSize = 100000;
 
 DynamicLowVariance::~DynamicLowVariance(){
   PQfinish(_conn);
@@ -42,7 +41,7 @@ DynamicLowVariance::~DynamicLowVariance(){
 }
 
 DynamicLowVariance::DynamicLowVariance(string dbname): dbname(dbname){
-  vector<string> names = {"Init", "ComputeStat", "PartialPartition", "FetchData", "ProcessData", "WriteData", "CreateIndex", "CreateTable", "gist", "id", "tid", "gid"};
+  vector<string> names = {"Init", "ComputeStat", "All", "FetchData", "ProcessData", "WriteData", "CreateIndex", "CreateTable", "gist", "id", "tid", "gid"};
   pro = Profiler(names);
   init();
 }
@@ -51,8 +50,7 @@ void DynamicLowVariance::init(){
   pro.clock(0);
   pg = new PgManager(dbname);
 
-  string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
-  _conn = PQconnectdb(conninfo.c_str());
+  _conn = PQconnectdb(pg->conninfo.c_str());
   assert(PQstatus(_conn) == CONNECTION_OK);
   _res = NULL;
 
@@ -71,22 +69,6 @@ void DynamicLowVariance::init(){
     "END $$;", kIntervalType);
   _res = PQexec(_conn, _sql.c_str());
   PQclear(_res);
-
-  // _sql = fmt::format(""\
-  //   "CREATE OR REPLACE FUNCTION {}() "\
-  //   "RETURNS void "\
-  //   "LANGUAGE plpgsql AS "\
-  //   "$$ "\
-  //   "DECLARE "\
-  //   "	rec record; "\
-  //   "BEGIN "\
-  //   "	FOR rec IN SELECT pid FROM pg_locks WHERE locktype='advisory' LOOP "\
-  //   "		PERFORM pg_terminate_backend(rec.pid); "\
-  //   "	END LOOP; "\
-  //   "END; "\
-  //   "$$; ", kClearLockFunction);
-  // _res = PQexec(_conn, _sql.c_str());
-  // PQclear(_res);
 
   _sql = fmt::format(""
     "CREATE TABLE IF NOT EXISTS {}("
@@ -116,6 +98,14 @@ void DynamicLowVariance::init(){
   pro.stop(0);
 }
 
+bool DynamicLowVariance::checkStats(string table_name){
+  _sql = fmt::format("SELECT COUNT(*) FROM {} WHERE table_name='{}';", kStatTable, table_name);
+  _res = PQexec(_conn, _sql.c_str());
+  int count = atoi(PQgetvalue(_res, 0, 0));
+  PQclear(_res);
+  return count;
+}
+
 void DynamicLowVariance::writeStats(string table_name, Stat *stat){
   _sql = fmt::format(""
     "INSERT INTO {}(table_name, size, cols, mean, M2, amin, amax) "
@@ -137,64 +127,100 @@ Stat* DynamicLowVariance::readStats(string table_name){
 }
 
 void DynamicLowVariance::partition(string table_name, string partition_name){
-  pro.clock(1);
   vector<string> cols = pg->getNumericCols(table_name);
-  // Stat *stat = pg->computeStats(table_name, cols);
-  // writeStats(table_name, stat);
-  // delete stat;
-  pro.stop(1);
-  pro.clock(2);
   partition(table_name, partition_name, cols);
-  pro.stop(2);
 }
 
 void DynamicLowVariance::partition(string table_name, string partition_name, const vector<string> &cols){
-  doPartition(table_name, partition_name, cols);
+  pro.clock(2);
+  long long size = doPartition(table_name, partition_name, cols);
+  string g_name = nextGName(table_name + "_" + partition_name);
+  while (size){
+    size = doPartition(g_name, "", cols);
+    g_name = nextGName(g_name);
+  }
+  pro.stop(2);
 }
 
-void DynamicLowVariance::quickPartition(string table_name, Stat *stat, const vector<string> &cols){
-  // Assumes uniform distribtion
+long long DynamicLowVariance::doPartition(string table_name, string suffix, const vector<string> &cols){
+  if (!checkStats(table_name)){
+    vector<string> cols = pg->getNumericCols(table_name);
+    Stat *stat = pg->computeStats(table_name, cols);
+    writeStats(table_name, stat);
+    delete stat;
+  }
+  Stat *stat = readStats(table_name);
+  long long size = stat->size;
+  if (size <= kLpSize) return 0;
+
+  int stat_max_var_index = -1;
   int max_var_index = -1;
   double max_var = -1;
-  for (int i = 0; i < cols.size(); i ++){
-    double var = stat->getVar(cols[i]);
+  int m = (int) cols.size();
+  for (int i = 0; i < m; i ++){
+    int index = stat->getIndex(cols[i]);
+    double var = stat->getVar(index);
     if (max_var < var){
       max_var = var;
       max_var_index = i;
+      stat_max_var_index = index;
     }
   }
-  double min_att = stat->amin(max_var_index);
-  double max_att = stat->amax(max_var_index);
+  double min_att = stat->amin(stat_max_var_index);
+  double max_att = stat->amax(stat_max_var_index);
 
-  long long size = stat->size;
   long long chunk = ceilDiv(size, kPCore);
   long long bucket = ceilDiv(size, kInMemorySize);
-  {
-    string sql;
-    string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
-    PGconn* conn = PQconnectdb(conninfo.c_str());
-    assert(PQstatus(conn) == CONNECTION_OK);
-    PGresult *res = NULL;
+  long long partition_count = bucket;
+  vector<MeanVar> bucket_stat (bucket, MeanVar(m));
+  vector<pair<double, double>> intervals (bucket);
+  map<double, long long> key_indices;
+  vector<double> keys (bucket);
+  vector<PGconn*> wait_conns;
 
-    for (long long i = 0; i < bucket; i ++){
-      sql = fmt::format(""
-        "CREATE TABLE IF NOT EXISTS {}{}("
-        "	tid BIGINT"
-        ");", kTempTable, i);
-      res = PQexec(conn, sql.c_str());
-      PQclear(res);
-    }
-    PQfinish(conn);
+  string create_tmp_table;
+  string drop_tmp_table = "DROP TABLE IF EXISTS {}{}";
+  {
+    vector<string> att_names (m);
+    for (int i = 0; i < m; i ++) att_names[i] = fmt::format("{} DOUBLE PRECISION", cols[i]);
+    
+    create_tmp_table = fmt::format(""
+      "CREATE TABLE IF NOT EXISTS {}("
+      "	tid BIGINT,"
+      " {}"
+      ");", "{}{}", join(att_names, ","));
   }
+
+  string symbolic_name = table_name;
+  if (suffix.length()) symbolic_name += "_" + suffix;
+  string g_name = nextGName(symbolic_name);
+  string p_name = nextPName(symbolic_name);
+  string col_names = join(cols, ",");
+
+  cout << "Begin 1a" << endl;
+  // Phase-1a: Initial quick-partition for #bucket partitions
+  double bucket_width = (max_att - min_att) / bucket;
+  for (long long i = 0; i < bucket; i ++){
+    _sql = fmt::format(drop_tmp_table, kTempTable, i);
+    _res = PQexec(_conn, _sql.c_str());
+    PQclear(_res);
+    _sql = fmt::format(create_tmp_table, kTempTable, i);
+    _res = PQexec(_conn, _sql.c_str());
+    PQclear(_res);
+
+    intervals[i] = {min_att + i*bucket_width, min_att + (i+1)*bucket_width};
+    key_indices[(double) i] = i;
+    keys[i] = i;
+  }
+
   #pragma omp parallel num_threads(kPCore)
   {
     string sql;
-    string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
-    PGconn* conn = PQconnectdb(conninfo.c_str());
+    PGconn *conn = PQconnectdb(pg->conninfo.c_str());
     assert(PQstatus(conn) == CONNECTION_OK);
     PGresult *res = NULL;
 
-    PGconn* _conn = PQconnectdb(conninfo.c_str());
+    PGconn *_conn = PQconnectdb(pg->conninfo.c_str());
     assert(PQstatus(_conn) == CONNECTION_OK);
     PGresult *_res = NULL;
 
@@ -202,14 +228,19 @@ void DynamicLowVariance::quickPartition(string table_name, Stat *stat, const vec
     long long start_id = seg * chunk + 1;
     long long end_id = min((seg + 1) * chunk, size);
     vector<int> sz (bucket, 0);
-    vector<vector<long long>> cache (bucket, vector<long long>(kTempReserveSize));
+    vector<vector<pair<long long, VectorXd>>> cache (bucket, vector<pair<long long, VectorXd>>(kTempReserveSize));
+    vector<MeanVar> cache_stat (bucket, MeanVar(m));
 
-    sql = fmt::format("SELECT {},{} FROM \"{}\" WHERE {} BETWEEN {} AND {};", kId, stat->cols[max_var_index], table_name, kId, start_id, end_id);
+    sql = fmt::format("SELECT {},{} FROM \"{}\" WHERE {} BETWEEN {} AND {};", kId, col_names, table_name, kId, start_id, end_id);
     res = PQexec(conn, sql.c_str());
+
     for (int i = 0; i < PQntuples(res); i++){
       long long tid = atol(PQgetvalue(res, i, 0));
-      long long bucket_ind = min((long long) floor((atof(PQgetvalue(res, i, 1)) - min_att) / (max_att - min_att + eps) * bucket), bucket-1);
-      cache[bucket_ind][sz[bucket_ind]] = tid;
+      VectorXd vs (m);
+      for (int j = 0; j < m; j ++) vs(j) = atof(PQgetvalue(res, i, j+1));
+      long long bucket_ind = min((long long) floor((vs(max_var_index) - min_att) / (max_att - min_att) * bucket), bucket-1);
+      cache[bucket_ind][sz[bucket_ind]] = {tid, vs};
+      cache_stat[bucket_ind].add(vs);
       sz[bucket_ind] ++;
       if (sz[bucket_ind] == kTempReserveSize){
         sql = fmt::format("COPY {}{} FROM STDIN with(delimiter ',');", kTempTable, bucket_ind);
@@ -217,7 +248,7 @@ void DynamicLowVariance::quickPartition(string table_name, Stat *stat, const vec
         assert(PQresultStatus(_res) == PGRES_COPY_IN);
         PQclear(_res);
         string data = "";
-        for (int j = 0; j < sz[bucket_ind]; j ++) data += fmt::format("{}\n", cache[bucket_ind][j]);
+        for (int j = 0; j < sz[bucket_ind]; j ++) data += fmt::format("{},{}\n", cache[bucket_ind][j].first, join(cache[bucket_ind][j].second, kPrecision));
         assert(PQputCopyData(_conn, data.c_str(), (int) data.length()) == 1);
         assert(PQputCopyEnd(_conn, NULL) == 1);
         _res = PQgetResult(_conn);
@@ -228,13 +259,17 @@ void DynamicLowVariance::quickPartition(string table_name, Stat *stat, const vec
     PQclear(res);
 
     for (long long i = 0; i < bucket; i ++){
+      #pragma omp critical
+      {
+        bucket_stat[i].add(cache_stat[i]);
+      }
       if (sz[i]){
         sql = fmt::format("COPY {}{} FROM STDIN with(delimiter ',');", kTempTable, i);
         _res = PQexec(_conn, sql.c_str());
         assert(PQresultStatus(_res) == PGRES_COPY_IN);
         PQclear(_res);
         string data = "";
-        for (int j = 0; j < sz[i]; j ++) data += fmt::format("{}\n", cache[i][j]);
+        for (int j = 0; j < sz[i]; j ++) data += fmt::format("{},{}\n", cache[i][j].first, join(cache[i][j].second, kPrecision));
         assert(PQputCopyData(_conn, data.c_str(), (int) data.length()) == 1);
         assert(PQputCopyEnd(_conn, NULL) == 1);
         _res = PQgetResult(_conn);
@@ -246,620 +281,583 @@ void DynamicLowVariance::quickPartition(string table_name, Stat *stat, const vec
     PQfinish(_conn);
   }
 
-  {
-    string sql;
-    string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
-    PGconn* conn = PQconnectdb(conninfo.c_str());
-    assert(PQstatus(conn) == CONNECTION_OK);
-    PGresult *res = NULL;
+  cout << "End 1a" << endl;
 
-    for (long long i = 0; i < bucket; i ++){
-      sql = fmt::format("SELECT COUNT(*) FROM {}{};", kTempTable, i);
-      res = PQexec(conn, sql.c_str());
-      long long sz = atol(PQgetvalue(res, 0, 0));
-      PQclear(res);
-      cout << sz;
-      if (i == bucket-1) cout << "\n";
-      else cout << " ";
+  pro.clock(3);
+  pg->dropTable(g_name);
+  string atts_names = fmt::format("{} BIGINT,", kId);
+  for (auto col : cols){
+    atts_names += fmt::format("interval_{} {},{} DOUBLE PRECISION, m2_{} DOUBLE PRECISION,", col, kIntervalType, col, col);
+  }
+  atts_names += "size BIGINT";
+  _sql = fmt::format("CREATE TABLE IF NOT EXISTS \"{}\"({});", g_name, atts_names);
+  _res = PQexec(_conn, _sql.c_str());
+  PQclear(_res);
 
-      sql = fmt::format("DROP TABLE IF EXISTS {}{};", kTempTable, i);
-      res = PQexec(conn, sql.c_str());
-      PQclear(res);
+  pg->dropTable(p_name);
+  _sql = fmt::format("CREATE TABLE IF NOT EXISTS \"{}\"("\
+    "tid BIGINT,"\
+    "gid BIGINT"\
+    ");", p_name);
+  _res = PQexec(_conn, _sql.c_str());
+  PQclear(_res);
+  pro.stop(3);
+
+  cout << "Begin 1b" << endl;
+
+  // Phase-1b: Recursive quick-partition for partition with size > #kInMemorySize
+  long long global_group_count = 0;
+  for (long long p = 0; p < partition_count; p ++){
+    long long recurse_size = bucket_stat[p].sample_count;
+    if (recurse_size > kInMemorySize){
+      double start_key = keys[p];
+      auto next_it = key_indices.upper_bound(start_key);
+      double end_key = start_key + 1;
+      if (next_it != key_indices.end()) end_key = next_it->first;
+      double key_width = (end_key - start_key) / bucket;
+      double bucket_width = (intervals[p].second - intervals[p].first) / bucket;
+      for (long long i = 0; i < bucket; i ++){
+        _sql = fmt::format(drop_tmp_table, kTempTable, partition_count + i);
+        _res = PQexec(_conn, _sql.c_str());
+        PQclear(_res);
+        _sql = fmt::format(create_tmp_table, kTempTable, partition_count + i);
+        _res = PQexec(_conn, _sql.c_str());
+        PQclear(_res);
+        intervals.emplace_back(intervals[p].first + i*bucket_width, intervals[p].first + (i+1)*bucket_width);
+        bucket_stat.emplace_back(m);
+        double key = start_key + key_width * i;
+        keys.emplace_back(key);
+        key_indices[key] = partition_count + i;
+      }
+
+      long long recurse_chunk = ceilDiv(recurse_size, kPCore);
+      _sql = fmt::format("SELECT * FROM {}{};", kTempTable, p);
+      _res = PQexec(_conn, _sql.c_str());
+
+      #pragma omp parallel num_threads(kPCore)
+      {
+        string sql;
+        PGconn* conn = PQconnectdb(pg->conninfo.c_str());
+        assert(PQstatus(conn) == CONNECTION_OK);
+        PGresult *res = NULL;
+
+        int seg = omp_get_thread_num();
+        long long start_tuple_id = seg * recurse_chunk;
+        long long end_tuple_id = min((seg + 1) * recurse_chunk - 1, recurse_size - 1);
+        vector<int> sz (bucket, 0);
+        vector<vector<pair<long long, VectorXd>>> cache (bucket, vector<pair<long long, VectorXd>>(kTempReserveSize));
+        vector<MeanVar> cache_stat (bucket, MeanVar(m));
+
+        for (int i = start_tuple_id; i <= end_tuple_id; i ++){
+          long long tid = atol(PQgetvalue(_res, i, 0));
+          VectorXd vs (m);
+          for (int j = 0; j < m; j ++) vs(j) = atof(PQgetvalue(_res, i, j+1));
+          long long bucket_ind = min((long long) floor((vs[max_var_index] - intervals[p].first) / bucket_width), bucket-1);
+          cache[bucket_ind][sz[bucket_ind]] = {tid, vs};
+          cache_stat[bucket_ind].add(vs);
+          sz[bucket_ind] ++;
+          if (sz[bucket_ind] == kTempReserveSize){
+            sql = fmt::format("COPY {}{} FROM STDIN with(delimiter ',');", kTempTable, partition_count + bucket_ind);
+            res = PQexec(conn, sql.c_str());
+            assert(PQresultStatus(res) == PGRES_COPY_IN);
+            PQclear(res);
+            string data = "";
+            for (int j = 0; j < sz[bucket_ind]; j ++) data += fmt::format("{},{}\n", cache[bucket_ind][j].first, join(cache[bucket_ind][j].second, kPrecision));
+            assert(PQputCopyData(conn, data.c_str(), (int) data.length()) == 1);
+            assert(PQputCopyEnd(conn, NULL) == 1);
+            res = PQgetResult(conn);
+            assert(PQresultStatus(res) == PGRES_COMMAND_OK);
+            sz[bucket_ind] = 0;
+          }
+        }
+
+        for (long long i = 0; i < bucket; i ++){
+          #pragma omp critical
+          {
+            bucket_stat[partition_count + i].add(cache_stat[i]);
+          }
+          if (sz[i]){
+            sql = fmt::format("COPY {}{} FROM STDIN with(delimiter ',');", kTempTable, partition_count + i);
+            res = PQexec(conn, sql.c_str());
+            assert(PQresultStatus(res) == PGRES_COPY_IN);
+            PQclear(res);
+            string data = "";
+            for (int j = 0; j < sz[i]; j ++) data += fmt::format("{},{}\n", cache[i][j].first, join(cache[i][j].second, kPrecision));
+            assert(PQputCopyData(conn, data.c_str(), (int) data.length()) == 1);
+            assert(PQputCopyEnd(conn, NULL) == 1);
+            res = PQgetResult(conn);
+            assert(PQresultStatus(res) == PGRES_COMMAND_OK);
+          }
+        }
+
+        PQfinish(conn);
+      }
+
+      PQclear(_res);
+      PGconn* conn = PQconnectdb(pg->conninfo.c_str());
+      assert(PQstatus(conn) == CONNECTION_OK);
+      wait_conns.push_back(conn);
+      _sql = fmt::format("DROP TABLE {}{};", kTempTable, p);
+      assert(PQsendQuery(conn, _sql.c_str()));
+      partition_count += bucket;
+      bucket_stat[p].reset();
     }
+  }
+
+  cout << "End 1b" << endl;
+
+
+  // Debug
+  // for (auto it : key_indices){
+  //   cout << it.second << " " << bucket_stat[it.second].sample_count << endl;
+  // }
+
+  // Phase-2a: Aggregate and compute group count for each local partition
+
+  cout << "Begin 2a" << endl;
+  vector<MeanVar> agg_bucket_stat;
+  vector<pair<double, double>> agg_intervals;
+  vector<vector<long long>> agg_groups;
+  MeanVar mv = MeanVar(m);
+  vector<long long> agg_group;
+  long long current_size = 0;
+  for (auto it : key_indices){
+    long long sz = bucket_stat[it.second].sample_count;
+    if (current_size + sz > kInMemorySize){
+      agg_bucket_stat.push_back(mv);
+      agg_groups.push_back(agg_group);
+      double left_bound = -DBL_MAX;
+      if (agg_intervals.size() > 0) left_bound = agg_intervals[agg_intervals.size() - 1].second;
+      agg_intervals.emplace_back(left_bound, intervals[it.second].first);
+      mv = MeanVar(m);
+      agg_group = vector<long long>();
+      current_size = 0;
+    }
+    mv.add(bucket_stat[it.second]);
+    agg_group.emplace_back(it.second);
+    current_size += sz;
+  }
+  if (agg_group.size() > 0){
+    agg_bucket_stat.push_back(mv);
+    agg_groups.push_back(agg_group);
+    double left_bound = -DBL_MAX;
+    if (agg_intervals.size() > 0) left_bound = agg_intervals[agg_intervals.size() - 1].second;
+    agg_intervals.emplace_back(left_bound, DBL_MAX);
+  }
+  // Debug
+  // long long s = 0;
+  // for (int i = 0; i < agg_intervals.size(); i ++){
+  //   s += agg_bucket_stat[i].sample_count;
+  //   cout << agg_intervals[i].first << " " << agg_intervals[i].second << " " << agg_bucket_stat[i].sample_count << endl;
+  //   print(agg_bucket_stat[i].getVar());
+  //   for (long long ind : agg_groups[i]) cout << ind << " ";
+  //   cout << endl;
+  // }
+  // cout << s << endl;
+
+  // Phase-2b: Size assignment problem
+  cout << "Begin 2b" << endl;
+  long long max_size = -1;
+  long long agg_count = (long long) agg_bucket_stat.size();
+  max_var = -1;
+  for (long long p = 0; p < agg_count; p ++){
+    if (agg_bucket_stat[p].sample_count){
+      max_size = max(max_size, agg_bucket_stat[p].sample_count);
+      max_var = max(max_var, agg_bucket_stat[p].getVar().sum());
+    }
+  }
+  VectorXd scores (agg_count); scores.fill(0);
+  vector<long long> group_count (agg_count, 0);
+  double current_bias = kSizeBias;
+  while (true){
+    double score_sum = 0;
+    for (long long p = 0; p < agg_count; p ++){
+      if (agg_bucket_stat[p].sample_count){
+        scores(p) = agg_bucket_stat[p].sample_count / (double) max_size * current_bias + agg_bucket_stat[p].getVar().sum() / max_var * (1 - current_bias);
+        score_sum += scores(p);
+      }
+    }
+    bool is_feasible = true;
+    for (long long p = 0; p < agg_count; p ++){
+      if (agg_bucket_stat[p].sample_count){
+        // cout << stat->size << " " << kGroupRatio << endl;
+        group_count[p] = (long long) ceil(stat->size * kGroupRatio * scores(p) / score_sum);
+        if (group_count[p] > agg_bucket_stat[p].sample_count) is_feasible = false;
+      }
+    }
+    if (is_feasible) break;
+    else current_bias = (1 + current_bias) / 2;
+  }
+  delete stat;
+
+  // Debug
+  // cout << "BIAS " << current_bias << endl;
+  // for (long long p = 0; p < agg_count; p ++){
+  //   if (agg_bucket_stat[p].sample_count){
+  //     cout << agg_bucket_stat[p].sample_count << " "  << group_count[p] << endl;
+  //   }
+  // }
+
+  cout << "Begin 2c" << endl;
+  // Phase-2c: Local DLV
+  string condition_names, rec_names, t_names;
+  {
+    vector<string> conditions;
+    vector<string> recs;
+    vector<string> ts;
+    for (int i = 0; i < m; i ++){
+      conditions.push_back(fmt::format("t.interval_{} @> %L::float8", cols[i]));
+      recs.push_back(fmt::format("rec.{}", cols[i]));
+      ts.push_back(fmt::format("t.{}", cols[i]));
+    }
+    condition_names = join(conditions, " AND ");
+    rec_names = join(recs, ", ");
+    t_names = join(ts, ",");
+  }
+
+  for (long long p = 0; p < agg_count; p ++){
+    long long n = agg_bucket_stat[p].sample_count;
+    if (n){
+      vector<PGconn*> conns (agg_groups[p].size());
+      vector<PGresult*> ress (agg_groups[p].size());
+      for (long long i = 0; i < (long long) agg_groups[p].size(); i ++){
+        conns[i] = PQconnectdb(pg->conninfo.c_str());
+        assert(PQstatus(conns[i]) == CONNECTION_OK);
+        string select_sql = fmt::format("SELECT * FROM {}{};", kTempTable, agg_groups[p][i]);
+        assert(PQsendQuery(conns[i], select_sql.c_str()));
+      }
+      // A is column-wise
+      double *A = new double [m*n];
+      vector<long long> tids (n);
+      pair<double, long long>* pis = new pair<double, long long>[n];
+      int partition_index = -1;
+      double max_var = -1;
+      VectorXd var = agg_bucket_stat[p].getVar();
+      for (int i = 0; i < m; i++){
+        if (max_var < var(i)){
+          max_var = var(i);
+          partition_index = i;
+        }
+      }
+      long long current_group_index = 0;
+      long long current_tuple_index = 0;
+      long long current_col_index = 0;
+      #pragma omp parallel num_threads(kPCore)
+      {
+        int local_group_index = -1;
+        int n_tuple = 0;
+        long long local_tuple_index = -1;
+        long long local_col_index = -1;
+        bool is_done = false;
+        while (true){
+          #pragma omp critical
+          {
+            if (current_group_index < (long long) agg_groups[p].size()){
+              local_group_index = current_group_index;
+              local_tuple_index = current_tuple_index;
+              local_col_index = current_col_index;
+              long long group_size = bucket_stat[agg_groups[p][current_group_index]].sample_count;
+              if (current_tuple_index + kTempReserveSize < group_size){
+                current_col_index += kTempReserveSize;
+                current_tuple_index += kTempReserveSize;
+              } else {
+                current_group_index ++;
+                current_col_index += group_size - current_tuple_index;
+                current_tuple_index = 0;
+              }
+              n_tuple = (int) (current_col_index - local_col_index);
+            } else is_done = true;
+            // cout << is_done << " " << p << " " << local_group_index << " " << local_tuple_index << " " << local_col_index << " " << omp_get_thread_num() << endl;
+          }
+          if (is_done) break;
+          #pragma omp critical
+          {
+            if (ress[local_group_index] == nullptr){
+              ress[local_group_index] = PQgetResult(conns[local_group_index]);
+              assert(PQgetResult(conns[local_group_index]) == nullptr);
+            }
+            // cout << PQntuples(ress[local_group_index]) << " " << local_tuple_index << " " << n_tuple << endl;
+          }
+          for (int i = 0; i < n_tuple; i ++){
+            long long col_index = local_col_index + i;
+            long long tuple_index = local_tuple_index + i;
+            long long tid = atoll(PQgetvalue(ress[local_group_index], tuple_index, 0));
+            tids[col_index] = tid;
+            for (int j = 0; j < m; j ++){
+              A[at(j, col_index)] = atof(PQgetvalue(ress[local_group_index], tuple_index, j+1));
+            }
+            pis[col_index] = {A[at(partition_index, col_index)], col_index};
+          }
+        }
+      }
+      for (long long i = 0; i < (long long) agg_groups[p].size(); i ++){
+        PQclear(ress[i]);
+        PQfinish(conns[i]);
+      }
+      for (auto group_ind : agg_groups[p]){
+        PGconn* conn = PQconnectdb(pg->conninfo.c_str());
+        assert(PQstatus(conn) == CONNECTION_OK);
+        wait_conns.push_back(conn);
+        _sql = fmt::format("DROP TABLE {}{};", kTempTable, group_ind);
+        assert(PQsendQuery(conn, _sql.c_str()));
+      }
+
+      map_sort::Sort(pis, n, kPCore);
+      long long soft_group_lim = (long long) ceil(n * kGroupRatio);
+      double var_ratio = kGroupRatio * kGroupRatio * kVarScale;
+      int soft_partition_lim = (int) ceil(kVarScale / kGroupRatio);
+      long long hard_group_lim = soft_group_lim + kPCore + soft_partition_lim;
+      long long group_count = kPCore;
+      long long heap_length = kPCore;
+      vector<vector<double>> lows (m, vector<double>(hard_group_lim, -DBL_MAX));
+      vector<vector<double>> highs (m, vector<double>(hard_group_lim, DBL_MAX));
+      vector<tuple<double, int, long long>> max_heap (hard_group_lim);
+      vector<vector<long long>*> groups (hard_group_lim, nullptr);
+      long long local_chunk = ceilDiv(n, kPCore);
+
+      #pragma omp parallel num_threads(kPCore)
+      {
+        {
+          int i = omp_get_thread_num();
+          lows[max_var_index][i] = agg_intervals[p].first;
+          highs[max_var_index][i] = agg_intervals[p].second;
+          long long left = i * local_chunk;
+          long long right = min((i+1)*local_chunk, n);
+          groups[i] = new vector<long long>(right - left);
+          if (i > 0) lows[partition_index][i] = A[at(partition_index, pis[left].second)];
+          if (i < kPCore - 1) highs[partition_index][i] = A[at(partition_index, pis[right].second)];
+
+          MeanVar mv = MeanVar(m);
+          for (int j = left; j < right; j ++){
+            long long col_index = pis[j].second;
+            (*groups[i])[j-left] = col_index;
+            mv.add(A+at(0, col_index));
+          }
+          int local_pindex = -1;
+          VectorXd total_vars = mv.getM2();
+          double max_total_var = -1;
+          for (int j = 0; j < m; j ++){
+            double total_var = total_vars(j);
+            if (max_total_var < total_var){
+              max_total_var = total_var;
+              local_pindex = j;
+            }
+          }
+          max_heap[i] = {max_total_var, local_pindex, i};
+        }
+        #pragma omp barrier
+        #pragma omp master
+        {
+          delete[] pis;
+          make_heap(max_heap.begin(), max_heap.begin() + heap_length);
+        }
+        #pragma omp barrier
+        while (group_count < soft_group_lim){
+          int mi = -1;
+          long long gi = -1;
+          double max_total_var = 0;
+          #pragma omp critical
+          {
+            while (heap_length > 0 && max_total_var == 0){
+              tie(max_total_var, mi, gi) = max_heap[0];
+              pop_heap(max_heap.begin(), max_heap.begin() + heap_length);
+              heap_length --;
+            }
+          }
+          if (max_total_var == 0) break;
+          auto& g = *groups[gi];
+          sort(g.begin(), g.end(), IndexComp(A, mi, m));
+          int delim_sz = soft_partition_lim;
+          vector<long long> delims (delim_sz);
+          int delim_count = 0;
+          ScalarMeanVar smv = ScalarMeanVar();
+          double reduced_var = max_total_var / g.size() * var_ratio;
+          for (int i = 0; i < (int) g.size(); i ++){
+            smv.add(A[at(mi, g[i])]);
+            if (smv.getVar() > reduced_var){
+              if (delim_count < delim_sz) delims[delim_count] = i;
+              else{
+                delim_sz += soft_partition_lim;
+                delims.resize(delim_sz);
+                delims[delim_count] = i;
+              }
+              delim_count ++;
+              smv.reset();
+              smv.add(A[at(mi, g[i])]);
+            }
+          }
+          if (delim_count < delim_sz) delims[delim_count] = (long long) g.size();
+          else delims.emplace_back(g.size());
+          delim_count ++;
+
+          long long g_start_index;
+          #pragma omp critical
+          {
+            g_start_index = group_count;
+            group_count += delim_count - 1;
+            if (group_count > hard_group_lim){
+              hard_group_lim += kPCore * soft_partition_lim;
+              for (int i = 0; i < m; i ++){
+                if (i == max_var_index){
+                  lows[i].resize(hard_group_lim, agg_intervals[p].first);
+                  highs[i].resize(hard_group_lim, agg_intervals[p].second);
+                } else{
+                  lows[i].resize(hard_group_lim, -DBL_MAX);
+                  highs[i].resize(hard_group_lim, DBL_MAX);
+                }
+              }
+              max_heap.resize(hard_group_lim);
+              groups.resize(hard_group_lim, nullptr);
+            }
+          }
+
+          for (int i = 0; i < delim_count-1; i ++){
+            long long g_index = g_start_index + i;
+            long long group_sz = delims[i+1] - delims[i];
+            vector<long long>* gptr = new vector<long long>(group_sz);
+            memcpy(&(*gptr)[0], &g[delims[i]], group_sz*sizeof(long long));
+
+            groups[g_index] = gptr;
+            for (int j = 0; j < m; j ++){
+              lows[j][g_index] = lows[j][gi];
+              highs[j][g_index] = highs[j][gi];
+            }
+            lows[mi][g_index] = A[at(mi, g[delims[i]])];
+            if (i < delim_count-2) highs[mi][g_index] = A[at(mi, g[delims[i+1]])];
+            else highs[mi][g_index] = highs[mi][gi];
+
+            MeanVar mv = MeanVar(m);
+            for (long long j = 0; j < group_sz; j ++){
+              mv.add(A+at(0, (*gptr)[j]));
+            }
+            int m_index = -1;
+            VectorXd total_vars = mv.getM2();
+            double m_var = 0;
+            for (int j = 0; j < m; j ++){
+              if (m_var < total_vars(j)){
+                m_var = total_vars(j);
+                m_index = j;
+              }
+            }
+            if (m_index != -1){
+              #pragma omp critical
+              {
+                max_heap[heap_length] = {m_var, m_index, g_index};
+                heap_length ++;
+                push_heap(max_heap.begin(), max_heap.begin() + heap_length);
+              }
+            }
+          }
+
+          {
+            if (delim_count != 1) highs[mi][gi] = A[at(mi, g[delims[0]])];
+            g.resize(delims[0]);
+
+            long long group_sz = delims[0];
+            MeanVar mv = MeanVar(m);
+            for (long long j = 0; j < group_sz; j ++){
+              mv.add(A+at(0, g[j]));
+            }
+            int m_index = -1;
+            VectorXd total_vars = mv.getM2();
+            double m_var = 0;
+            for (int j = 0; j < m; j ++){
+              if (m_var < total_vars(j)){
+                m_var = total_vars(j);
+                m_index = j;
+              }
+            }
+            if (m_index != -1){
+              #pragma omp critical
+              {
+                max_heap[heap_length] = {m_var, m_index, gi};
+                heap_length ++;
+                push_heap(max_heap.begin(), max_heap.begin() + heap_length);
+              }
+            }
+          }
+        }
+        #pragma omp barrier
+        PGconn *conn = PQconnectdb(pg->conninfo.c_str());
+        assert(PQstatus(conn) == CONNECTION_OK);
+        PGresult *res = NULL;
+
+        #pragma omp master
+        cout << "Populate G/P" << endl;
+        // Populate G table
+        string sql = fmt::format("COPY \"{}\" FROM STDIN with (delimiter '|', null '{}');", g_name, kNullLiteral);
+        res = PQexec(conn, sql.c_str());
+        assert(PQresultStatus(res) == PGRES_COPY_IN);
+        PQclear(res);
+        #pragma omp for nowait
+        for (long long i = 0; i < group_count; i ++){
+          const auto& g = *groups[i];
+          MeanVar mv = MeanVar(m);
+          string data = fmt::format("{}|", global_group_count+i+1);
+          for (long long j : g) mv.add(A + at(0, j));
+          VectorXd mean = mv.getMean();
+          VectorXd M2 = mv.getM2();
+          for (int j = 0; j < m; j ++){
+            data += fmt::format("[{},{}]|{:.{}Lf}|{:.{}Lf}|", infAlias(lows[j][i], kPrecision), infAlias(highs[j][i], kPrecision), mean(j), kPrecision, M2(j), kPrecision);
+          }
+          data += fmt::format("{}\n", mv.sample_count);
+          assert(PQputCopyData(conn, data.c_str(), (int) data.length()) == 1);
+        }
+        assert(PQputCopyEnd(conn, NULL) == 1);
+        res = PQgetResult(conn);
+        assert(PQresultStatus(res) == PGRES_COMMAND_OK);
+        PQclear(res);
+
+        // Populate P table
+        sql = fmt::format("COPY \"{}\" FROM STDIN with(delimiter ',');", p_name);
+        res = PQexec(conn, sql.c_str());
+        assert(PQresultStatus(res) == PGRES_COPY_IN);
+        PQclear(res);
+        #pragma omp for nowait
+        for (long long i = 0; i < group_count; i ++){
+          const auto& g = *groups[i];
+          string data = "";
+          for (long long j : g){
+            data += fmt::format("{},{}\n", tids[j], global_group_count+i+1);
+          }
+          assert(PQputCopyData(conn, data.c_str(), (int) data.length()) == 1);
+        }
+        assert(PQputCopyEnd(conn, NULL) == 1);
+        res = PQgetResult(conn);
+        assert(PQresultStatus(res) == PGRES_COMMAND_OK);
+        PQclear(res);
+        PQfinish(conn);
+        #pragma omp barrier
+        #pragma omp for nowait
+        for (long long i = 0; i < group_count; i ++) delete groups[i];
+      }
+      global_group_count += group_count;
+      delete[] A;
+    }
+  }  
+  PGconn *conn;
+
+  conn = PQconnectdb(pg->conninfo.c_str());
+  vector<string> interval_names;
+  for (int i = 0; i < min(m, kMaxMultiColumnIndexes); i ++) interval_names.push_back("interval_" + cols[i]);
+  _sql = fmt::format("CREATE INDEX \"{}_group_interval\" ON \"{}\" USING gist ({});", g_name, g_name, join(interval_names, ","));
+  assert(PQsendQuery(conn, _sql.c_str()));
+  wait_conns.push_back(conn);
+
+  conn = PQconnectdb(pg->conninfo.c_str());
+  _sql = fmt::format("ALTER TABLE \"{}\" ADD PRIMARY KEY ({});", g_name, kId);
+  assert(PQsendQuery(conn, _sql.c_str()));
+  wait_conns.push_back(conn);
+
+  conn = PQconnectdb(pg->conninfo.c_str());
+  _sql = fmt::format("CREATE INDEX \"{}_gid_index\" ON \"{}\" USING btree (gid);", p_name, p_name);
+  assert(PQsendQuery(conn, _sql.c_str()));
+  wait_conns.push_back(conn);
+
+  for (PGconn* conn : wait_conns){
+    while (PQgetResult(conn));
     PQfinish(conn);
   }
+
+  return global_group_count;
 }
-
-void DynamicLowVariance::doPartition(string table_name, string suffix, const vector<string> &cols){
-  Stat *stat = readStats(table_name);
-  quickPartition(table_name, stat, cols);
-  delete stat;
-}
-
-// void DynamicLowVariance::doPartition(string table_name, string suffix, const vector<string> &cols){
-//   // Compute min_partition_var
-//   int m = (int) cols.size();
-//   Stat *stat = readStats(table_name);
-//   long long n = stat->size;
-//   if (n < kMaxSize) return;
-//   long long total_groups = (long long) ceil(n * kGroupRatio);
-//   double min_partition_var = 1.0;
-//   for (string col : cols) min_partition_var *= stat->getVar(col);
-//   delete stat;
-//   min_partition_var /= total_groups;
-//   min_partition_var /= total_groups;
-//   min_partition_var = pow(min_partition_var, 1.0/m) * kVarScale * kVarScale;
-//   int min_partition_size = (int) ceil(1.0 / (kGroupRatio * kGroupRatio));
-
-//   int kInitialSize = n;
-//   cout << "With " << kInitialSize << endl;
-//   // Phase 1a
-//   string symbolic_name = table_name;
-//   if (suffix.length()) symbolic_name += "_" + suffix;
-//   string p_name = nextPName(symbolic_name);
-//   string g_name = nextGName(symbolic_name);
-//   string col_names = join(cols, ",");
-//   Stat st = Stat(cols);
-//   double *A = new double [m*kInitialSize];
-//   pair<double, int>* pis = new pair<double, int>[kInitialSize];
-//   VectorXi group_indices (kInitialSize);
-//   int partition_index = -1;
-//   int chunk = (int) ceilDiv(kInitialSize, kPCore);
-//   long long overall_chunk = ceilDiv(n, kPCore);
-//   long long phase_two_chunk = ceilDiv(n - kInitialSize, kPCore);
-//   pro.clock(3);
-//   #pragma omp parallel num_threads(kPCore)
-//   {
-//     string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
-//     PGconn *conn = PQconnectdb(conninfo.c_str());
-//     assert(PQstatus(conn) == CONNECTION_OK);
-//     PGresult *res = NULL;
-//     MeanVar mv = MeanVar(m);
-//     int tn = omp_get_thread_num();
-//     int left = tn * chunk;
-//     int right = min((tn+1) * chunk, kInitialSize);
-//     string select_sql = fmt::format("SELECT {} FROM \"{}\" WHERE {} BETWEEN {} AND {}", col_names, table_name, kId, left+1, right);
-//     res = PQexec(conn, select_sql.c_str());
-//     for (int i = 0; i < PQntuples(res); i ++){
-//       int index = i + left;
-//       for (int j = 0; j < m; j ++) A[at(j, index)] = atof(PQgetvalue(res, i, j));
-//       mv.add(A+at(0, index));
-//     }
-//     PQclear(res);
-//     PQfinish(conn);
-//     #pragma omp critical
-//     {
-//       st.add(mv.sample_count, mv.getMean(), mv.getM2());
-//     }
-//     #pragma omp barrier
-//     #pragma omp master
-//     {
-//       double max_total_var = -1;
-//       for (int i = 0; i < m; i ++){
-//         double var = st.getVar(i);
-//         if (max_total_var < var){
-//           max_total_var = var;
-//           partition_index = i;
-//         }
-//       }
-//     }
-//     #pragma omp barrier
-//     #pragma omp for nowait
-//     for (int i = 0; i < kInitialSize; i ++) pis[i] = {A[at(partition_index, i)], i};
-//   }
-//   pro.stop(3);
-//   pro.clock(4);
-//   map_sort::Sort(pis, kInitialSize, kPCore);
-//   int soft_group_lim = (int) ceil(kInitialSize * kGroupRatio);
-//   double var_ratio = kGroupRatio * kGroupRatio * kVarScale;
-//   int soft_partition_lim = (int) ceil(kVarScale / kGroupRatio);
-//   int hard_group_lim = soft_group_lim + kPCore + soft_partition_lim;
-//   long long group_count = kPCore;
-//   int heap_length = kPCore;
-//   vector<vector<double>> lows (m, vector<double>(hard_group_lim, -DBL_MAX));
-//   vector<vector<double>> highs (m, vector<double>(hard_group_lim, DBL_MAX));
-//   vector<tuple<double, int, int>> max_heap (hard_group_lim);
-//   vector<VectorXi*> groups (hard_group_lim, NULL);
-
-//   string condition_names, rec_names, t_names;
-//   {
-//     vector<string> conditions;
-//     vector<string> recs;
-//     vector<string> ts;
-//     for (int i = 0; i < m; i ++){
-//       conditions.push_back(fmt::format("t.interval_{} @> %L::float8", cols[i]));
-//       recs.push_back(fmt::format("rec.{}", cols[i]));
-//       ts.push_back(fmt::format("t.{}", cols[i]));
-//     }
-//     condition_names = join(conditions, " AND ");
-//     rec_names = join(recs, ", ");
-//     t_names = join(ts, ",");
-//   }
-
-//   #pragma omp parallel num_threads(kPCore)
-//   {
-//     {
-//       int i = omp_get_thread_num();
-//       int left = i * chunk;
-//       int right = min((i+1)*chunk, kInitialSize);
-//       groups[i] = new VectorXi(right - left);
-//       if (i > 0) lows[partition_index][i] = A[at(partition_index, pis[left].second)];
-//       if (i < kPCore - 1) highs[partition_index][i] = A[at(partition_index, pis[right].second)];
-
-//       MeanVar mv = MeanVar(m);
-//       for (int j = left; j < right; j ++){
-//         int col_index = pis[j].second;
-//         (*groups[i])(j-left) = col_index;
-//         mv.add(A+at(0, col_index));
-//       }
-//       int local_pindex = -1;
-//       VectorXd total_vars = mv.getM2();
-//       double max_total_var = -1;
-//       for (int j = 0; j < m; j ++){
-//         double total_var = total_vars(j);
-//         if (max_total_var < total_var){
-//           max_total_var = total_var;
-//           local_pindex = j;
-//         }
-//       }
-//       max_heap[i] = {max_total_var, local_pindex, i};
-//     }
-//     #pragma omp barrier
-//     #pragma omp master
-//     {
-//       delete[] pis;
-//       make_heap(max_heap.begin(), max_heap.begin() + heap_length);
-//     }
-//     #pragma omp barrier
-//     // Phase 1b
-//     while (group_count < soft_group_lim){
-//       int mi = -1;
-//       int gi = -1; 
-//       double max_total_var = 0;
-//       #pragma omp critical
-//       {
-//         while (heap_length > 0 && max_total_var == 0){
-//           tie(max_total_var, mi, gi) = max_heap[0];
-//           pop_heap(max_heap.begin(), max_heap.begin() + heap_length);
-//           heap_length --;
-//         }
-//       }
-//       if (gi == -1) break;
-//       auto& g = *groups[gi];
-//       sort(g.begin(), g.end(), IndexComp(A, mi, m));
-//       int delim_sz = soft_partition_lim;
-//       vector<int> delims (delim_sz);
-//       int delim_count = 0;
-//       ScalarMeanVar smv = ScalarMeanVar();
-//       double reduced_var = max_total_var / g.size() * var_ratio;
-//       for (int i = 0; i < g.size(); i ++){
-//         smv.add(A[at(mi, g(i))]);
-//         if (smv.getVar() > reduced_var){
-//           if (delim_count < delim_sz) delims[delim_count] = i;
-//           else{
-//             delim_sz += soft_partition_lim;
-//             delims.resize(delim_sz);
-//             delims[delim_count] = i;
-//           }
-//           delim_count ++;
-//           smv.reset();
-//           smv.add(A[at(mi, g(i))]);
-//         }
-//       }
-//       if (delim_count < delim_sz) delims[delim_count] = (int) g.size();
-//       else delims.push_back((int) g.size());
-//       delim_count ++;
-
-//       int g_start_index;
-//       #pragma omp critical
-//       {
-//         g_start_index = (int) group_count;
-//         group_count += delim_count-1;
-//         if (group_count > hard_group_lim){
-//           hard_group_lim += kPCore * soft_partition_lim;
-//           for (int i = 0; i < m; i ++){
-//             lows[i].resize(hard_group_lim, -DBL_MAX);
-//             highs[i].resize(hard_group_lim, DBL_MAX);
-//           }
-//           max_heap.resize(hard_group_lim);
-//           groups.resize(hard_group_lim, NULL);
-//         }
-//       }
-
-//       for (int i = 0; i < delim_count-1; i ++){
-//         int g_index = g_start_index + i;
-//         int group_sz = delims[i+1] - delims[i];
-//         VectorXi* gptr = new VectorXi(group_sz);
-//         memcpy(&(*gptr)(0), &g(delims[i]), group_sz*sizeof(int));
-
-//         groups[g_index] = gptr;
-//         for (int j = 0; j < m; j ++){
-//           lows[j][g_index] = lows[j][gi];
-//           highs[j][g_index] = highs[j][gi];
-//         }
-//         lows[mi][g_index] = A[at(mi, g(delims[i]))];
-//         if (i < delim_count-2) highs[mi][g_index] = A[at(mi, g(delims[i+1]))];
-//         else highs[mi][g_index] = highs[mi][gi];
-
-//         // Begin Repeatable code 
-//         MeanVar mv = MeanVar(m);
-//         for (int j = 0; j < group_sz; j ++){
-//           mv.add(A+at(0, (*gptr)(j)));
-//         }
-//         int m_index = -1;
-//         VectorXd total_vars = mv.getM2();
-//         double m_var = 0;
-//         for (int j = 0; j < m; j ++){
-//           double total_var = total_vars(j);
-//           if (m_var < total_var){
-//             m_var = total_var;
-//             m_index = j;
-//           }
-//         }
-//         if (m_index != -1){
-//           #pragma omp critical
-//           {
-//             max_heap[heap_length] = {m_var, m_index, g_index};
-//             heap_length ++;
-//             push_heap(max_heap.begin(), max_heap.begin() + heap_length);
-//           }
-//         }
-//         // End Repeatable code 
-//       }
-
-//       {
-//         // lows is good no need to change
-//         if (delim_count != 1) highs[mi][gi] = A[at(mi, g(delims[0]))];
-//         g.conservativeResize(delims[0]);
-
-//         int group_sz = delims[0];
-//         // Begin Repeatable code 
-//         MeanVar mv = MeanVar(m);
-//         for (int j = 0; j < group_sz; j ++){
-//           mv.add(A+at(0, g(j)));
-//         }
-//         VectorXd total_vars = mv.getM2();
-//         int m_index = -1;
-//         double m_var = 0;
-//         for (int j = 0; j < m; j ++){
-//           double total_var = total_vars(j);
-//           if (m_var < total_var){
-//             m_var = total_var;
-//             m_index = j;
-//           }
-//         }
-//         if (m_index != -1){
-//           #pragma omp critical
-//           {
-//             max_heap[heap_length] = {m_var, m_index, gi};
-//             heap_length ++;
-//             push_heap(max_heap.begin(), max_heap.begin() + heap_length);
-//           }
-//         }
-//         // End Repeatable code 
-//       }
-//     }
-
-//     // Phase 1c
-//     #pragma omp master
-//     {
-//       pro.stop(4);
-//       pro.clock(5);
-//       pro.clock(7);
-//       string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
-//       PGconn *conn = PQconnectdb(conninfo.c_str());
-//       assert(PQstatus(conn) == CONNECTION_OK);
-//       PGresult *res = NULL;
-
-//       string drop_sql = fmt::format("DROP TABLE IF EXISTS \"{}\";", g_name);
-//       res = PQexec(conn, drop_sql.c_str());
-//       PQclear(res);
-
-//       string atts_names = fmt::format("{} BIGINT,", kId);
-//       for (auto col : cols){
-//         atts_names += fmt::format(""\
-//         "interval_{} {},"\
-//         "{} DOUBLE PRECISION,", col, kIntervalType, col);
-//       }
-//       atts_names += "max_total_var DOUBLE PRECISION, max_size BIGINT, stsatus INTEGER";
-//       string create_sql = fmt::format("CREATE TABLE IF NOT EXISTS \"{}\"({});", g_name, atts_names);
-//       res = PQexec(conn, create_sql.c_str());
-//       PQclear(res);
-
-//       drop_sql = fmt::format("DROP TABLE IF EXISTS \"{}\";", p_name);
-//       res = PQexec(conn, drop_sql.c_str());
-//       PQclear(res);
-
-//       create_sql = fmt::format("CREATE TABLE IF NOT EXISTS \"{}\"("\
-//         "tid BIGINT,"\
-//         "gid BIGINT"\
-//         ");", p_name);
-//       res = PQexec(conn, create_sql.c_str());
-//       PQclear(res);
-
-//       PQfinish(conn);
-//       pro.stop(7);
-//     }
-//     #pragma omp barrier
-
-//     {
-//       string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
-//       PGconn *conn = PQconnectdb(conninfo.c_str());
-//       assert(PQstatus(conn) == CONNECTION_OK);
-//       PGresult *res = NULL;
-
-//       // Populate G table
-//       string sql = fmt::format("COPY \"{}\" FROM STDIN with(delimiter '|', null '{}');", g_name, kNullLiteral);
-//       res = PQexec(conn, sql.c_str());
-//       assert(PQresultStatus(res) == PGRES_COPY_IN);
-//       PQclear(res);
-//       #pragma omp for nowait
-//       for (int i = 0; i < group_count; i ++){
-//         const auto& g = *groups[i];
-//         MeanVar mv = MeanVar(m);
-//         string data = fmt::format("{}|", i+1);
-//         for (int j : g) mv.add(A+at(0, j));
-//         VectorXd mean = mv.getMean();
-//         for (int j = 0; j < m; j ++){
-//           data += fmt::format("[{:.{}Lf},{:.{}Lf}]|{:.{}Lf}|", lows[j][i], kPrecision, highs[j][i], kPrecision, mean(j), kPrecision);
-//         }
-//         data += fmt::format("{:.{}Lf}|{}|{}\n", mv.getM2().maxCoeff(), kPrecision, min_partition_size, Unlocked);
-//         assert(PQputCopyData(conn, data.c_str(), (int) data.length()) == 1);
-//       }
-//       #pragma omp for nowait
-//       for (long long i = group_count; i < total_groups; i ++){
-//         string data = fmt::format("{}|", i+1);
-//         for (int j = 0; j < m; j ++){
-//           data += fmt::format("{}|{}|", kNullLiteral, kNullLiteral);
-//         }
-//         data += fmt::format("{}|{}|{}\n", kNullLiteral, min_partition_size, Unitialized);
-//         assert(PQputCopyData(conn, data.c_str(), (int) data.length()) == 1);
-//       }
-//       assert(PQputCopyEnd(conn, NULL) == 1);
-//       res = PQgetResult(conn);
-//       assert(PQresultStatus(res) == PGRES_COMMAND_OK);
-//       PQclear(res);
-
-//       // Populate P tabless
-//       #pragma omp for
-//       for (int i = 0; i < group_count; i ++){
-//         const auto& g = *groups[i];
-//         for (int j : g) group_indices[j] = i;
-//       }
-//       sql = fmt::format("COPY \"{}\" FROM STDIN with(delimiter ',');", p_name);
-//       res = PQexec(conn, sql.c_str());
-//       assert(PQresultStatus(res) == PGRES_COPY_IN);
-//       PQclear(res);
-//       int seg = omp_get_thread_num();
-//       long long start_count = seg * overall_chunk + 1;
-//       long long end_count = min((seg+1) * overall_chunk, n);
-//       long long in_memory_count = ceilDiv(end_count-start_count+1, kInMemorySize);
-//       for (long long i = 0; i < in_memory_count; i ++){
-//         long long left = start_count + i*kInMemorySize;
-//         long long right = min(left + kInMemorySize - 1, end_count);
-//         string data = "";
-//         for (long long tid = left; tid <= right; tid ++){
-//           long long gid = 0;
-//           if (tid <= kInitialSize) gid = group_indices[tid-1] + 1;
-//           data += fmt::format("{},{}\n", tid, gid);
-//         }
-//         assert(PQputCopyData(conn, data.c_str(), (int) data.length()) == 1);
-//       }
-//       assert(PQputCopyEnd(conn, NULL) == 1);
-//       res = PQgetResult(conn);
-//       assert(PQresultStatus(res) == PGRES_COMMAND_OK);
-//       PQclear(res);
-//       PQfinish(conn);
-
-//       #pragma omp barrier
-//       #pragma omp for nowait
-//       for (int i = 0; i < group_count; i ++) delete groups[i];
-//     }
-//     #pragma omp barrier
-
-//     #pragma omp master
-//     {
-//       pro.stop(5);
-//       pro.clock(6);
-//       delete[] A;
-
-//       string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
-//       PGconn *conn = PQconnectdb(conninfo.c_str());
-//       assert(PQstatus(conn) == CONNECTION_OK);
-//       PGresult *res = NULL;
-
-//       pro.clock(8);
-//       vector<string> intervals;
-//       for (int i = 0; i < min(m, kMaxMultiColumnIndexes); i ++) intervals.push_back("interval_" + cols[i]);
-//       string sql = fmt::format("CREATE INDEX \"{}_group_interval\" ON \"{}\" USING gist ({});", g_name, g_name, join(intervals, ","));
-//       res = PQexec(conn, sql.c_str());
-//       PQclear(res);
-//       pro.stop(8);
-//       pro.clock(9);
-//       sql = fmt::format("ALTER TABLE \"{}\" ADD PRIMARY KEY ({});", g_name, kId);
-//       res = PQexec(conn, sql.c_str());
-//       PQclear(res);
-//       pro.stop(9);
-//       // pro.clock(10);
-//       // sql = fmt::format("CREATE INDEX \"{}_tid_index\" ON \"{}\"(tid)", p_name, p_name);
-//       // res = PQexec(conn, sql.c_str());
-//       // PQclear(res);
-//       // pro.stop(10);
-//       pro.clock(11);
-//       sql = fmt::format("CREATE INDEX \"{}_gid_index\" ON \"{}\"(gid) USING btree", p_name, p_name);
-//       res = PQexec(conn, sql.c_str());
-//       PQclear(res);
-//       pro.stop(11);
-//       // sql = fmt::format(""\
-//       //   "CREATE OR REPLACE FUNCTION traverse( "\
-//       //   "	start_id BIGINT, "\
-//       //   "	end_id BIGINT "\
-//       //   ") "\
-//       //   "RETURNS TABLE( "\
-//       //   "	v BIGINT "\
-//       //   ") "\
-//       //   "LANGUAGE plpgsql AS "\
-//       //   "$$ "\
-//       //   "DECLARE "\
-//       //   "	query text := 'SELECT {},{} FROM \"{}\" WHERE {} BETWEEN %L AND %L'; "\
-//       //   "	subquery text := 'SELECT {},max_size,status FROM \"{}\" AS t WHERE {} LIMIT 1'; "\
-//       //   "	p_update_query text := 'UPDATE \"{}\" SET gid = %L WHERE tid = %L'; "\
-//       //   "	p_size_query text := 'SELECT COUNT(*) FROM \"{}\" WHERE gid = %L'; "\
-//       //   "	g_status_query text := 'SELECT status FROM \"{}\" WHERE {} = %L'; "\
-//       //   "	g_lock_query text := 'UPDATE \"{}\" SET status = {}, max_size = max_size*2 WHERE {} = %L'; "\
-//       //   "	subrec record; "\
-//       //   "	rec record; "\
-//       //   "	subrec_size BIGINT; "\
-//       //   " subrec_status INTEGER; "\
-//       //   "	is_locked bool; "\
-//       //   "BEGIN "\
-//       //   "	FOR rec IN EXECUTE format(query, start_id, end_id) LOOP "\
-//       //   "		FOR subrec in EXECUTE format(subquery, {}) LOOP "\
-//       //   "			IF	subrec.status = {} THEN "\
-//       //   "				EXECUTE format(p_update_query, subrec.{}, rec.{}); "\
-//       //   "				EXECUTE format(p_size_query, subrec.{}) INTO subrec_size; "\
-//       //   "				IF subrec_size >= subrec.max_size THEN "\
-//       //   "					SELECT pg_try_advisory_lock(subrec.{}) INTO is_locked; "\
-//       //   "					EXECUTE format(g_status_query, subrec.{}) INTO subrec_status; "\
-//       //   "					IF is_locked AND subrec_status = {} THEN "\
-//       //   "						EXECUTE format(g_lock_query, subrec.{}); "\
-//       //   "						v := rec.{}; "\
-//       //   "						RETURN NEXT; "\
-//       //   "						v := -subrec.{}; "\
-//       //   "						RETURN NEXT; "\
-//       //   "						PERFORM pg_advisory_unlock(subrec.{}); "\
-//       //   "						RETURN; "\
-//       //   "					ELSE "\
-//       //   "						EXECUTE format(p_update_query, 0, rec.{}); "\
-//       //   "						v := rec.{}; "\
-//       //   "						RETURN NEXT; "\
-//       //   "					END IF; "\
-//       //   "				END IF; "\
-//       //   "			ELSE "\
-//       //   "				v := -rec.{}; "\
-//       //   "				RETURN NEXT; "\
-//       //   "			END IF; "\
-//       //   "		END LOOP; "\
-//       //   "	END LOOP; "\
-//       //   "END; "\
-//       //   "$$; ", kId, col_names, table_name, kId, kId, g_name, condition_names, p_name, p_name, g_name, kId, g_name, Locked, kId, rec_names, Unlocked, kId, kId, kId, kId, kId, Unlocked, kId, kId, kId, kId, kId, kId, kId);
-//       // res = PQexec(conn, sql.c_str());
-//       // PQclear(res);
-
-//       sql = fmt::format("SELECT {}();", kClearLockFunction);
-//       res = PQexec(conn, sql.c_str());
-//       PQclear(res);
-//       pro.stop(6);
-//       PQfinish(conn);
-//     }
-//     #pragma omp barrier
-
-//   //   // Phase 2
-//   //   {
-//   //     string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
-//   //     PGconn *conn = PQconnectdb(conninfo.c_str());
-//   //     assert(PQstatus(conn) == CONNECTION_OK);
-//   //     PGresult *res = NULL;
-//   //     int seg = omp_get_thread_num();
-//   //     long long start_id = kInitialSize + seg * phase_two_chunk + 1;
-//   //     long long end_id = min(kInitialSize + (seg + 1) * phase_two_chunk, n);
-//   //     vector<long long> remained_indices (kReserveSize);
-//   //     int remained_size = 0;
-//   //     string sql = fmt::format("SELECT * FROM {}({}, {});", kTraverseFunction, start_id, end_id);
-//   //     #pragma omp critical
-//   //     res = PQexec(conn, sql.c_str());
-//   //     int ntuples = PQntuples(res);
-//   //     long long group_id = 0;
-//   //     long long last_id = 0;
-//   //     if (ntuples >= 2){
-//   //       group_id = atoll(PQgetvalue(res, ntuples-1, 0));
-//   //       if (group_id < 0){
-//   //         last_id = atoll(PQgetvalue(res, ntuples-2, 0));
-//   //         ntuples -= 2;
-//   //       }
-//   //     }
-//   //     for (int i = 0; i < ntuples; i ++){
-//   //       remained_indices[remained_size] = atoll(PQgetvalue(res, i, 0));
-//   //       remained_size ++;
-//   //     }
-//   //     PQclear(res);
-
-//   //     if (remained_size >= kReserveSize){
-//   //       vector<string> indices (remained_size);
-//   //       for (int i = 0; i < remained_size; i ++) indices[i] = to_string(remained_indices[i]);
-//   //       string index_names = join(indices, ",");
-//   //       sql = fmt::format(""\
-//   //         "CREATE OR REPLACE FUNCTION {}{}() "\
-//   //         "RETURNS TABLE( "\
-//   //         "	v BIGINT "\
-//   //         ") "\
-//   //         "LANGUAGE plpgsql AS "\
-//   //         "$$ "\
-//   //         "DECLARE "\
-//   //         "	subquery text := 'SELECT {},status FROM \"{}\" AS t WHERE {} LIMIT 1'; "\
-//   //         "	p_update_query text := 'UPDATE \"{}\" SET gid = %L WHERE tid = %L'; "\
-//   //         "	subrec record; "\
-//   //         "	rec record; "\
-//   //         "BEGIN "\
-//   //         "	FOR rec IN SELECT {},{} FROM \"{}\" WHERE {} IN ({}) LOOP "\
-//   //         "		FOR subrec in EXECUTE format(subquery, {}) LOOP "\
-//   //         "			IF subrec.status = {} THEN "\
-//   //         "				EXECUTE format(p_update_query, subrec.{}, rec.{}); "\
-//   //         "			ELSIF subrec.status = {} THEN "\
-//   //         "				v := rec.{}; "\
-//   //         "				RETURN NEXT; "\
-//   //         "			END IF; "\
-//   //         "		END LOOP; "\
-//   //         "	END LOOP; "\
-//   //         "END; "\
-//   //         "$$; ", kProcessReserveFunction, seg, kId, g_name, condition_names, p_name, kId, col_names, table_name, kId, index_names, rec_names, Unlocked, kId, kId, Locked, kId);
-//   //       res = PQexec(conn, sql.c_str());
-//   //       PQclear(res);
-
-//   //       sql = fmt::format("SELECT * FROM {}{}();", kProcessReserveFunction, seg);
-//   //       res = PQexec(conn, sql.c_str());
-//   //       remained_size = PQntuples(res);
-//   //       for (int i = 0; i < remained_size; i ++) remained_indices[i] = atoll(PQgetvalue(res, i, 0));
-//   //       PQclear(res);
-//   //     }
-
-//   //     if (group_id < 0){
-//   //       sql = fmt::format("SELECT t.{},{} FROM \"{}\" AS t "\
-//   //         "INNER JOIN \"{}\" AS p ON (t.{}=p.tid) WHERE p.gid={};", kId, t_names, table_name, p_name, kId, -group_id);
-//   //       res = PQexec(conn, sql.c_str());
-//   //       int size = PQntuples(res);
-//   //       vector<long long> tids (size);
-//   //       double *A = new double [size * m];
-//   //       MeanVar mv = MeanVar(m);
-//   //       for (int i = 0; i < size; i ++){
-//   //         tids[i] = atoll(PQgetvalue(res, i, 0));
-//   //         for (int j = 0; j < m; j ++) A[at(j, i)] = atof(PQgetvalue(res, i, j+1));
-//   //         mv.add(A+at(0, i));
-//   //       }
-//   //       PQclear(res);
-//   //       VectorXd total_vars = mv.getM2();
-//   //       int mi = -1;
-//   //       double max_total_var = -1;
-//   //       for (int i = 0; i < m; i ++){
-//   //         double total_var = total_vars(i);
-//   //         if (max_total_var < total_var){
-//   //           max_total_var = total_var;
-//   //           mi = i;
-//   //         }
-//   //       }
-//   //       double reduced_var = max_total_var / size * var_ratio;
-//   //       #pragma omp critical
-//   //       {
-//   //         for (int i = 0; i < remained_size; i ++) cout << remained_indices[i] << " ";
-//   //         cout << endl;
-//   //         cout << group_count << " " << group_id << " " << size << " " << start_id << " " << last_id << endl;
-//   //       }
-//   //       // VectorXi indices (size); 
-//   //       // iota(indices.begin(), indices.end(), 0);
-//   //       // print(indices);
-//   //       delete[] A;
-//   //     }
-//   //     PQfinish(conn);
-//   //   }
-//   }
-// }

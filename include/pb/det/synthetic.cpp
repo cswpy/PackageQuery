@@ -43,9 +43,9 @@ void Synthetic::createMixed(long long N, int ucount, int ncount, double mean, do
 
 void Synthetic::create(long long N, int ucount, int ncount, vector<double> means, vector<double> vars){
   pro.clock(1);
+  string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
   {
     string sql;
-    string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
     PGconn* conn = PQconnectdb(conninfo.c_str());
     assert(PQstatus(conn) == CONNECTION_OK);
     PGresult *res = NULL;
@@ -83,7 +83,6 @@ void Synthetic::create(long long N, int ucount, int ncount, vector<double> means
     long long start_id = seg * chunk + 1;
     long long end_id = min((seg + 1) * chunk, N);
 
-    string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
     PGconn *conn = PQconnectdb(conninfo.c_str());
     assert(PQstatus(conn) == CONNECTION_OK);
     PGresult *res = NULL;
@@ -110,7 +109,6 @@ void Synthetic::create(long long N, int ucount, int ncount, vector<double> means
   pro.clock(3);
   {
     string sql;
-    string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
     PGconn* conn = PQconnectdb(conninfo.c_str());
     assert(PQstatus(conn) == CONNECTION_OK);
     PGresult *res = NULL;

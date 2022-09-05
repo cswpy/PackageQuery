@@ -2,6 +2,7 @@
 
 #include <omp.h>
 #include <regex>
+#include <cfloat>
 #include "fmt/core.h"
 #include "umisc.h"
 #include "boost/algorithm/string.hpp"
@@ -13,6 +14,12 @@ using std::regex;
 using std::smatch;
 
 const string kPgDelim = ",";
+
+string infAlias(double val, int precision){
+  if (val == -DBL_MAX) return "-infinity";
+  if (val == DBL_MAX) return "infinity";
+  return fmt::format("{:.{}Lf}", val, precision);
+}
 
 string join(vector<string> names, string delim){
   string res = "";

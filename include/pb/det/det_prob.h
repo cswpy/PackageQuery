@@ -17,6 +17,6 @@ public:
   DetProb();
   DetProb(int m, int n);
   void resize(int m, int n);
-  void uniformGenerate(int n, int expected_n, double att_var, double outlier_prob, bool restrict_count=true, bool is_positive=false, bool is_translate=false);
-  void normalGenerate(int n, int expected_n, double att_var, double outlier_prob, bool restrict_count=true);
+  void uniformGenerate(int n, int expected_n, double att_var, double outlier_prob, bool restrict_count=true, bool is_positive=false, bool is_translate=false, int seed=-1);
+  void normalGenerate(int n, int expected_n, double att_var, double outlier_prob, bool restrict_count=true, int seed=-1);
 };

@@ -35,6 +35,8 @@ GurobiSolver::GurobiSolver(const DetProb &prob): Checker(prob){
   }
   assert(!GRBupdatemodel(model));
   exe_init = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start).count() / 1000000.0;
+  // GRBwrite(model, "/home/alm818/model.lp");
+  // printf("%s\n", GRBgeterrormsg(env));
 }
 
 void GurobiSolver::solveIlp(double time_limit){
@@ -58,6 +60,11 @@ void GurobiSolver::solveIlp(double time_limit){
 void GurobiSolver::solveLp(){
   GRBmodel *relaxed;
   assert(!GRBrelaxmodel(model, &relaxed));
+  GRBenv *local_env = GRBgetenv(relaxed);
+  // Best configuration according to Gurobi
+  assert(!GRBsetintparam(local_env, GRB_INT_PAR_PRESOLVE, 0));
+  // assert(!GRBsetintparam(local_env, GRB_INT_PAR_SIFTING, 1));
+  assert(!GRBsetintparam(local_env, GRB_INT_PAR_METHOD, 0));
   exe_lp = exeTime([](GRBmodel *relaxed) {
     assert(!GRBoptimize(relaxed));
   }, relaxed);

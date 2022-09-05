@@ -12,14 +12,14 @@ private:
   PGresult *_res;
 public:
   static double kGroupRatio, kVarScale;
-  static int kMaxSize, kInitialSize;
+  static long long kLpSize;
   Profiler pro;
 private:
   void init();
+  bool checkStats(string table_name);
   void writeStats(string table_name, Stat *stat);
   Stat* readStats(string table_name);
-  void quickPartition(string table_name, Stat *stat, const vector<string> &cols);
-  void doPartition(string table_name, string suffix, const vector<string> &cols);
+  long long doPartition(string table_name, string suffix, const vector<string> &cols);
 public:
   ~DynamicLowVariance();
   DynamicLowVariance(string dbname);

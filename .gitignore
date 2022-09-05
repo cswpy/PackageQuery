@@ -3,3 +3,4 @@ build/*
 !build/conanfile.txt
 !resource/sql_script
 !resource/backup
+!plots/dual

@@ -61,6 +61,28 @@ void MeanVar::add(double *start, int cycle){
   }
 }
 
+void MeanVar::add(MeanVar &mv){
+  if (attr_count == mv.attr_count){
+    if (sample_count){
+      long long total_sample_count = sample_count + mv.sample_count;
+      VectorXd delta = mv.mean - mean;
+      mean = (sample_count * mean + mv.sample_count * mv.mean) / total_sample_count;
+      M2 += mv.M2 + delta.cwiseProduct(delta)*sample_count*mv.sample_count/total_sample_count;
+      sample_count = total_sample_count;
+    } else{
+      sample_count = mv.sample_count;
+      mean = mv.mean;
+      M2 = mv.M2;
+    }
+  }
+}
+
+void MeanVar::reset(){
+  mean.fill(0);
+  M2.fill(0);
+  sample_count = 0;
+}
+
 VectorXd MeanVar::getMean(){
   return mean;
 }
@@ -91,6 +113,21 @@ void ScalarMeanVar::add(double x){
   double delta = x - mean;
   mean += delta / sample_count;
   M2 += delta * (x - mean);
+}
+
+void ScalarMeanVar::add(ScalarMeanVar &smv){
+  if (sample_count){
+    long long total_sample_count = sample_count + smv.sample_count;
+    double delta = smv.mean - mean;
+    mean = (sample_count * mean + smv.sample_count * smv.mean) / total_sample_count;
+    M2 += smv.M2 + delta*delta*sample_count*smv.sample_count/total_sample_count;
+    sample_count = total_sample_count;
+  } else{
+    // Important to avoid both smv being zero sample_count
+    sample_count = smv.sample_count;
+    mean = smv.mean;
+    M2 = smv.M2;
+  }
 }
 
 double ScalarMeanVar::getMean(){
