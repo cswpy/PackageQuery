@@ -10,5 +10,6 @@ physical_core = 80
 logical_core = 160
 max_multicolumn_indexes = 2
 in_memory_size = 1000000
+precision = 20
 # Id column is based-1
 id_column = id
