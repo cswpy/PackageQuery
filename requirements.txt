@@ -1,3 +1,4 @@
 wget
 matplotlib
 numpy
+psycopg

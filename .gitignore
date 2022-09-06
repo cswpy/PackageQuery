@@ -6,4 +6,5 @@ plots/*
 !resource/backup
 !plots/*ipynb
 !resource/*.ipynb
-!resource/*py
+!resource/*.py
+!resource/*.sh
