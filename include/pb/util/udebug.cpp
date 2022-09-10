@@ -1,6 +1,7 @@
 #define FMT_HEADER_ONLY
 
 #include <omp.h>
+#include <cmath>
 
 #include "udebug.h"
 #include "fmt/core.h"
@@ -77,11 +78,22 @@ string feasMessage(int feas_status){
 string solCombination(VectorXd sol){
   string combs = "";
   for (int i = 0; i < sol.size(); i ++){
-    int count = (int) ceil(sol(i));
+    int count = (int) round(sol(i));
     if (count == 1) combs += to_string(i) + " ";
     else if (count > 1) combs += fmt::format("{}x{} ", to_string(i), count);
   }
   return combs;
+}
+
+string showClassification(double x) {
+  switch(std::fpclassify(x)) {
+    case FP_INFINITE:  return "Inf";
+    case FP_NAN:       return "NaN";
+    case FP_NORMAL:    return "normal";
+    case FP_SUBNORMAL: return "subnormal";
+    case FP_ZERO:      return "zero";
+    default:           return "unknown";
+  }
 }
 
 Profiler::Profiler(){

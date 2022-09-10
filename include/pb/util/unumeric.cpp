@@ -25,7 +25,7 @@ bool isGreater(double x, double y, double eps){
 bool isInteger(double x, double eps){
   double whole, frac;
   frac = modf(x, &whole);
-  return isEqual(frac, 0, eps);
+  return isEqual(frac, 0, eps) || isEqual(frac, 1, eps);
 }
 
 long long ceilDiv(long long x, long long q){

@@ -1,6 +1,7 @@
 #include "pb/core/dual.h"
 #include "pb/core/map_sort.h"
 #include "pb/util/unumeric.h"
+#include "pb/util/udebug.h"
 
 using std::upper_bound;
 
@@ -98,10 +99,10 @@ Dual::Dual(int core, const DetProb &prob){
 
   // Basis indices
   bhead.resize(m);
-  for (int i = 0; i < m; i ++) bhead[i] = i+n;
+  for (int i = 0; i < m; i ++) bhead(i) = i+n;
   // Inv Basis indices
   inv_bhead = boost::dynamic_bitset<>(n+m, 0);
-  for (int i = 0; i < m; i ++) inv_bhead[bhead[i]].flip();
+  for (int i = 0; i < m; i ++) inv_bhead[bhead(i)].flip();
 
   // Primal solution
   sol.resize(n+m); sol.fill(0);
@@ -388,13 +389,17 @@ Dual::Dual(int core, const DetProb &prob){
         score += local_score;
       }
     }
+    if (!init_size){
+      status = Infeasible;
+      break;
+    }
     if (status != Found){
       // Ratio test using Algorithm 4 combining Algorithm 5
-      //cout << "A " << iteration_count << " " << init_size << endl;
+      // cout << "A " << iteration_count << " " << init_size << endl;
       // pro.clock(9, false);
       map_sort::Sort(init, init_size, core);
       // pro.stop(9, false);
-      // cout << "TIME " << pro.time(9) << " " << init_size << endl;
+      // cout << "A1" << endl;
       slope_partition.fill(init_size);
       slope_sums.resize(init_size);
       #pragma omp parallel num_threads(core)
@@ -413,7 +418,7 @@ Dual::Dual(int core, const DetProb &prob){
         }
         #pragma omp master
         {
-          //cout << "B " << iteration_count << " " << init_size << endl;
+          // cout << "B " << iteration_count << " " << init_size << endl;
           sort(slope_partition.begin(), slope_partition.end());
           slope_sums_parition(0) = 0;
           for (int i = 1; i < core; i ++){
@@ -453,6 +458,7 @@ Dual::Dual(int core, const DetProb &prob){
               mini_iteration_count += q_index - 1;
               max_delta = sign_max_delta * (fabs(max_delta) - slope_sums(q_index-1));
             }
+            // cout << alpha_r(q) << endl;
             dual_step = d(q) / alpha_r(q) * sign_max_delta;
             d(p) = -dual_step;
             tilde_a.fill(0);

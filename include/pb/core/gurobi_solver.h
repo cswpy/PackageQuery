@@ -27,4 +27,5 @@ public:
   double getScore(const VectorXd &sol);
   int checkLpFeasibility(const VectorXd &sol);
   int checkIlpFeasibility(const VectorXd &sol);
+  void writeModel(string file_name);
 };

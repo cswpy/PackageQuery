@@ -6,6 +6,14 @@
 #include <utility>
 #include "Eigen/Dense"
 
+inline char separator(){
+  #ifdef _WIN32
+      return '\\';
+  #else
+      return '/';
+  #endif
+}
+
 using std::vector;
 using std::string;
 using Eigen::VectorXd;

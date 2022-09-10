@@ -35,8 +35,10 @@ GurobiSolver::GurobiSolver(const DetProb &prob): Checker(prob){
   }
   assert(!GRBupdatemodel(model));
   exe_init = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start).count() / 1000000.0;
-  // GRBwrite(model, "/home/alm818/model.lp");
-  // printf("%s\n", GRBgeterrormsg(env));
+}
+
+void GurobiSolver::writeModel(string file_name){
+  assert(!GRBwrite(model, file_name.c_str()));
 }
 
 void GurobiSolver::solveIlp(double time_limit){
@@ -113,7 +115,7 @@ int GurobiSolver::checkLpFeasibility(const VectorXd &sol){
 int GurobiSolver::checkIlpFeasibility(const VectorXd &sol){
   if (sol.size() != n) return Unsolved;
   for (int i = 0; i < n; i ++){
-    if (!isInteger(sol(i), kEpsilon)) return Integrality;
+    if (!isInteger(sol(i), epsilon)) return Integrality;
   }
   return checkLpFeasibility(sol);
 }

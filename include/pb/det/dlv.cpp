@@ -40,7 +40,7 @@ DynamicLowVariance::~DynamicLowVariance(){
   delete pg;
 }
 
-DynamicLowVariance::DynamicLowVariance(string dbname): dbname(dbname){
+DynamicLowVariance::DynamicLowVariance(){
   vector<string> names = {"Init", "ComputeStat", "All", "FetchData", "ProcessData", "WriteData", "CreateIndex", "CreateTable", "gist", "id", "tid", "gid"};
   pro = Profiler(names);
   init();
@@ -48,7 +48,7 @@ DynamicLowVariance::DynamicLowVariance(string dbname): dbname(dbname){
 
 void DynamicLowVariance::init(){
   pro.clock(0);
-  pg = new PgManager(dbname);
+  pg = new PgManager();
 
   _conn = PQconnectdb(pg->conninfo.c_str());
   assert(PQstatus(_conn) == CONNECTION_OK);

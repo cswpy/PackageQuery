@@ -12,17 +12,16 @@ using std::string;
 using std::unordered_map;
 
 static int readConfigs(unordered_map<string, string>& configs){
-  char separator = '/';
   char cwd[PATH_MAX];
   if (getcwd(cwd, sizeof(cwd)) == NULL) {
     perror("getcwd() error");
     return 1;
   }
   string project_home (cwd);
-  project_home = project_home.substr(0, project_home.find_last_of(separator));
+  project_home = project_home.substr(0, project_home.find_last_of(separator()));
   configs["project_home"] = project_home;
 
-  std::fstream config_file; config_file.open(project_home + separator + "config.txt", std::ios::in);
+  std::fstream config_file; config_file.open(project_home + separator() + "config.txt", std::ios::in);
   if (config_file.is_open()){
     string line;
     while (getline(config_file, line)){
@@ -56,6 +55,7 @@ static const int kPgPort = stoi(configs["port"]);
 static const int kPrecision = stoi(configs["precision"]);
 static const long long kInMemorySize = stoll(configs["in_memory_size"]); // In Memory Size for all cores in term of number of tuples
 
+const string kPgDatabase = configs["database"];
 const string kPgUser = configs["user"];
 const string kPgPassword = configs["password"];
 const string kPgHostaddr = configs["hostname"];

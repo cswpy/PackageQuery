@@ -22,6 +22,7 @@ void showHistogram(VectorXd x, int bucket_count, double start, double end);
 string solMessage(int sol_status);
 string feasMessage(int feas_status);
 string solCombination(VectorXd sol);
+string showClassification(double x);
 
 template <typename T>
 string print(Matrix<T, Dynamic, 1> v) {

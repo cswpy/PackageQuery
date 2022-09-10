@@ -3,6 +3,7 @@
 #pragma once
 
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
@@ -50,4 +51,13 @@ namespace pb{
   using Eigen::VectorXd;
   using Eigen::VectorXi;
   using Eigen::MatrixXd;
+
+  using std::random_device;
+  using std::default_random_engine;
+  using std::uniform_real_distribution;
+  using std::normal_distribution;
+  using std::seed_seq;
+
+  using std::fstream;
+  using std::ios;
 }

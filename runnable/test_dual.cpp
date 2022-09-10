@@ -1,6 +1,7 @@
 #include "pb/util/udeclare.h"
 #include "pb/util/udebug.h"
 #include "pb/util/uconfig.h"
+#include "pb/util/umisc.h"
 #include "pb/core/dual.h"
 #include "pb/core/gurobi_solver.h"
 
@@ -23,19 +24,27 @@ void testAcc(){
 }
 
 void testRunningTime(){
-  vector<int> Es = {10, 10, 1000, 1000};
-  vector<double> vars = {1, 10000, 1, 10000};
+  fstream out_file; out_file.open(kProjectHome + separator() + "plots" + separator() + "dual.csv", std::ios::out);
+  vector<int> expected_ns = {10, 10, 1000, 1000};
+  vector<double> inner_probs = {0.6, 0.3, 0.6, 0.3};
   vector<int> Ns = {1000, 10000, 100000, 1000000, 10000000, 100000000};
   // vector<int> Ns = {100000000};
-  vector<int> seeds = {1, 2, 3, 4};
-  double outlier_prob = 2.0;
+  vector<int> seeds = {1, 2, 3, 4, 5};
   for (int N : Ns){
     for (int q = 0 ; q < 8; q ++){
       int index = q % 4;
       for (int seed : seeds){
         DetProb prob;
-        if (q < 4) prob.uniformGenerate(N, Es[index], vars[index], outlier_prob, true, false, false, seed);
-        else prob.normalGenerate(N, Es[index], vars[index], outlier_prob, true, seed);
+        string table_name;
+        if (q < 4){
+          vector<string> cols = {"tmass_prox", "j", "h", "k"};
+          table_name = "ssds";
+          prob.tableGenerate(table_name, cols, false, N, expected_ns[index], inner_probs[index], seed);
+        } else{
+          vector<string> cols = {"price", "quantity", "discount", "tax"};
+          table_name = "tpch";
+          prob.tableGenerate(table_name, cols, true, N, expected_ns[index], inner_probs[index], seed);
+        }
         Dual d1 = Dual(1, prob);
         Dual d4 = Dual(4, prob);
         Dual d80 = Dual(80, prob);
@@ -43,14 +52,20 @@ void testRunningTime(){
         if (N <= 10000000){
           GurobiSolver gs = GurobiSolver(prob);
           gs.solveLp();
-          s = fmt::format("{},{},{},{},{:.2Lf},{:.2Lf},{:.2Lf},{:.2Lf},{:.8Lf},{:.8Lf},{:.8Lf},{:.8Lf}\n", N, Es[index], vars[index], seed, d1.exe_solve, d4.exe_solve, d80.exe_solve, gs.getLpTime(), d1.score, d4.score, d80.score, gs.lp_score);
+          if (gs.lp_status != Found){
+            gs.lp_score = 0.0;
+          }
+          s = fmt::format("{},{},{},{},{},{:.2Lf},{:.2Lf},{:.2Lf},{:.2Lf},{:.8Lf},{:.8Lf},{:.8Lf},{:.8Lf}\n", table_name, N, expected_ns[index], inner_probs[index], seed, d1.exe_solve, d4.exe_solve, d80.exe_solve, gs.getLpTime(), d1.score, d4.score, d80.score, gs.lp_score);
         } else{
-          s = fmt::format("{},{},{},{},{:.2Lf},{:.2Lf},{:.2Lf},{:.2Lf},{:.8Lf},{:.8Lf},{:.8Lf},{:.8Lf}\n", N, Es[index], vars[index], seed, d1.exe_solve, d4.exe_solve, d80.exe_solve, -1.0, d1.score, d4.score, d80.score, -1.0);
+          s = fmt::format("{},{},{},{},{},{:.2Lf},{:.2Lf},{:.2Lf},{:.2Lf},{:.8Lf},{:.8Lf},{:.8Lf},{:.8Lf}\n", table_name, N, expected_ns[index], inner_probs[index], seed, d1.exe_solve, d4.exe_solve, d80.exe_solve, -1.0, d1.score, d4.score, d80.score, -1.0);
         }
         cout << s;
+        out_file << s;
+        out_file.flush();
       }
     }
   }
+  out_file.close();
 }
 
 int main(){

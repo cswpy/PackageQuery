@@ -24,13 +24,13 @@ public:
 
 class PgManager{
 private:
-  string dbname, _sql;
+  string _sql;
   PGconn *_conn;
   PGresult *_res;
 public:
   string conninfo;
   ~PgManager();
-  PgManager(string dbname);
+  PgManager();
   long long getSize(string table_name);
   bool existTable(string table_name);
   void dropTable(string table_name);

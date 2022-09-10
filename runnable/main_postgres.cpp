@@ -5,16 +5,14 @@
 using namespace pb;
 
 void create_table(){
-  string dbname = "benchmark";
-  Synthetic syn = Synthetic(dbname);
+  Synthetic syn = Synthetic();
   long long N = 1000000000;
   syn.createMixed(N, 2, 2, 20, 100);
   syn.pro.print();
 } 
 
 void test_dlv(){
-  string dbname = "benchmark";
-  DynamicLowVariance dlv = DynamicLowVariance(dbname);
+  DynamicLowVariance dlv = DynamicLowVariance();
   dlv.partition(Synthetic::table_name, "P0");
   dlv.pro.print();
 }

@@ -6,7 +6,7 @@
 
 class DynamicLowVariance{
 private:
-  string dbname, _sql;
+  string _sql;
   PgManager *pg;
   PGconn *_conn;
   PGresult *_res;
@@ -22,7 +22,7 @@ private:
   long long doPartition(string table_name, string suffix, const vector<string> &cols);
 public:
   ~DynamicLowVariance();
-  DynamicLowVariance(string dbname);
+  DynamicLowVariance();
   void partition(string table_name, string partition_name);
   void partition(string table_name, string partition_name, const vector<string> &cols);
 };

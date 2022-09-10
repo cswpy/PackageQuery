@@ -1,8 +1,9 @@
 #include "det_prob.h"
 #include "pb/util/uconfig.h"
-#include "pb/util/udebug.h"
+#include "pb/util/upostgres.h"
+#include "pb/util/unumeric.h"
 
-double DetProb::kTranslation = 0;
+#include <boost/math/special_functions/erf.hpp>
 
 DetProb::~DetProb(){
 }
@@ -21,6 +22,7 @@ void DetProb::resize(int m, int n){
   c.resize(n); c.fill(0);
   l.resize(n); l.fill(0);
   u.resize(n); u.fill(1);
+  ids.resize(n);
 }
 
 void DetProb::uniformGenerate(int n, int expected_n, double att_var, double outlier_prob, bool restrict_count, bool is_positive, bool is_translate, int seed){
@@ -30,19 +32,19 @@ void DetProb::uniformGenerate(int n, int expected_n, double att_var, double outl
   double right = sqrt(3*att_var);
   if (is_positive){
     double translation = 0;
-    if (is_translate) translation = kTranslation;
+    if (is_translate) translation = 1;
     left = translation * right;
     right = (2 + translation) * right;
   }
   unsigned int local_seed;
   if (seed < 0){
-    std::random_device rd;
+    random_device rd;
     local_seed = rd();
   } else{
     local_seed = seed;
   }
-  std::default_random_engine gen (local_seed);
-  std::uniform_real_distribution dist(left, right);
+  default_random_engine gen (local_seed);
+  uniform_real_distribution dist(left, right);
   for (int i = 0; i < n; i ++){
     A(0, i) = dist(gen);
     A(1, i) = dist(gen);
@@ -50,8 +52,8 @@ void DetProb::uniformGenerate(int n, int expected_n, double att_var, double outl
     if (restrict_count) A(3, i) = 1;
     c(i) = dist(gen);
   }
-  std::normal_distribution bound_dist((left+right)/2*expected_n, sqrt(att_var*expected_n));
-  //std::uniform_real_distribution dist(left*sqrt(expected_n), right*sqrt(expected_n));
+  normal_distribution bound_dist((left+right)/2*expected_n, sqrt(att_var*expected_n));
+  //uniform_real_distribution dist(left*sqrt(expected_n), right*sqrt(expected_n));
   double tol = sqrt(att_var*expected_n/outlier_prob);
   double v = bound_dist(gen);
   bl(0) = v-tol;
@@ -69,13 +71,13 @@ void DetProb::normalGenerate(int n, int expected_n, double att_var, double outli
   else resize(3, n);
   unsigned int local_seed;
   if (seed < 0){
-    std::random_device rd;
+    random_device rd;
     local_seed = rd();
   } else{
     local_seed = seed;
   }
-  std::default_random_engine gen (local_seed);
-  std::normal_distribution dist(0.0, sqrt(att_var));
+  default_random_engine gen (local_seed);
+  normal_distribution dist(0.0, sqrt(att_var));
   for (int i = 0; i < n; i ++){
     A(0, i) = dist(gen);
     A(1, i) = dist(gen);
@@ -83,7 +85,7 @@ void DetProb::normalGenerate(int n, int expected_n, double att_var, double outli
     if (restrict_count) A(3, i) = 1;
     c(i) = dist(gen);
   }
-  std::normal_distribution bound_dist(0.0, sqrt(expected_n*att_var));
+  normal_distribution bound_dist(0.0, sqrt(expected_n*att_var));
   double tol = sqrt(att_var*expected_n/outlier_prob);
   double v = bound_dist(gen);
   bl(0) = v-tol;
@@ -94,4 +96,104 @@ void DetProb::normalGenerate(int n, int expected_n, double att_var, double outli
     bl(3) = expected_n/2;
     bu(3) = expected_n*3/2;
   }
+}
+
+double getQuantile(double mean, double var, double p){
+  return mean + sqrt(2 * var) * boost::math::erf_inv(2 * p - 1);
+}
+
+void DetProb::tableGenerate(string table_name, vector<string>& cols, bool is_maximize, int n, int expected_n, double inner_prob, int seed){
+  PgManager pg = PgManager();
+  long long size = pg.getSize(table_name);
+  long long chunk = ceilDiv(size, kPCore);
+  double probability = n / (double) size;
+  unsigned int local_seed;
+  if (seed < 0){
+    random_device rd;
+    local_seed = rd();
+  } else{
+    local_seed = seed;
+  }
+  seed_seq seq{local_seed};
+  vector<unsigned int> local_seeds (kPCore);
+  seq.generate(local_seeds.begin(), local_seeds.end());
+  string col_name = join(cols, ",");
+  int global_size = 0;
+  MeanVar mv = MeanVar(3);
+  #pragma omp parallel num_threads(kPCore)
+  {
+    int seg = omp_get_thread_num();
+    default_random_engine gen (local_seeds[seg]);
+    uniform_real_distribution dist (0.0, 1.0);
+    long long start_id = seg * chunk + 1;
+    long long end_id = (seg + 1) * chunk;
+    vector<long long> selected_ids;
+    for (long long id = start_id; id <= end_id; id ++){
+      if (dist(gen) <= probability) selected_ids.push_back(id);
+    }
+    int start_index;
+    #pragma omp critical
+    {
+      start_index = global_size;
+      global_size += selected_ids.size();
+    }
+    #pragma omp barrier
+    #pragma omp master
+    {
+      resize(4, global_size);
+    }
+    #pragma omp barrier
+    vector<string> sids;
+    for (auto id : selected_ids) sids.push_back(to_string(id));
+    string sql = fmt::format("SELECT {},{} FROM \"{}\" WHERE {} IN ({})", kId, col_name, table_name, kId, join(sids, ","));
+    PGconn *conn = PQconnectdb(pg.conninfo.c_str());
+    assert(PQstatus(conn) == CONNECTION_OK);
+    PGresult *res = NULL;
+    res = PQexec(conn, sql.c_str());
+
+    MeanVar local_mv = MeanVar(3);
+    for (int i = 0; i < PQntuples(res); i++){
+      int index = i + start_index;
+      ids[index] = atol(PQgetvalue(res, i, 0));
+      if (is_maximize) c(index) = atof(PQgetvalue(res, i, 1));
+      else c(index) = -atof(PQgetvalue(res, i, 1));
+      VectorXd x (3);
+      for (int j = 0; j < 3; j ++){
+        A(j, index) = atof(PQgetvalue(res, i, j+2));
+        x(j) = A(j, index);
+      }
+      local_mv.add(x);
+      A(3, index) = 1;
+    }
+    PQclear(res);
+    PQfinish(conn);
+    #pragma omp critical
+    {
+      mv.add(local_mv);
+    }
+  }
+  default_random_engine gen (local_seed);
+  uniform_real_distribution dist (0.0, 1.0);
+  VectorXd mean = mv.getMean();
+  VectorXd var = mv.getVar();
+  for (int i = 0; i < 3; i ++){
+    double mu = mean(i) * expected_n;
+    double nu = var(i) * expected_n;
+    if (i == 0){
+      bl(i) = getQuantile(mu, nu, 1 - inner_prob);
+    } else if (i == 1){
+      bu(i) = getQuantile(mu, nu, inner_prob);
+    } else{
+      bl(i) = getQuantile(mu, nu, 0.5 - inner_prob / 2);
+      bu(i) = getQuantile(mu, nu, 0.5 + inner_prob / 2);
+    }
+  }
+  bl(3) = expected_n/2;
+  bu(3) = expected_n*3/2;
+}
+
+void DetProb::normalizeObjective(){
+  double max_abs = 0;
+  for (int i = 0; i < c.size(); i ++) max_abs = max(fabs(c(i)), max_abs);
+  if (max_abs > 0) c /= max_abs;
 }

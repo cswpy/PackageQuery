@@ -14,7 +14,7 @@ string Synthetic::table_name = "test_data";
 
 // const string kGenerateFunc = "generate_table";
 
-Synthetic::Synthetic(string dbname): dbname(dbname){
+Synthetic::Synthetic(){
   vector<string> names = {"Init", "Create table", "Generate data", "Create index"};
   pro = Profiler(names);
   pro.clock(0);
@@ -43,7 +43,7 @@ void Synthetic::createMixed(long long N, int ucount, int ncount, double mean, do
 
 void Synthetic::create(long long N, int ucount, int ncount, vector<double> means, vector<double> vars){
   pro.clock(1);
-  string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
+  string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, kPgDatabase, kPgPassword);
   {
     string sql;
     PGconn* conn = PQconnectdb(conninfo.c_str());

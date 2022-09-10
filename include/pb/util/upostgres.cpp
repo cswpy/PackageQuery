@@ -26,8 +26,8 @@ PgManager::~PgManager(){
   PQfinish(_conn);
 }
 
-PgManager::PgManager(string dbname): dbname(dbname){
-  conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
+PgManager::PgManager(){
+  conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, kPgDatabase, kPgPassword);
   _conn = PQconnectdb(conninfo.c_str());
   assert(PQstatus(_conn) == CONNECTION_OK);
   _res = NULL;

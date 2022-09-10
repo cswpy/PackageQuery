@@ -1,20 +1,40 @@
 #include "pb/util/udeclare.h"
 #include "pb/util/uconfig.h"
+#include "pb/util/udebug.h"
+#include "pb/det/det_prob.h"
+#include "pb/core/dual_reducer.h"
+#include "pb/core/gurobi_solver.h"
 
 using namespace pb;
 
 int main(){
-  // int N = 20;
-  // int d = 5;
-  // VectorXd array (N);
-  // std::default_random_engine gen;
-  // gen.seed(std::chrono::system_clock::now().time_since_epoch().count());
-  // std::uniform_real_distribution<double> dist(0.0,1.0);
-  // for (int i = 0; i < N; i ++) array(i) = dist(gen);
-  // VectorXd sorted_array = array;
-  // sort(sorted_array.begin(), sorted_array.end());
-  // VectorXd delims (d-1);
-  // for (int i = 0; i < d-1; i ++) delims(i) = sorted_array((i+1)*(N/d));
-  // print(sorted_array);
-  // print(delims);
+  // 19 20
+  string file_name = "/home/alm818/model.lp";
+  for (int seed = 1; seed <= 100; seed ++){
+    // vector<string> cols = {"tmass_prox", "j", "h", "k"};
+    // DetProb prob; prob.tableGenerate("ssds", cols, false, 100000, 10, 0.5, seed);
+    vector<string> cols = {"price", "quantity", "discount", "tax"};
+    DetProb prob; prob.tableGenerate("tpch", cols, true, 10000, 10, 0.01, seed);
+    // prob.normalizeObjective();
+    cout << seed << "\n";
+    GurobiSolver gs = GurobiSolver(prob);
+    gs.solveIlp();
+    // gs.writeModel(file_name);
+    DualReducer dr = DualReducer(4, prob);
+    DualReducer dr2 = DualReducer(4, prob, gs.ilp_sol);
+    if (dr.status != Found && dr2.status != Found && gs.ilp_status != Found) continue;
+    printf("%.2f %.8f\n", dr.exe_lp, dr.lp_score);
+    printf("%.2f %.8f\n", dr.exe_ilp, dr.ilp_score);
+    printf("%.2f %.8f\n", dr2.exe_ilp, dr2.ilp_score);
+    printf("%.2f %.8f %.4f%% %.4f%%\n", gs.getIlpTime(), gs.ilp_score, (dr.lp_score - dr.ilp_score)*100/(dr.lp_score - gs.ilp_score), (dr.lp_score - dr2.ilp_score)*100/(dr.lp_score - gs.ilp_score));
+    Checker ch = Checker(prob, dr.kEpsilon);
+    cout << solMessage(dr.status) << " " << solMessage(dr2.status) << endl;
+    cout << feasMessage(ch.checkIlpFeasibility(dr.ilp_sol)) << " " << feasMessage(ch.checkIlpFeasibility(dr2.ilp_sol)) << endl;
+    cout << ch.getScore(dr.ilp_sol) << " " << ch.getScore(dr2.ilp_sol) << " " << ch.getScore(gs.ilp_sol) << endl;
+    if (dr.ilp_sol.size() < 100){
+      cout << solCombination(dr.ilp_sol) << endl;
+      cout << solCombination(dr2.ilp_sol) << endl;
+      cout << solCombination(gs.ilp_sol) << endl;
+    }
+  }
 }
