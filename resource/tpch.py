@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[30]:
+# In[1]:
 
 
 import os, subprocess
 import multiprocessing as mp
 
 
-# In[31]:
+# In[2]:
 
 
 config = {}
@@ -37,7 +37,7 @@ with psycopg.connect("dbname={} host={} port={} user={} password={}".format(conf
         conn.commit()
 
 
-# In[32]:
+# In[3]:
 
 
 if not os.path.exists("tpch-kit"):
@@ -52,7 +52,7 @@ if not os.path.exists("tpch-kit"):
         print("Error when executing git clone and make")
 
 
-# In[35]:
+# In[4]:
 
 
 sf = 300
@@ -90,11 +90,14 @@ def generating_data(global_size, sf, thread):
         print("Thread", thread, "finished inserting", size, "rows")
 
 
-# In[29]:
+# In[10]:
 
 
-ranges = [(1, sf//2), (sf//2 + 1, sf)]
-for a,b in ranges: 
+size = int(config["main_memory_size"]) // 4
+for i in range(1, sf, size):
+    a = i
+    b = min(i + size, sf)
+    print("Start collecting range ({},{})".format(a, b))
     ps = [mp.Process(target = generating_data, args = (global_size, sf, i)) for i in range(a, b+1)]
     for p in ps:
         p.start()

@@ -102,6 +102,7 @@ double getQuantile(double mean, double var, double p){
   return mean + sqrt(2 * var) * boost::math::erf_inv(2 * p - 1);
 }
 
+// First column is the objective
 void DetProb::tableGenerate(string table_name, vector<string>& cols, bool is_maximize, int n, int expected_n, double inner_prob, int seed){
   PgManager pg = PgManager();
   long long size = pg.getSize(table_name);
@@ -127,7 +128,7 @@ void DetProb::tableGenerate(string table_name, vector<string>& cols, bool is_max
     uniform_real_distribution dist (0.0, 1.0);
     long long start_id = seg * chunk + 1;
     long long end_id = (seg + 1) * chunk;
-    vector<long long> selected_ids;
+    vector<long long> selected_ids; selected_ids.reserve((int)(chunk * probability));
     for (long long id = start_id; id <= end_id; id ++){
       if (dist(gen) <= probability) selected_ids.push_back(id);
     }
@@ -155,8 +156,8 @@ void DetProb::tableGenerate(string table_name, vector<string>& cols, bool is_max
     for (int i = 0; i < PQntuples(res); i++){
       int index = i + start_index;
       ids[index] = atol(PQgetvalue(res, i, 0));
-      if (is_maximize) c(index) = atof(PQgetvalue(res, i, 1));
-      else c(index) = -atof(PQgetvalue(res, i, 1));
+      if (is_maximize) c(index) = fabs(atof(PQgetvalue(res, i, 1)));
+      else c(index) = -fabs(atof(PQgetvalue(res, i, 1)));
       VectorXd x (3);
       for (int j = 0; j < 3; j ++){
         A(j, index) = atof(PQgetvalue(res, i, j+2));

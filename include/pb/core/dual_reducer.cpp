@@ -8,6 +8,7 @@
 int DualReducer::kIlpSize = 5000;
 double DualReducer::kEpsilon = 1e-10;
 double DualReducer::kTimeLimit = 10.0;
+double DualReducer::kMipGap = 1e-4;
 enum StayStatus {NotStay, LikelyStay, Stay};
 
 DualReducer::~DualReducer(){
@@ -23,7 +24,7 @@ DualReducer::DualReducer(int core, const DetProb &prob){
   if (n < kIlpSize){
     // Gurobi
     GurobiSolver gs = GurobiSolver(prob);
-    gs.solveIlp(kTimeLimit);
+    gs.solveIlp(kMipGap, kTimeLimit);
     status = gs.ilp_status;
     if (gs.ilp_status == Found){
       for (int i = 0; i < gs.ilp_sol.size(); i ++){
@@ -209,7 +210,7 @@ DualReducer::DualReducer(int core, const DetProb &prob){
         reduced_prob.u(i) = prob.u(reduced_index(i));
       }
       GurobiSolver gs = GurobiSolver(reduced_prob);
-      gs.solveIlp(kTimeLimit);
+      gs.solveIlp(kMipGap, kTimeLimit);
       status = gs.ilp_status;
       if (gs.ilp_status == Found){
         for (int i = 0; i < gs.ilp_sol.size(); i ++){
@@ -429,7 +430,7 @@ DualReducer::DualReducer(int core, const DetProb &prob, VectorXd oracle){
         reduced_prob.u(i) = prob.u(reduced_index(i));
       }
       GurobiSolver gs = GurobiSolver(reduced_prob);
-      gs.solveIlp(10.0);
+      gs.solveIlp(kMipGap, kTimeLimit);
       status = gs.ilp_status;
       if (gs.ilp_status == Found){
         for (int i = 0; i < gs.ilp_sol.size(); i ++){

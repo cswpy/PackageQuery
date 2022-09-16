@@ -6,8 +6,11 @@ using namespace pb;
 
 void create_table(){
   Synthetic syn = Synthetic();
-  long long N = 1000000000;
-  syn.createMixed(N, 2, 2, 20, 100);
+  // long long N = 1000000000;
+  // vector<string> cols = {"tmass_prox", "j", "h", "k"};
+  // syn.createSubtable("ssds", 7, cols, 1);
+  vector<string> cols = {"price", "quantity", "discount", "tax"};
+  syn.createSubtable("tpch", 7, cols, 1);
   syn.pro.print();
 } 
 
@@ -18,6 +21,6 @@ void test_dlv(){
 }
 
 int main(){
-  //create_table();
-  test_dlv();
+  create_table();
+  // test_dlv();
 }

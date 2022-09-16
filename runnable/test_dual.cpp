@@ -25,11 +25,12 @@ void testAcc(){
 
 void testRunningTime(){
   fstream out_file; out_file.open(kProjectHome + separator() + "plots" + separator() + "dual.csv", std::ios::out);
-  vector<int> expected_ns = {10, 10, 1000, 1000};
-  vector<double> inner_probs = {0.6, 0.3, 0.6, 0.3};
-  vector<int> Ns = {1000, 10000, 100000, 1000000, 10000000, 100000000};
+  vector<int> expected_ns = {50, 50, 1000, 1000};
+  vector<double> inner_probs_ssds = {0.8, 0.5, 0.8, 0.5};
+  vector<double> inner_probs_tpch = {0.1, 0.01, 0.1, 0.01};
+  vector<int> Ns = {2000, 20000, 200000, 2000000, 20000000};
   // vector<int> Ns = {100000000};
-  vector<int> seeds = {1, 2, 3, 4, 5};
+  vector<int> seeds = {1, 2, 3, 4};
   for (int N : Ns){
     for (int q = 0 ; q < 8; q ++){
       int index = q % 4;
@@ -39,17 +40,17 @@ void testRunningTime(){
         if (q < 4){
           vector<string> cols = {"tmass_prox", "j", "h", "k"};
           table_name = "ssds";
-          prob.tableGenerate(table_name, cols, false, N, expected_ns[index], inner_probs[index], seed);
+          prob.tableGenerate(table_name, cols, false, N, expected_ns[index], inner_probs_ssds[index], seed);
         } else{
           vector<string> cols = {"price", "quantity", "discount", "tax"};
           table_name = "tpch";
-          prob.tableGenerate(table_name, cols, true, N, expected_ns[index], inner_probs[index], seed);
+          prob.tableGenerate(table_name, cols, true, N, expected_ns[index], inner_probs_tpch[index], seed);
         }
         Dual d1 = Dual(1, prob);
         Dual d4 = Dual(4, prob);
         Dual d80 = Dual(80, prob);
         string s;
-        if (N <= 10000000){
+        if (N <= 20000000){
           GurobiSolver gs = GurobiSolver(prob);
           gs.solveLp();
           if (gs.lp_status != Found){

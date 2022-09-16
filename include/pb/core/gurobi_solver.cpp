@@ -41,10 +41,11 @@ void GurobiSolver::writeModel(string file_name){
   assert(!GRBwrite(model, file_name.c_str()));
 }
 
-void GurobiSolver::solveIlp(double time_limit){
+void GurobiSolver::solveIlp(double mipGap, double time_limit){
   if (time_limit > 0){
     assert(!GRBsetdblparam(GRBgetenv(model), GRB_DBL_PAR_TIMELIMIT, time_limit));
   }
+  assert(!GRBsetdblparam(GRBgetenv(model), GRB_DBL_PAR_MIPGAP, mipGap));
   exe_ilp = exeTime([](GRBmodel *model){
     assert(!GRBoptimize(model));
   }, model);

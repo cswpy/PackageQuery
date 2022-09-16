@@ -9,7 +9,7 @@ using namespace pb;
 class DualReducer{
 public:
   static int kIlpSize;
-  static double kEpsilon, kTimeLimit;
+  static double kEpsilon, kTimeLimit, kMipGap;
   VectorXd ilp_sol, lp_sol;
   double ilp_score, lp_score, exe_ilp, exe_lp;
   int status;

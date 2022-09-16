@@ -53,6 +53,7 @@ static const int kLCore = stoi(configs["logical_core"]);
 static const int kMaxMultiColumnIndexes = stoi(configs["max_multicolumn_indexes"]);
 static const int kPgPort = stoi(configs["port"]);
 static const int kPrecision = stoi(configs["precision"]);
+static const long long kMainMemorySize = stoll(configs["main_memory_size"]);
 static const long long kInMemorySize = stoll(configs["in_memory_size"]); // In Memory Size for all cores in term of number of tuples
 
 const string kPgDatabase = configs["database"];
@@ -64,3 +65,5 @@ const string kId = configs["id_column"]; // Must not equal to "tid"
 const string kStatTable = "dlv_stats";
 const string kPartitionTable = "dlv_partitions";
 const string kNullLiteral = "null";
+
+long long getTupleCount(int tuple_size, int core_count=kPCore);

@@ -20,7 +20,7 @@ public:
 public:
   ~GurobiSolver();
   GurobiSolver(const DetProb &prob);
-  void solveIlp(double time_limit=-1.0);
+  void solveIlp(double mipGap=1e-4, double time_limit=-1.0);
   void solveLp();
   double getLpTime();
   double getIlpTime();

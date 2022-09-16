@@ -12,7 +12,9 @@ using namespace pb;
 
 string Synthetic::table_name = "test_data";
 
-// const string kGenerateFunc = "generate_table";
+Synthetic::~Synthetic(){
+  delete pg;
+}
 
 Synthetic::Synthetic(){
   vector<string> names = {"Init", "Create table", "Generate data", "Create index"};
@@ -20,6 +22,123 @@ Synthetic::Synthetic(){
   pro.clock(0);
   init();
   pro.stop(0);
+}
+
+void Synthetic::init(){
+  pg = new PgManager();
+}
+
+void Synthetic::createSubtable(string table_name, double order, vector<string>& cols, int seed){
+  pro.clock(1);
+  string subtable_name = table_name + "_" + to_string((int) round(order)) + "_" + to_string(seed);
+  {
+    string sql;
+    PGconn* conn = PQconnectdb(pg->conninfo.c_str());
+    assert(PQstatus(conn) == CONNECTION_OK);
+    PGresult *res = NULL;
+
+    sql = fmt::format("DROP TABLE IF EXISTS {} CASCADE;", subtable_name);
+    res = PQexec(conn, sql.c_str());
+    PQclear(res);
+
+    string inject = ", {} DOUBLE PRECISION";
+    string declare_inject = "";
+    for (int i = 0; i < (int) cols.size(); i ++) declare_inject += fmt::format(inject, cols[i]);
+
+    sql = fmt::format(""
+      "CREATE TABLE IF NOT EXISTS {} ("
+      "	{} BIGINT"
+      " {}"
+      ");", subtable_name, kId, declare_inject);
+    res = PQexec(conn, sql.c_str());
+    PQclear(res);
+    PQfinish(conn);
+  }
+  pro.stop(1);
+  pro.clock(2);
+  long long size = pg->getSize(table_name);
+  long long chunk = ceilDiv(size, kPCore);
+  double n = pow(10.0, order);
+  double probability = n / size;
+  unsigned int local_seed;
+  if (seed < 0){
+    random_device rd;
+    local_seed = rd();
+  } else{
+    local_seed = seed;
+  }
+  seed_seq seq{local_seed};
+  vector<unsigned int> local_seeds (kPCore);
+  seq.generate(local_seeds.begin(), local_seeds.end());
+  string col_name = join(cols, ",");
+  long long global_size = 0;
+
+  #pragma omp parallel num_threads(kPCore)
+  {
+    int seg = omp_get_thread_num();
+    default_random_engine gen (local_seeds[seg]);
+    uniform_real_distribution dist (0.0, 1.0);
+    long long start_id = seg * chunk + 1;
+    long long end_id = (seg + 1) * chunk;
+    vector<long long> selected_ids; selected_ids.reserve((int)(chunk * probability));
+    for (long long id = start_id; id <= end_id; id ++){
+      if (dist(gen) <= probability) selected_ids.push_back(id);
+    }
+    long long start_index;
+    #pragma omp critical
+    {
+      start_index = global_size;
+      global_size += selected_ids.size();
+    }
+    #pragma omp barrier
+    vector<string> sids;
+    for (auto id : selected_ids) sids.push_back(to_string(id));
+    string sql = fmt::format("SELECT {} FROM \"{}\" WHERE {} IN ({})", col_name, table_name, kId, join(sids, ","));
+    
+    PGconn *conn = PQconnectdb(pg->conninfo.c_str());
+    assert(PQstatus(conn) == CONNECTION_OK);
+    PGresult *res = NULL;
+    res = PQexec(conn, sql.c_str());
+
+    PGconn *_conn = PQconnectdb(pg->conninfo.c_str());
+    assert(PQstatus(_conn) == CONNECTION_OK);
+    PGresult *_res = NULL;
+    string _sql = fmt::format("COPY \"{}\" FROM STDIN with(delimiter ',');", subtable_name);
+    _res = PQexec(_conn, _sql.c_str());
+    assert(PQresultStatus(_res) == PGRES_COPY_IN);
+    PQclear(_res);
+
+    VectorXd vals (cols.size());
+    for (long long i = 0; i < PQntuples(res); i++){
+      long long index = i + start_index;
+      for (int j = 0; j < (int) cols.size(); j ++) vals(j) = atof(PQgetvalue(res, i, j));
+      string data = fmt::format("{},{}\n", index, join(vals, kPrecision));
+      assert(PQputCopyData(_conn, data.c_str(), (int) data.length()) == 1);
+    }
+    assert(PQputCopyEnd(_conn, NULL) == 1);
+    _res = PQgetResult(_conn);
+    assert(PQresultStatus(_res) == PGRES_COMMAND_OK);
+    PQclear(_res);
+    PQclear(res);
+    
+    PQfinish(_conn);
+    PQfinish(conn);
+  }
+  pro.stop(2);
+  pro.clock(3);
+  {
+    string sql;
+    PGconn* conn = PQconnectdb(pg->conninfo.c_str());
+    assert(PQstatus(conn) == CONNECTION_OK);
+    PGresult *res = NULL;
+
+    sql = fmt::format("ALTER TABLE {} ADD PRIMARY KEY ({});", subtable_name, kId);
+    res = PQexec(conn, sql.c_str());
+    PQclear(res);
+
+    PQfinish(conn);
+  }
+  pro.stop(3);
 }
 
 void Synthetic::createUniform(long long N, int count, double mean, double var){
@@ -120,129 +239,4 @@ void Synthetic::create(long long N, int ucount, int ncount, vector<double> means
     PQfinish(conn);
   }
   pro.stop(3);
-}
-
-// Deprecated 
-// void Synthetic::create(long long N, int ucount, int ncount, vector<double> means, vector<double> vars){
-//   long long chunk = ceilDiv(N, kPCore);
-//   pro.clock(1);
-//   {
-//     string sql;
-//     string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
-//     PGconn* conn = PQconnectdb(conninfo.c_str());
-//     assert(PQstatus(conn) == CONNECTION_OK);
-//     PGresult *res = NULL;
-
-//     sql = fmt::format("SET client_min_messages = warning;");
-//     res = PQexec(conn, sql.c_str());
-//     PQclear(res);
-
-//     sql = fmt::format("DROP FUNCTION IF EXISTS {};", kGenerateFunc);
-//     res = PQexec(conn, sql.c_str());
-//     PQclear(res);
-
-//     string inject1 = ", u{} DOUBLE PRECISION";
-//     string inject2 = ", n{} DOUBLE PRECISION";
-//     string declare_inject = "";
-//     for (int i = 1; i <= ucount; i ++) declare_inject += fmt::format(inject1, i);
-//     for (int i = 1; i <= ncount; i ++) declare_inject += fmt::format(inject2, i);
-
-//     inject1 = ", UNNEST(ARRAY(SELECT {:.{}Lf} + {:.{}Lf} * RANDOM() FROM GENERATE_SERIES(0, end_id-start_id))) AS u{}";
-//     inject2 = ", UNNEST(ARRAY(SELECT * FROM NORMAL_RAND((end_id-start_id+1)::Integer, {:.{}Lf}, {:.{}Lf}))) AS n{}";
-//     string query_inject = "";
-//     for (int i = 0; i < ucount; i ++){
-//       double tmp = sqrt(3*vars[i]);
-//       query_inject += fmt::format(inject1, means[i]-tmp, kPrecision, 2*tmp, kPrecision, i+1);
-//     }
-//     for (int i = 0; i < ncount; i ++) query_inject += fmt::format(inject2, means[i+ucount], kPrecision, sqrt(vars[i+ucount]), kPrecision, i+1);
-//     sql = fmt::format(""
-//       "CREATE OR REPLACE FUNCTION {}( "
-//       "	start_id BIGINT, "
-//       "	end_id BIGINT "
-//       ") "
-//       "RETURNS TABLE( "
-//       "{} BIGINT"
-//       "{}"
-//       ") "
-//       "LANGUAGE plpgsql AS "
-//       "$$ "
-//       "BEGIN "
-//       "	RETURN QUERY SELECT "
-//       "	UNNEST(ARRAY(SELECT GENERATE_SERIES FROM GENERATE_SERIES(start_id, end_id))) AS {}"
-//       " {};"
-//       "END; "
-//       "$$; ", kGenerateFunc, kId, declare_inject, kId, query_inject);
-//     res = PQexec(conn, sql.c_str());
-//     PQclear(res);
-
-//     sql = fmt::format("DROP TABLE IF EXISTS {} CASCADE;", Synthetic::table_name);
-//     res = PQexec(conn, sql.c_str());
-//     PQclear(res);
-
-//     sql = fmt::format(""
-//       "CREATE TABLE IF NOT EXISTS {} ("
-//       "	{} BIGINT"
-//       " {}"
-//       ");", Synthetic::table_name, kId, declare_inject);
-//     res = PQexec(conn, sql.c_str());
-//     PQclear(res);
-
-//     PQfinish(conn);
-//   }
-//   pro.stop(1);
-//   pro.clock(2);
-//   #pragma omp parallel num_threads(kPCore)
-//   {
-//     string sql;
-//     string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
-//     PGconn* conn = PQconnectdb(conninfo.c_str());
-//     assert(PQstatus(conn) == CONNECTION_OK);
-//     PGresult *res = NULL;
-//     int seg = omp_get_thread_num();
-//     long long start_count = seg * chunk + 1;
-//     long long end_count = min((seg + 1) * chunk, N);
-//     long long in_memory_count = ceilDiv(end_count-start_count+1, kInMemorySize);
-//     for (long long i = 0; i < in_memory_count; i ++){
-//       long long left = start_count + i * kInMemorySize;
-//       long long right = min(left + kInMemorySize - 1, end_count);
-//       sql = fmt::format("INSERT INTO {} SELECT * FROM {}({}, {});", Synthetic::table_name, kGenerateFunc, left, right);
-//       res = PQexec(conn, sql.c_str());
-//       PQclear(res);
-//     }
-//     PQfinish(conn);
-//   }
-//   pro.stop(2);
-//   pro.clock(3);
-//   {
-//     string sql;
-//     string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
-//     PGconn* conn = PQconnectdb(conninfo.c_str());
-//     assert(PQstatus(conn) == CONNECTION_OK);
-//     PGresult *res = NULL;
-
-//     sql = fmt::format("ALTER TABLE {} ADD PRIMARY KEY ({});", Synthetic::table_name, kId);
-//     res = PQexec(conn, sql.c_str());
-//     PQclear(res);
-
-//     PQfinish(conn);
-//   }
-//   pro.stop(3);
-// }
-
-void Synthetic::init(){
-  // string sql;
-  // string conninfo = fmt::format("postgresql://{}@{}?port={}&dbname={}&password={}", kPgUser, kPgHostaddr, kPgPort, dbname, kPgPassword);
-  // PGconn* conn = PQconnectdb(conninfo.c_str());
-  // assert(PQstatus(conn) == CONNECTION_OK);
-  // PGresult *res = NULL;
-  
-  // sql = fmt::format("SET client_min_messages = warning;");
-  // res = PQexec(conn, sql.c_str());
-  // PQclear(res);
-
-  // sql = "CREATE EXTENSION IF NOT EXISTS tablefunc;";
-  // res = PQexec(conn, sql.c_str());
-  // PQclear(res);
-
-  // PQfinish(conn);
 }
