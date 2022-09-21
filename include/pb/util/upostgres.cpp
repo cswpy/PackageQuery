@@ -254,5 +254,6 @@ int Stat::getIndex(string col){
 
 double Stat::getVar(int i){
   assert(0 <= i && i < (int) cols.size());
-  return M2(i) / size;
+  if (size <= 1) return M2(i);
+  return M2(i) / (size - 1);
 }

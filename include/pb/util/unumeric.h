@@ -11,6 +11,9 @@ bool isInteger(double x, double eps=kNumericEps);
 
 long long ceilDiv(long long x, long long q);
 
+double normalQuantile(double u, double v, double p);
+double normalCdf(double u, double v, double x);
+
 template <typename T>
 double sign(T value) {
   if (value < 0) return -1.0;

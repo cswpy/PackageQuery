@@ -18,12 +18,14 @@
 #include <chrono>
 #include <ctime>
 #include <cfloat>
+#include <stdexcept>
 
 #include "Eigen/Dense"
 #include "fmt/core.h"
 
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> RMatrixXd;
 
+enum ConsSense { LowerBounded, UpperBounded, Bounded};
 enum SolStatus { NotFound, Found, Feasible, Infeasible, Unbounded, DualUnbounded, Timeout};
 enum FeasStatus { Unsolved, Feasibility, Infeasibility, LbConstraint, UbConstraint, LbVariable, UbVariable, Integrality};
 enum GroupStatus { Unitialized, Unlocked, Locked};
@@ -60,4 +62,6 @@ namespace pb{
 
   using std::fstream;
   using std::ios;
+
+  using std::invalid_argument;
 }

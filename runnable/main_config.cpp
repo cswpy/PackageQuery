@@ -4,10 +4,11 @@
 #include "pb/det/det_prob.h"
 #include "pb/core/dual_reducer.h"
 #include "pb/core/gurobi_solver.h"
+#include "pb/det/det_bound.h"
 
 using namespace pb;
 
-int main(){
+void main1(){
   // 19 20
   string file_name = "/home/alm818/model.lp";
   for (int seed = 1; seed <= 100; seed ++){
@@ -42,4 +43,29 @@ int main(){
       cout << solCombination(gs.ilp_sol) << endl;
     }
   }
+}
+
+void main2(){
+  vector<int> consSense = {UpperBounded, LowerBounded, Bounded, LowerBounded, UpperBounded};
+  vector<double> means = {10, 20, 30, 40, 50};
+  vector<double> vars = {100, 100, 150, 400, 100};
+  DetBound detBound = DetBound(consSense, means, vars);
+  double E = 50;
+  double rho = 0.8;
+  double alpha = 0.5;
+  int m = consSense.size();
+  VectorXd bl (m); bl.fill(-DBL_MAX);
+  VectorXd bu (m); bu.fill(DBL_MAX);
+  double hard = detBound.sample(E, rho, alpha, bl, bu);
+  double minE;
+  double minHard = detBound.minHardness(minE, bl, bu);
+  cout << hard << endl;
+  cout << minE << " " << minHard << endl;
+  double this_rho = detBound.sampleHardness(E, alpha, 10, bl, bu);
+  double my_hard = detBound.measureHardness(E, bl, bu);
+  cout << this_rho << " " << my_hard << endl;
+}
+
+int main(){
+
 }

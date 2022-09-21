@@ -1,6 +1,9 @@
 #include <cstdlib>
+#include <boost/math/special_functions/erf.hpp>
 
 #include "unumeric.h"
+
+using boost::math::erf_inv;
 
 bool isEqual(double x, double y, double eps){
   return fabs(x-y) < eps;
@@ -31,6 +34,14 @@ bool isInteger(double x, double eps){
 long long ceilDiv(long long x, long long q){
   lldiv_t d = lldiv(x, q);
   return d.quot + (d.rem != 0LL);
+}
+
+double normalQuantile(double u, double v, double p){
+  return u + sqrt(2*v) * erf_inv(2*p - 1);
+}
+
+double normalCdf(double u, double v, double x){
+  return 0.5 + 0.5 * erf((x-u) / (sqrt(2*v)));
 }
 
 MeanVar::MeanVar(){
@@ -87,9 +98,10 @@ VectorXd MeanVar::getMean(){
   return mean;
 }
 
+// Unbiased estimate
 VectorXd MeanVar::getVar(){
-  if (sample_count == 0) return M2;
-  return M2 / sample_count;
+  if (sample_count <= 1) return M2;
+  return M2 / (sample_count - 1);
 }
 
 VectorXd MeanVar::getM2(){
@@ -134,9 +146,10 @@ double ScalarMeanVar::getMean(){
   return mean;
 }
 
+// Unbiased estimate
 double ScalarMeanVar::getVar(){
-  if (sample_count == 0) return 0;
-  return M2 / sample_count;
+  if (sample_count <= 1) return 0;
+  return M2 / (sample_count - 1);
 }
 
 double ScalarMeanVar::getM2(){
