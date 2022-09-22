@@ -3,7 +3,8 @@
 #include <iostream>
 #include <omp.h>
 #include <cfloat>
-#include "fmt/core.h"
+#include <fmt/core.h>
+
 #include "upostgres.h"
 #include "pb/util/uconfig.h"
 #include "pb/util/umisc.h"
@@ -31,6 +32,19 @@ PgManager::PgManager(){
   _conn = PQconnectdb(conninfo.c_str());
   assert(PQstatus(_conn) == CONNECTION_OK);
   _res = NULL;
+
+  _sql = fmt::format(""
+    "CREATE TABLE IF NOT EXISTS {}("
+    "	table_name VARCHAR(63) UNIQUE NOT NULL,"
+    "	size BIGINT,"
+    " cols TEXT[],"
+    "	mean DOUBLE PRECISION[],"
+    "	M2 DOUBLE PRECISION[],"
+    "	amin DOUBLE PRECISION[],"
+    "	amax DOUBLE PRECISION[]"
+    ")", kStatTable);
+  _res = PQexec(_conn, _sql.c_str());
+  PQclear(_res);
 
   _sql = fmt::format("SET client_min_messages = warning;");
   _res = PQexec(_conn, _sql.c_str());
@@ -100,6 +114,34 @@ Stat* PgManager::computeStats(string table_name, const vector<string> &cols){
       stat->add(mv.sample_count, mv.getMean(), mv.getM2(), amin, amax);
     }
   }
+  return stat;
+}
+
+bool PgManager::checkStats(string table_name){
+  _sql = fmt::format("SELECT COUNT(*) FROM {} WHERE table_name='{}';", kStatTable, table_name);
+  _res = PQexec(_conn, _sql.c_str());
+  int count = atoi(PQgetvalue(_res, 0, 0));
+  PQclear(_res);
+  return count;
+}
+
+void PgManager::writeStats(string table_name, Stat *stat){
+  _sql = fmt::format(""
+    "INSERT INTO {}(table_name, size, cols, mean, M2, amin, amax) "
+    "VALUES ('{}', {}, {}, {}, {}, {}, {}) "
+    "ON CONFLICT (table_name) "
+    "DO UPDATE SET size=EXCLUDED.size,cols=EXCLUDED.cols,mean=EXCLUDED.mean,M2=EXCLUDED.M2,amin=EXCLUDED.amin,amax=EXCLUDED.amax;", 
+    kStatTable, table_name, stat->size, pgJoin(stat->cols), pgJoin(stat->mean, kPrecision), pgJoin(stat->M2, kPrecision), pgJoin(stat->amin, kPrecision), pgJoin(stat->amax, kPrecision));
+  _res = PQexec(_conn, _sql.c_str());
+  PQclear(_res);
+}
+
+Stat* PgManager::readStats(string table_name){
+  _sql = fmt::format("SELECT size, cols, mean, M2, amin, amax FROM \"{}\" WHERE table_name='{}';", kStatTable, table_name);
+  _res = PQexec(_conn, _sql.c_str());
+  Stat* stat = new Stat(pgStringSplit(PQgetvalue(_res, 0, 1)));
+  stat->add(atoll(PQgetvalue(_res, 0, 0)), pgValueSplit(PQgetvalue(_res, 0, 2)), pgValueSplit(PQgetvalue(_res, 0, 3)), pgValueSplit(PQgetvalue(_res, 0, 4)), pgValueSplit(PQgetvalue(_res, 0, 5)));
+  PQclear(_res);
   return stat;
 }
 
@@ -256,4 +298,9 @@ double Stat::getVar(int i){
   assert(0 <= i && i < (int) cols.size());
   if (size <= 1) return M2(i);
   return M2(i) / (size - 1);
+}
+
+VectorXd Stat::getVars(){
+  if (size <= 1) return M2;
+  return M2 / (size - 1);
 }

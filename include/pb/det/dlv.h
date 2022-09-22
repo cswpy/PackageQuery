@@ -16,9 +16,6 @@ public:
   Profiler pro;
 private:
   void init();
-  bool checkStats(string table_name);
-  void writeStats(string table_name, Stat *stat);
-  Stat* readStats(string table_name);
   long long doPartition(string table_name, string suffix, const vector<string> &cols);
 public:
   ~DynamicLowVariance();

@@ -20,6 +20,7 @@ public:
   void add(long long size, VectorXd mean, VectorXd M2);
   int getIndex(string col);
   double getVar(int i);
+  VectorXd getVars();
 };
 
 class PgManager{
@@ -35,5 +36,8 @@ public:
   bool existTable(string table_name);
   void dropTable(string table_name);
   vector<string> getNumericCols(string table_name);
+  bool checkStats(string table_name);
+  void writeStats(string table_name, Stat *stat);
+  Stat* readStats(string table_name);
   Stat* computeStats(string table_name, const vector<string> &cols);
 };

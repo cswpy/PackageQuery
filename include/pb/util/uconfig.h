@@ -62,7 +62,7 @@ const string kPgPassword = configs["password"];
 const string kPgHostaddr = configs["hostname"];
 
 const string kId = configs["id_column"]; // Must not equal to "tid"
-const string kStatTable = "dlv_stats";
+const string kStatTable = "stats";
 const string kPartitionTable = "dlv_partitions";
 const string kNullLiteral = "null";
 

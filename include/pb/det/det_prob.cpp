@@ -3,8 +3,6 @@
 #include "pb/util/upostgres.h"
 #include "pb/util/unumeric.h"
 
-#include <boost/math/special_functions/erf.hpp>
-
 DetProb::~DetProb(){
 }
 
@@ -98,12 +96,8 @@ void DetProb::normalGenerate(int n, int expected_n, double att_var, double outli
   }
 }
 
-double getQuantile(double mean, double var, double p){
-  return mean + sqrt(2 * var) * boost::math::erf_inv(2 * p - 1);
-}
-
 // First column is the objective
-void DetProb::tableGenerate(string table_name, vector<string>& cols, bool is_maximize, int n, int expected_n, double inner_prob, int seed){
+void DetProb::tableGenerate(string table_name, vector<string>& cols, bool is_maximize, int n, int seed){
   PgManager pg = PgManager();
   long long size = pg.getSize(table_name);
   long long chunk = ceilDiv(size, kPCore);
@@ -173,24 +167,14 @@ void DetProb::tableGenerate(string table_name, vector<string>& cols, bool is_max
       mv.add(local_mv);
     }
   }
-  default_random_engine gen (local_seed);
-  uniform_real_distribution dist (0.0, 1.0);
-  VectorXd mean = mv.getMean();
-  VectorXd var = mv.getVar();
-  for (int i = 0; i < 3; i ++){
-    double mu = mean(i) * expected_n;
-    double nu = var(i) * expected_n;
-    if (i == 0){
-      bl(i) = getQuantile(mu, nu, 1 - inner_prob);
-    } else if (i == 1){
-      bu(i) = getQuantile(mu, nu, inner_prob);
-    } else{
-      bl(i) = getQuantile(mu, nu, 0.5 - inner_prob / 2);
-      bu(i) = getQuantile(mu, nu, 0.5 + inner_prob / 2);
-    }
-  }
-  bl(3) = expected_n/2;
-  bu(3) = expected_n*3/2;
+  vector<int> consSense = {LowerBounded, UpperBounded, Bounded};
+  detBound = DetBound(consSense, mv.getMean(), mv.getVar(), seed);
+}
+
+double DetProb::boundGenerate(double E, double alpha, double hardness){
+  bl(3) = E/2;
+  bu(3) = E*3/2;
+  return detBound.sampleHardness(E, alpha, hardness, bl, bu);
 }
 
 void DetProb::normalizeObjective(){

@@ -1,7 +1,5 @@
 #include "det_bound.h"
 
-const double kRho = 0.5;
-
 void DetBound::computeRotationMatrix(){
   M.resize(m, m);
   double a = 1 / (m + sqrt(m));
@@ -48,8 +46,25 @@ double DetBound::computeLowerBound(double E, double rho){
   return c;
 }
 
+DetBound::DetBound(){
+}
+
 DetBound::DetBound(vector<int> consSense, vector<double> means, vector<double> vars, int seed, double eps): consSense(consSense), means(means), vars(vars), seed(seed), eps(eps){
   m = consSense.size();
+  if (seed < 0) {
+    random_device rd;
+    DetBound::seed = rd();
+  }
+  gen.seed(DetBound::seed);
+  computeRotationMatrix();
+}
+
+DetBound::DetBound(vector<int> consSense, VectorXd means, VectorXd vars, int seed, double eps): consSense(consSense), seed(seed), eps(eps){
+  m = consSense.size();
+  DetBound::means.resize(m);
+  VectorXd::Map(&DetBound::means[0], m) = means;
+  DetBound::vars.resize(m);
+  VectorXd::Map(&DetBound::vars[0], m) = vars;
   if (seed < 0) {
     random_device rd;
     DetBound::seed = rd();
@@ -138,8 +153,8 @@ double DetBound::sample(double E, double rho, double alpha, VectorXd& bl, Vector
   return measureHardness(E, bl, bu);
 }
 
-double DetBound::sampleHardness(double E, double alpha, double hardness, VectorXd& bl, VectorXd& bu){
-  VectorXd center = sampleCenter(E, kRho, alpha);
+double DetBound::sampleHardness(double E, double alpha, double hardness, VectorXd& bl, VectorXd& bu, double rho){
+  VectorXd center = sampleCenter(E, rho, alpha);
   double left = 0.0;
   double right = 1.0;
   while (fabs(left - right) > eps){

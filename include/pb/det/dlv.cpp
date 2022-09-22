@@ -72,19 +72,6 @@ void DynamicLowVariance::init(){
 
   _sql = fmt::format(""
     "CREATE TABLE IF NOT EXISTS {}("
-    "	table_name VARCHAR(63) UNIQUE NOT NULL,"
-    "	size BIGINT,"
-    " cols TEXT[],"
-    "	mean DOUBLE PRECISION[],"
-    "	M2 DOUBLE PRECISION[],"
-    "	amin DOUBLE PRECISION[],"
-    "	amax DOUBLE PRECISION[]"
-    ")", kStatTable);
-  _res = PQexec(_conn, _sql.c_str());
-  PQclear(_res);
-
-  _sql = fmt::format(""
-    "CREATE TABLE IF NOT EXISTS {}("
     "	table_name VARCHAR(63) NOT NULL,"
     "	partition_name VARCHAR(31) NOT NULL,"
     "	cols TEXT[],"
@@ -96,34 +83,6 @@ void DynamicLowVariance::init(){
   _res = PQexec(_conn, _sql.c_str());
   PQclear(_res);
   pro.stop(0);
-}
-
-bool DynamicLowVariance::checkStats(string table_name){
-  _sql = fmt::format("SELECT COUNT(*) FROM {} WHERE table_name='{}';", kStatTable, table_name);
-  _res = PQexec(_conn, _sql.c_str());
-  int count = atoi(PQgetvalue(_res, 0, 0));
-  PQclear(_res);
-  return count;
-}
-
-void DynamicLowVariance::writeStats(string table_name, Stat *stat){
-  _sql = fmt::format(""
-    "INSERT INTO {}(table_name, size, cols, mean, M2, amin, amax) "
-    "VALUES ('{}', {}, {}, {}, {}, {}, {}) "
-    "ON CONFLICT (table_name) "
-    "DO UPDATE SET size=EXCLUDED.size,cols=EXCLUDED.cols,mean=EXCLUDED.mean,M2=EXCLUDED.M2,amin=EXCLUDED.amin,amax=EXCLUDED.amax;", 
-    kStatTable, table_name, stat->size, pgJoin(stat->cols), pgJoin(stat->mean, kPrecision), pgJoin(stat->M2, kPrecision), pgJoin(stat->amin, kPrecision), pgJoin(stat->amax, kPrecision));
-  _res = PQexec(_conn, _sql.c_str());
-  PQclear(_res);
-}
-
-Stat* DynamicLowVariance::readStats(string table_name){
-  _sql = fmt::format("SELECT size, cols, mean, M2, amin, amax FROM \"{}\" WHERE table_name='{}';", kStatTable, table_name);
-  _res = PQexec(_conn, _sql.c_str());
-  Stat* stat = new Stat(pgStringSplit(PQgetvalue(_res, 0, 1)));
-  stat->add(atoll(PQgetvalue(_res, 0, 0)), pgValueSplit(PQgetvalue(_res, 0, 2)), pgValueSplit(PQgetvalue(_res, 0, 3)), pgValueSplit(PQgetvalue(_res, 0, 4)), pgValueSplit(PQgetvalue(_res, 0, 5)));
-  PQclear(_res);
-  return stat;
 }
 
 void DynamicLowVariance::partition(string table_name, string partition_name){
@@ -143,13 +102,13 @@ void DynamicLowVariance::partition(string table_name, string partition_name, con
 }
 
 long long DynamicLowVariance::doPartition(string table_name, string suffix, const vector<string> &cols){
-  if (!checkStats(table_name)){
+  if (!pg->checkStats(table_name)){
     vector<string> cols = pg->getNumericCols(table_name);
     Stat *stat = pg->computeStats(table_name, cols);
-    writeStats(table_name, stat);
+    pg->writeStats(table_name, stat);
     delete stat;
   }
-  Stat *stat = readStats(table_name);
+  Stat *stat = pg->readStats(table_name);
   long long size = stat->size;
   if (size <= kLpSize) return 0;
 

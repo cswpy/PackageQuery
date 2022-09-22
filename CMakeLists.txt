@@ -68,6 +68,7 @@ set(MAIN_NAME "main_config")
 #set(MAIN_NAME "test_dual")
 #set(MAIN_NAME "test_dual_reducer")
 #set(MAIN_NAME "test_cplex_solver")
+#set(MAIN_NAME "test_det_bound")
 
 message("PROJECT NAME: " ${PROJECT_NAME})
 message("SOURCE FOLDER: " ${CMAKE_SOURCE_DIR})

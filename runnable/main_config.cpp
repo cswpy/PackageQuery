@@ -13,7 +13,8 @@ void main1(){
   string file_name = "/home/alm818/model.lp";
   for (int seed = 1; seed <= 100; seed ++){
     vector<string> cols = {"tmass_prox", "j", "h", "k"};
-    DetProb prob; prob.tableGenerate("ssds", cols, false, 200000, 1000, 0.8, seed);
+    DetProb prob; prob.tableGenerate("ssds", cols, false, 200000, seed);
+    prob.boundGenerate(1000, 0, 2);
     // vector<string> cols = {"price", "quantity", "discount", "tax"};
     // DetProb prob; prob.tableGenerate("tpch", cols, true, 10000, 5000, 0.5, seed);
     prob.normalizeObjective();
