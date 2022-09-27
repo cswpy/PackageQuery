@@ -13,6 +13,8 @@ using namespace pb;
 const string kIntervalType = "floatrange";
 const string kTempTable = "tmp";
 const double kSizeBias = 0.5;
+const double kVarScale = 2.5;
+const double kBucketCompensate = 2.0;
 const int kTempReserveSize = 1000;
 // const string kTraverseFunction = "traverse";
 // const string kClearLockFunction = "clear_lock";
@@ -31,16 +33,12 @@ struct IndexComp{
   }
 };
 
-double DynamicLowVariance::kGroupRatio = 0.01;
-double DynamicLowVariance::kVarScale = 2.5;
-long long DynamicLowVariance::kLpSize = 100000;
-
 DynamicLowVariance::~DynamicLowVariance(){
   PQfinish(_conn);
   delete pg;
 }
 
-DynamicLowVariance::DynamicLowVariance(){
+DynamicLowVariance::DynamicLowVariance(double group_ratio): group_ratio(group_ratio){
   vector<string> names = {"Init", "ComputeStat", "All", "FetchData", "ProcessData", "WriteData", "CreateIndex", "CreateTable", "gist", "id", "tid", "gid"};
   pro = Profiler(names);
   init();
@@ -76,13 +74,38 @@ void DynamicLowVariance::init(){
     "	partition_name VARCHAR(31) NOT NULL,"
     "	cols TEXT[],"
     "	group_ratio DOUBLE PRECISION,"
-    "	max_size INTEGER,"
+    "	lp_size INTEGER,"
+    " main_memory_used INTEGER,"
+    " core_used INTEGER,"
     " layer_count INTEGER,"
     " UNIQUE (table_name, partition_name)"
     ");", kPartitionTable);
   _res = PQexec(_conn, _sql.c_str());
   PQclear(_res);
   pro.stop(0);
+}
+
+void DynamicLowVariance::dropTempTables(){
+  vector<string> tables = pg->listTables();
+  for (string table : tables){
+    if (startsWith(table, kTempTable)){
+      pg->dropTable(table);
+    }
+  }
+}
+
+void DynamicLowVariance::dropPartition(string table_name, string partition_name){
+  _sql = fmt::format("DELETE FROM {} WHERE table_name='{}' AND partition_name='{}';", kPartitionTable, table_name, partition_name);
+  _res = PQexec(_conn, _sql.c_str());
+  PQclear(_res);
+
+  vector<string> tables = pg->listTables();
+  string subtable_name = table_name + "_" + partition_name;
+  for (string table : tables){
+    if (endsWith(table, subtable_name)){
+      pg->dropTable(table);
+    }
+  }
 }
 
 void DynamicLowVariance::partition(string table_name, string partition_name){
@@ -92,17 +115,29 @@ void DynamicLowVariance::partition(string table_name, string partition_name){
 
 void DynamicLowVariance::partition(string table_name, string partition_name, const vector<string> &cols){
   pro.clock(2);
+  dropPartition(table_name, partition_name);
   long long size = doPartition(table_name, partition_name, cols);
   string g_name = nextGName(table_name + "_" + partition_name);
+  int layer_count = 0;
   while (size){
     size = doPartition(g_name, "", cols);
     g_name = nextGName(g_name);
+    layer_count ++;
   }
+
+  _sql = fmt::format(""
+    "INSERT INTO {}(table_name, partition_name, cols, group_ratio, lp_size, main_memory_used, core_used, layer_count) "
+    "VALUES ('{}', '{}', {}, {}, {}, {}, {}, {});",
+    kPartitionTable, table_name, partition_name, pgJoin(cols), group_ratio, kLpSize, kMainMemorySize, kPCore, layer_count);
+  _res = PQexec(_conn, _sql.c_str());
+  PQclear(_res);
+
   pro.stop(2);
 }
 
 long long DynamicLowVariance::doPartition(string table_name, string suffix, const vector<string> &cols){
   if (!pg->checkStats(table_name)){
+    // cout << "First time, need to find stats" << endl;
     vector<string> cols = pg->getNumericCols(table_name);
     Stat *stat = pg->computeStats(table_name, cols);
     pg->writeStats(table_name, stat);
@@ -128,8 +163,12 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   double min_att = stat->amin(stat_max_var_index);
   double max_att = stat->amax(stat_max_var_index);
 
+  // In memory size for a local partition, meaning all 80 cores will share
+  double lower_in_memory_size_limit = kBucketCompensate * ceilDiv(kPCore * size * kTempReserveSize * (m + 1) * 8, kMainMemorySize * 1e9);
+  long long in_memory_size = getTupleCount((m + 1) * 2, 2);
+  assert(in_memory_size >= lower_in_memory_size_limit);
+  long long bucket = (long long) (ceilDiv(size, in_memory_size) * kBucketCompensate); // Assuming bucket is within main memory otherwise above assert error will raise
   long long chunk = ceilDiv(size, kPCore);
-  long long bucket = ceilDiv(size, kInMemorySize);
   long long partition_count = bucket;
   vector<MeanVar> bucket_stat (bucket, MeanVar(m));
   vector<pair<double, double>> intervals (bucket);
@@ -145,9 +184,9 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
     
     create_tmp_table = fmt::format(""
       "CREATE TABLE IF NOT EXISTS {}("
-      "	tid BIGINT,"
+      "	{} BIGINT,"
       " {}"
-      ");", "{}{}", join(att_names, ","));
+      ");", "{}{}", kId, join(att_names, ","));
   }
 
   string symbolic_name = table_name;
@@ -156,7 +195,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   string p_name = nextPName(symbolic_name);
   string col_names = join(cols, ",");
 
-  cout << "Begin 1a" << endl;
+  // cout << "Begin 1a" << endl;
   // Phase-1a: Initial quick-partition for #bucket partitions
   double bucket_width = (max_att - min_att) / bucket;
   for (long long i = 0; i < bucket; i ++){
@@ -172,6 +211,8 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
     keys[i] = i;
   }
 
+  // cout << "Begin real 1a" << endl;
+
   #pragma omp parallel num_threads(kPCore)
   {
     string sql;
@@ -186,36 +227,65 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
     int seg = omp_get_thread_num();
     long long start_id = seg * chunk + 1;
     long long end_id = min((seg + 1) * chunk, size);
+    long long slide_size = getTupleCount(m+1);
+    long long slide_count = ceilDiv(end_id - start_id + 1, slide_size);
     vector<int> sz (bucket, 0);
     vector<vector<pair<long long, VectorXd>>> cache (bucket, vector<pair<long long, VectorXd>>(kTempReserveSize));
     vector<MeanVar> cache_stat (bucket, MeanVar(m));
-
-    sql = fmt::format("SELECT {},{} FROM \"{}\" WHERE {} BETWEEN {} AND {};", kId, col_names, table_name, kId, start_id, end_id);
-    res = PQexec(conn, sql.c_str());
-
-    for (int i = 0; i < PQntuples(res); i++){
-      long long tid = atol(PQgetvalue(res, i, 0));
-      VectorXd vs (m);
-      for (int j = 0; j < m; j ++) vs(j) = atof(PQgetvalue(res, i, j+1));
-      long long bucket_ind = min((long long) floor((vs(max_var_index) - min_att) / (max_att - min_att) * bucket), bucket-1);
-      cache[bucket_ind][sz[bucket_ind]] = {tid, vs};
-      cache_stat[bucket_ind].add(vs);
-      sz[bucket_ind] ++;
-      if (sz[bucket_ind] == kTempReserveSize){
-        sql = fmt::format("COPY {}{} FROM STDIN with(delimiter ',');", kTempTable, bucket_ind);
-        _res = PQexec(_conn, sql.c_str());
-        assert(PQresultStatus(_res) == PGRES_COPY_IN);
-        PQclear(_res);
-        string data = "";
-        for (int j = 0; j < sz[bucket_ind]; j ++) data += fmt::format("{},{}\n", cache[bucket_ind][j].first, join(cache[bucket_ind][j].second, kPrecision));
-        assert(PQputCopyData(_conn, data.c_str(), (int) data.length()) == 1);
-        assert(PQputCopyEnd(_conn, NULL) == 1);
-        _res = PQgetResult(_conn);
-        assert(PQresultStatus(_res) == PGRES_COMMAND_OK);
-        sz[bucket_ind] = 0;
+    
+    for (long long sl = 0; sl < slide_count; sl ++){
+      long long slide_start_id = start_id + sl * slide_size;
+      long long slide_end_id = min(start_id + (sl + 1) * slide_size - 1, end_id);
+      sql = fmt::format("SELECT {},{} FROM \"{}\" WHERE {} BETWEEN {} AND {};", kId, col_names, table_name, kId, slide_start_id, slide_end_id);
+      // cout << sql << endl;
+      res = PQexec(conn, sql.c_str());
+      // #pragma omp critical
+      // {
+      //   cout << slide_start_id << " " << slide_end_id << " " << PQntuples(res) << " " << PQnfields(res) << endl;
+      // }
+      for (long long i = 0; i < PQntuples(res); i++){
+        // cout << "BEF " << i << endl;
+        long long tid = atol(PQgetvalue(res, i, 0));
+        // cout << "BEF0 " << i << endl;
+        VectorXd vs (m);
+        for (int j = 0; j < m; j ++) vs(j) = atof(PQgetvalue(res, i, j+1));
+        // cout << "BEF1 " << i << endl;
+        long long bucket_ind = max(min((long long) floor((vs(max_var_index) - min_att) / (max_att - min_att) * bucket), bucket-1), 0LL);
+        // cout << "BEF1.5 " << i << endl;
+        // cout << bucket_ind << " " << bucket << " " << sz[bucket_ind] << endl;
+        // assert(max_var_index < m && bucket_ind < bucket && sz[bucket_ind] < kTempReserveSize);
+        cache[bucket_ind][sz[bucket_ind]] = {tid, vs};
+        // cout << "BEF2 " << i << endl;
+        cache_stat[bucket_ind].add(vs);
+        // cout << "BEF3 " << i << endl;
+        sz[bucket_ind] ++;
+        // cout << "AFT " << i << endl;
+        if (sz[bucket_ind] == kTempReserveSize){
+          sql = fmt::format("COPY {}{} FROM STDIN with(delimiter ',');", kTempTable, bucket_ind);
+          _res = PQexec(_conn, sql.c_str());
+          assert(PQresultStatus(_res) == PGRES_COPY_IN);
+          PQclear(_res);
+          string data = "";
+          for (int j = 0; j < sz[bucket_ind]; j ++) data += fmt::format("{},{}\n", cache[bucket_ind][j].first, join(cache[bucket_ind][j].second, kPrecision));
+          assert(PQputCopyData(_conn, data.c_str(), (int) data.length()) == 1);
+          assert(PQputCopyEnd(_conn, NULL) == 1);
+          _res = PQgetResult(_conn);
+          assert(PQresultStatus(_res) == PGRES_COMMAND_OK);
+          PQclear(_res);
+          sz[bucket_ind] = 0;
+        }
       }
+      PQclear(res);
     }
-    PQclear(res);
+
+    // cout << "GOOD" << endl;
+
+    // #pragma omp critical
+    // {
+    //   cout << "PASS " << omp_get_thread_num() << endl; 
+    // }
+
+    // #pragma omp barrier
 
     for (long long i = 0; i < bucket; i ++){
       #pragma omp critical
@@ -233,6 +303,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
         assert(PQputCopyEnd(_conn, NULL) == 1);
         _res = PQgetResult(_conn);
         assert(PQresultStatus(_res) == PGRES_COMMAND_OK);
+        PQclear(_res);
       }
     }
     
@@ -240,7 +311,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
     PQfinish(_conn);
   }
 
-  cout << "End 1a" << endl;
+  // cout << "End 1a" << endl;
 
   pro.clock(3);
   pg->dropTable(g_name);
@@ -262,13 +333,14 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   PQclear(_res);
   pro.stop(3);
 
-  cout << "Begin 1b" << endl;
+  // cout << "Begin 1b" << endl;
 
   // Phase-1b: Recursive quick-partition for partition with size > #kInMemorySize
   long long global_group_count = 0;
   for (long long p = 0; p < partition_count; p ++){
     long long recurse_size = bucket_stat[p].sample_count;
-    if (recurse_size > kInMemorySize){
+    if (recurse_size > in_memory_size){
+      // cout << "Begin recurse on " << p << " " << recurse_size << endl;
       double start_key = keys[p];
       auto next_it = key_indices.upper_bound(start_key);
       double end_key = start_key + 1;
@@ -288,71 +360,82 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
         keys.emplace_back(key);
         key_indices[key] = partition_count + i;
       }
+      // cout << "Begin real recurse on " << p << endl;
+      long long slide_size = getTupleCount(m+1);
+      long long slide_count = ceilDiv(recurse_size, slide_size);
+      for (long long sl = 0; sl < slide_count; sl ++){
+        long long offset = sl * slide_size;
+        long long limit = min((sl + 1) * slide_size - 1, recurse_size - 1) - offset + 1;
+        _sql = fmt::format("SELECT * FROM {}{} ORDER BY {} LIMIT {} OFFSET {};", kTempTable, p, kId, limit, offset);
+        _res = PQexec(_conn, _sql.c_str());
+        long long recurse_chunk = ceilDiv(limit, kPCore);
+        // cout << "Begin slide " << sl << endl;
+        // cout << "HERE " << PQntuples(_res) << endl;
+        #pragma omp parallel num_threads(kPCore)
+        {
+          string sql;
+          PGconn* conn = PQconnectdb(pg->conninfo.c_str());
+          assert(PQstatus(conn) == CONNECTION_OK);
+          PGresult *res = NULL;
 
-      long long recurse_chunk = ceilDiv(recurse_size, kPCore);
-      _sql = fmt::format("SELECT * FROM {}{};", kTempTable, p);
-      _res = PQexec(_conn, _sql.c_str());
-
-      #pragma omp parallel num_threads(kPCore)
-      {
-        string sql;
-        PGconn* conn = PQconnectdb(pg->conninfo.c_str());
-        assert(PQstatus(conn) == CONNECTION_OK);
-        PGresult *res = NULL;
-
-        int seg = omp_get_thread_num();
-        long long start_tuple_id = seg * recurse_chunk;
-        long long end_tuple_id = min((seg + 1) * recurse_chunk - 1, recurse_size - 1);
-        vector<int> sz (bucket, 0);
-        vector<vector<pair<long long, VectorXd>>> cache (bucket, vector<pair<long long, VectorXd>>(kTempReserveSize));
-        vector<MeanVar> cache_stat (bucket, MeanVar(m));
-
-        for (int i = start_tuple_id; i <= end_tuple_id; i ++){
-          long long tid = atol(PQgetvalue(_res, i, 0));
-          VectorXd vs (m);
-          for (int j = 0; j < m; j ++) vs(j) = atof(PQgetvalue(_res, i, j+1));
-          long long bucket_ind = min((long long) floor((vs[max_var_index] - intervals[p].first) / bucket_width), bucket-1);
-          cache[bucket_ind][sz[bucket_ind]] = {tid, vs};
-          cache_stat[bucket_ind].add(vs);
-          sz[bucket_ind] ++;
-          if (sz[bucket_ind] == kTempReserveSize){
-            sql = fmt::format("COPY {}{} FROM STDIN with(delimiter ',');", kTempTable, partition_count + bucket_ind);
-            res = PQexec(conn, sql.c_str());
-            assert(PQresultStatus(res) == PGRES_COPY_IN);
-            PQclear(res);
-            string data = "";
-            for (int j = 0; j < sz[bucket_ind]; j ++) data += fmt::format("{},{}\n", cache[bucket_ind][j].first, join(cache[bucket_ind][j].second, kPrecision));
-            assert(PQputCopyData(conn, data.c_str(), (int) data.length()) == 1);
-            assert(PQputCopyEnd(conn, NULL) == 1);
-            res = PQgetResult(conn);
-            assert(PQresultStatus(res) == PGRES_COMMAND_OK);
-            sz[bucket_ind] = 0;
+          int seg = omp_get_thread_num();
+          long long start_tuple_id = seg * recurse_chunk;
+          long long end_tuple_id = min((seg + 1) * recurse_chunk - 1, limit - 1);
+          vector<int> sz (bucket, 0);
+          vector<vector<pair<long long, VectorXd>>> cache (bucket, vector<pair<long long, VectorXd>>(kTempReserveSize));
+          vector<MeanVar> cache_stat (bucket, MeanVar(m));
+          // #pragma omp critical
+          // {
+          //   cout << start_tuple_id << " " << end_tuple_id << " " << limit << endl;
+          // }
+          for (long long i = start_tuple_id; i <= end_tuple_id; i ++){
+            long long tid = atol(PQgetvalue(_res, i, 0));
+            VectorXd vs (m);
+            for (int j = 0; j < m; j ++) vs(j) = atof(PQgetvalue(_res, i, j+1));
+            long long bucket_ind = max(min((long long) floor((vs[max_var_index] - intervals[p].first) / bucket_width), bucket-1), 0LL);
+            cache[bucket_ind][sz[bucket_ind]] = {tid, vs};
+            cache_stat[bucket_ind].add(vs);
+            sz[bucket_ind] ++;
+            if (sz[bucket_ind] == kTempReserveSize){
+              sql = fmt::format("COPY {}{} FROM STDIN with(delimiter ',');", kTempTable, partition_count + bucket_ind);
+              res = PQexec(conn, sql.c_str());
+              assert(PQresultStatus(res) == PGRES_COPY_IN);
+              PQclear(res);
+              string data = "";
+              for (int j = 0; j < sz[bucket_ind]; j ++) data += fmt::format("{},{}\n", cache[bucket_ind][j].first, join(cache[bucket_ind][j].second, kPrecision));
+              assert(PQputCopyData(conn, data.c_str(), (int) data.length()) == 1);
+              assert(PQputCopyEnd(conn, NULL) == 1);
+              res = PQgetResult(conn);
+              assert(PQresultStatus(res) == PGRES_COMMAND_OK);
+              PQclear(res);
+              sz[bucket_ind] = 0;
+            }
           }
+
+          for (long long i = 0; i < bucket; i ++){
+            #pragma omp critical
+            {
+              bucket_stat[partition_count + i].add(cache_stat[i]);
+            }
+            if (sz[i]){
+              sql = fmt::format("COPY {}{} FROM STDIN with(delimiter ',');", kTempTable, partition_count + i);
+              res = PQexec(conn, sql.c_str());
+              assert(PQresultStatus(res) == PGRES_COPY_IN);
+              PQclear(res);
+              string data = "";
+              for (int j = 0; j < sz[i]; j ++) data += fmt::format("{},{}\n", cache[i][j].first, join(cache[i][j].second, kPrecision));
+              assert(PQputCopyData(conn, data.c_str(), (int) data.length()) == 1);
+              assert(PQputCopyEnd(conn, NULL) == 1);
+              res = PQgetResult(conn);
+              assert(PQresultStatus(res) == PGRES_COMMAND_OK);
+              PQclear(res);
+            }
+          }
+          PQfinish(conn);
         }
-
-        for (long long i = 0; i < bucket; i ++){
-          #pragma omp critical
-          {
-            bucket_stat[partition_count + i].add(cache_stat[i]);
-          }
-          if (sz[i]){
-            sql = fmt::format("COPY {}{} FROM STDIN with(delimiter ',');", kTempTable, partition_count + i);
-            res = PQexec(conn, sql.c_str());
-            assert(PQresultStatus(res) == PGRES_COPY_IN);
-            PQclear(res);
-            string data = "";
-            for (int j = 0; j < sz[i]; j ++) data += fmt::format("{},{}\n", cache[i][j].first, join(cache[i][j].second, kPrecision));
-            assert(PQputCopyData(conn, data.c_str(), (int) data.length()) == 1);
-            assert(PQputCopyEnd(conn, NULL) == 1);
-            res = PQgetResult(conn);
-            assert(PQresultStatus(res) == PGRES_COMMAND_OK);
-          }
-        }
-
-        PQfinish(conn);
+        PQclear(_res);
       }
 
-      PQclear(_res);
       PGconn* conn = PQconnectdb(pg->conninfo.c_str());
       assert(PQstatus(conn) == CONNECTION_OK);
       wait_conns.push_back(conn);
@@ -363,7 +446,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
     }
   }
 
-  cout << "End 1b" << endl;
+  // cout << "End 1b" << endl;
 
 
   // Debug
@@ -373,7 +456,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
 
   // Phase-2a: Aggregate and compute group count for each local partition
 
-  cout << "Begin 2a" << endl;
+  // cout << "Begin 2a" << endl;
   vector<MeanVar> agg_bucket_stat;
   vector<pair<double, double>> agg_intervals;
   vector<vector<long long>> agg_groups;
@@ -382,7 +465,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   long long current_size = 0;
   for (auto it : key_indices){
     long long sz = bucket_stat[it.second].sample_count;
-    if (current_size + sz > kInMemorySize){
+    if (current_size + sz > in_memory_size){
       agg_bucket_stat.push_back(mv);
       agg_groups.push_back(agg_group);
       double left_bound = -DBL_MAX;
@@ -415,7 +498,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   // cout << s << endl;
 
   // Phase-2b: Size assignment problem
-  cout << "Begin 2b" << endl;
+  // cout << "Begin 2b" << endl;
   long long max_size = -1;
   long long agg_count = (long long) agg_bucket_stat.size();
   max_var = -1;
@@ -439,8 +522,8 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
     bool is_feasible = true;
     for (long long p = 0; p < agg_count; p ++){
       if (agg_bucket_stat[p].sample_count){
-        // cout << stat->size << " " << kGroupRatio << endl;
-        group_count[p] = (long long) ceil(stat->size * kGroupRatio * scores(p) / score_sum);
+        // cout << stat->size << " " << group_ratio << endl;
+        group_count[p] = (long long) ceil(stat->size * group_ratio * scores(p) / score_sum);
         if (group_count[p] > agg_bucket_stat[p].sample_count) is_feasible = false;
       }
     }
@@ -457,7 +540,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   //   }
   // }
 
-  cout << "Begin 2c" << endl;
+  // cout << "Begin 2c" << endl;
   // Phase-2c: Local DLV
   string condition_names, rec_names, t_names;
   {
@@ -562,9 +645,9 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
       }
 
       map_sort::Sort(pis, n, kPCore);
-      long long soft_group_lim = (long long) ceil(n * kGroupRatio);
-      double var_ratio = kGroupRatio * kGroupRatio * kVarScale;
-      int soft_partition_lim = (int) ceil(kVarScale / kGroupRatio);
+      long long soft_group_lim = (long long) ceil(n * group_ratio);
+      double var_ratio = group_ratio * group_ratio * kVarScale;
+      int soft_partition_lim = (int) ceil(kVarScale / group_ratio);
       long long hard_group_lim = soft_group_lim + kPCore + soft_partition_lim;
       long long group_count = kPCore;
       long long heap_length = kPCore;
@@ -741,8 +824,8 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
         assert(PQstatus(conn) == CONNECTION_OK);
         PGresult *res = NULL;
 
-        #pragma omp master
-        cout << "Populate G/P" << endl;
+        // #pragma omp master
+        // cout << "Populate G/P" << endl;
         // Populate G table
         string sql = fmt::format("COPY \"{}\" FROM STDIN with (delimiter '|', null '{}');", g_name, kNullLiteral);
         res = PQexec(conn, sql.c_str());

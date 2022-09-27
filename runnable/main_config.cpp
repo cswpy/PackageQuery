@@ -5,6 +5,9 @@
 #include "pb/core/dual_reducer.h"
 #include "pb/core/gurobi_solver.h"
 #include "pb/det/det_bound.h"
+#include "pb/det/dlv.h"
+#include "pb/det/synthetic.h"
+#include "pb/util/upostgres.h"
 
 using namespace pb;
 
@@ -67,6 +70,51 @@ void main2(){
   cout << this_rho << " " << my_hard << endl;
 }
 
-int main(){
+void main3(){
+  string table_name = "ssds";
+  PgManager pg = PgManager();
+  if (!pg.checkStats(table_name)){
+    vector<string> cols = pg.getNumericCols(table_name);
+    Stat *stat = pg.computeStats(table_name, cols);
+    pg.writeStats(table_name, stat);
+    delete stat;
+  }
+  pg.readStats(table_name);
+}
 
+void main4(){
+  Synthetic syn = Synthetic();
+  // long long N = 1000000000;
+  // vector<string> cols = {"tmass_prox", "j", "h", "k"};
+  // syn.createSubtable("ssds", 8, cols, 1);
+  vector<string> cols = {"price", "quantity", "discount", "tax"};
+  syn.createSubtable("tpch", 8, cols, 1);
+  syn.pro.print();
+}
+
+void main5(){
+  double group_ratio = 0.01;
+  string partition_name = "P0";
+  vector<string> table_names = {"tpch", "ssds"};
+  vector<vector<int>> orders = {{6,7,8,9}, {6,7,8}};
+  int seeds = 1;
+  for (int t = 0; t < (int) table_names.size(); t ++){
+    string table_name = table_names[t];
+    for (int order : orders[t]){
+      for (int seed = 1; seed <= seeds; seed++){
+        string real_table_name = fmt::format("{}_{}_{}", table_name, order, seed);
+        cout << table_name << " on order " << order << endl;
+        DynamicLowVariance dlv = DynamicLowVariance(group_ratio);
+        dlv.partition(real_table_name, partition_name);
+        dlv.pro.print();
+      }
+    }
+  }
+  // dlv.dropTempTables();
+  // dlv.dropPartition(table_name, partition_name);
+}
+
+int main(){
+  // main4();
+  main5();
 }

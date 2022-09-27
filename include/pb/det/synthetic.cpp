@@ -75,52 +75,67 @@ void Synthetic::createSubtable(string table_name, double order, vector<string>& 
 
   #pragma omp parallel num_threads(kPCore)
   {
+    PGconn *conn = PQconnectdb(pg->conninfo.c_str());
+    assert(PQstatus(conn) == CONNECTION_OK);
+    PGconn *_conn = PQconnectdb(pg->conninfo.c_str());
+    assert(PQstatus(_conn) == CONNECTION_OK);
+
     int seg = omp_get_thread_num();
     default_random_engine gen (local_seeds[seg]);
     uniform_real_distribution dist (0.0, 1.0);
     long long start_id = seg * chunk + 1;
     long long end_id = (seg + 1) * chunk;
-    vector<long long> selected_ids; selected_ids.reserve((int)(chunk * probability));
-    for (long long id = start_id; id <= end_id; id ++){
-      if (dist(gen) <= probability) selected_ids.push_back(id);
-    }
-    long long start_index;
-    #pragma omp critical
-    {
-      start_index = global_size;
-      global_size += selected_ids.size();
-    }
-    #pragma omp barrier
-    vector<string> sids;
-    for (auto id : selected_ids) sids.push_back(to_string(id));
-    string sql = fmt::format("SELECT {} FROM \"{}\" WHERE {} IN ({})", col_name, table_name, kId, join(sids, ","));
-    
-    PGconn *conn = PQconnectdb(pg->conninfo.c_str());
-    assert(PQstatus(conn) == CONNECTION_OK);
-    PGresult *res = NULL;
-    res = PQexec(conn, sql.c_str());
+    long long slide_size = getTupleCount(2*cols.size()+4);
+    long long slide_count = ceilDiv(end_id - start_id + 1, slide_size);
+    for (long long sl = 0; sl < slide_count; sl ++){
+      // #pragma omp critical
+      // {
+      //   cout << "Thread: " << omp_get_thread_num() << " starts slide " << sl << " with size " << slide_size << endl;
+      // }
+      long long slide_start_id = start_id + sl * slide_size;
+      long long slide_end_id = min(start_id + (sl + 1) * slide_size - 1, end_id);
+      vector<long long> selected_ids; selected_ids.reserve((int)(slide_size * probability));
+      for (long long id = slide_start_id; id <= slide_end_id; id ++){
+        if (dist(gen) <= probability) selected_ids.push_back(id);
+      }
+      long long start_index;
+      #pragma omp critical
+      {
+        start_index = global_size;
+        global_size += selected_ids.size();
+      }
+      #pragma omp barrier
+      vector<string> sids;
+      for (auto id : selected_ids) sids.push_back(to_string(id));
+      
+      PGresult *res = NULL;
+      PGresult *_res = NULL;
 
-    PGconn *_conn = PQconnectdb(pg->conninfo.c_str());
-    assert(PQstatus(_conn) == CONNECTION_OK);
-    PGresult *_res = NULL;
-    string _sql = fmt::format("COPY \"{}\" FROM STDIN with(delimiter ',');", subtable_name);
-    _res = PQexec(_conn, _sql.c_str());
-    assert(PQresultStatus(_res) == PGRES_COPY_IN);
-    PQclear(_res);
+      string sql = fmt::format("SELECT {} FROM \"{}\" WHERE {} IN ({})", col_name, table_name, kId, join(sids, ","));
+      res = PQexec(conn, sql.c_str());
 
-    VectorXd vals (cols.size());
-    for (long long i = 0; i < PQntuples(res); i++){
-      long long index = i + start_index;
-      for (int j = 0; j < (int) cols.size(); j ++) vals(j) = atof(PQgetvalue(res, i, j));
-      string data = fmt::format("{},{}\n", index, join(vals, kPrecision));
-      assert(PQputCopyData(_conn, data.c_str(), (int) data.length()) == 1);
+      string _sql = fmt::format("COPY \"{}\" FROM STDIN with(delimiter ',');", subtable_name);
+      _res = PQexec(_conn, _sql.c_str());
+      assert(PQresultStatus(_res) == PGRES_COPY_IN);
+      PQclear(_res);
+
+      VectorXd vals (cols.size());
+      for (long long i = 0; i < PQntuples(res); i++){
+        long long index = i + start_index;
+        for (int j = 0; j < (int) cols.size(); j ++) vals(j) = atof(PQgetvalue(res, i, j));
+        string data = fmt::format("{},{}\n", index, join(vals, kPrecision));
+        assert(PQputCopyData(_conn, data.c_str(), (int) data.length()) == 1);
+      }
+      assert(PQputCopyEnd(_conn, NULL) == 1);
+      _res = PQgetResult(_conn);
+      assert(PQresultStatus(_res) == PGRES_COMMAND_OK);
+      PQclear(_res);
+      PQclear(res);
+      // #pragma omp critical
+      // {
+      //   cout << "Thread: " << omp_get_thread_num() << " finishs slide " << sl << endl;
+      // }
     }
-    assert(PQputCopyEnd(_conn, NULL) == 1);
-    _res = PQgetResult(_conn);
-    assert(PQresultStatus(_res) == PGRES_COMMAND_OK);
-    PQclear(_res);
-    PQclear(res);
-    
     PQfinish(_conn);
     PQfinish(conn);
   }

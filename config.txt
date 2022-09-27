@@ -11,7 +11,7 @@ logical_core = 160
 max_multicolumn_indexes = 2
 # Main memory in GB
 main_memory_size = 300
-in_memory_size = 1000000
+lp_size = 100000
 precision = 20
 # Id column is based-1
 id_column = id

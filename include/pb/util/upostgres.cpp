@@ -81,6 +81,7 @@ vector<string> PgManager::getNumericCols(string table_name){
 
 Stat* PgManager::computeStats(string table_name, const vector<string> &cols){
   long long size = getSize(table_name);
+  // cout << table_name << " " << size << endl;
   long long chunk = ceilDiv(size, kPCore);
   Stat* stat = new Stat(cols);
   #pragma omp parallel num_threads(kPCore)
@@ -93,26 +94,34 @@ Stat* PgManager::computeStats(string table_name, const vector<string> &cols){
     int seg = omp_get_thread_num();
     long long start_id = seg * chunk + 1;
     long long end_id = min((seg + 1) * chunk, size);
+    long long slide_size = getTupleCount(cols.size());
+    long long slide_count = ceilDiv(end_id - start_id + 1, slide_size);
+    // #pragma omp critical
+    // cout << start_id << " " << end_id << " " << slide_size << " " << slide_count << endl;
     MeanVar mv = MeanVar(cols.size());
-
-    sql = fmt::format("SELECT {} FROM \"{}\" WHERE {} BETWEEN {} AND {};", join(cols, ","), table_name, kId, start_id, end_id);
-    res = PQexec(conn, sql.c_str());
-    VectorXd x (cols.size());
     VectorXd amin (cols.size()); amin.fill(DBL_MAX);
     VectorXd amax (cols.size()); amax.fill(-DBL_MAX);
-    for (int i = 0; i < PQntuples(res); i++){
-      for (int j = 0; j < (int) cols.size(); j ++){
-        x(j) = atof(PQgetvalue(res, i, j));
-        amin(j) = min(amin(j), x(j));
-        amax(j) = max(amax(j), x(j));
+    for (long long sl = 0; sl < slide_count; sl ++){
+      long long slide_start_id = start_id + sl * slide_size;
+      long long slide_end_id = min(start_id + (sl + 1) * slide_size - 1, end_id);
+      sql = fmt::format("SELECT {} FROM \"{}\" WHERE {} BETWEEN {} AND {};", join(cols, ","), table_name, kId, slide_start_id, slide_end_id);
+      res = PQexec(conn, sql.c_str());
+      VectorXd x (cols.size());
+      for (int i = 0; i < PQntuples(res); i++){
+        for (int j = 0; j < (int) cols.size(); j ++){
+          x(j) = atof(PQgetvalue(res, i, j));
+          amin(j) = min(amin(j), x(j));
+          amax(j) = max(amax(j), x(j));
+        }
+        mv.add(x);
       }
-      mv.add(x);
+      PQclear(res);
     }
-
     #pragma omp critical
     {
       stat->add(mv.sample_count, mv.getMean(), mv.getM2(), amin, amax);
     }
+    PQfinish(conn);
   }
   return stat;
 }
@@ -157,6 +166,17 @@ void PgManager::dropTable(string table_name){
   _sql = fmt::format("DROP TABLE IF EXISTS \"{}\";", table_name);
   _res = PQexec(_conn, _sql.c_str());
   PQclear(_res);
+}
+
+vector<string> PgManager::listTables(string schema_name){
+  _sql = fmt::format("SELECT tablename FROM pg_tables WHERE schemaname='{}'", schema_name);
+  _res = PQexec(_conn, _sql.c_str());
+  vector<string> tables;
+  for (int i = 0; i < PQntuples(_res); i ++){
+    tables.push_back(string(PQgetvalue(_res, i, 0)));
+  }
+  PQclear(_res);
+  return tables;
 }
 
 // Deprecated since Postgres does not allow inter-multithreaded

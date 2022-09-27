@@ -103,6 +103,20 @@ int getLayerIndex(string table_name){
   else return stoi(m[1]);
 }
 
+bool startsWith(string full, string sub){
+  if (full.length() >= sub.length()){
+    return full.compare(0, sub.length(), sub) == 0;
+  }
+  return false;
+}
+
+bool endsWith(string full, string sub){
+  if (full.length() >= sub.length()){
+    return full.compare(full.length() - sub.length(), sub.length(), sub) == 0;
+  }
+  return false;
+}
+
 
 // Return the number of threads that would be executed in parallel regions
 int GetMaxThreads() {

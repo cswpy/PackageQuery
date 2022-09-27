@@ -7,6 +7,8 @@ using std::string;
 using std::vector;
 using Eigen::VectorXd;
 
+const string kDefaultSchema = "public";
+
 void showError(PGconn *conn);
 
 class Stat{
@@ -33,6 +35,7 @@ public:
   ~PgManager();
   PgManager();
   long long getSize(string table_name);
+  vector<string> listTables(string schema_name=kDefaultSchema);
   bool existTable(string table_name);
   void dropTable(string table_name);
   vector<string> getNumericCols(string table_name);

@@ -33,6 +33,9 @@ string nextGName(string table_name);
 string nextPName(string table_name);
 int getLayerIndex(string table_name);
 
+bool startsWith(string full, string sub);
+bool endsWith(string full, string sub);
+
 // Return the number of threads that would be executed in parallel regions
 int GetMaxThreads();
 // Set the number of threads that would be executed in parallel regions
