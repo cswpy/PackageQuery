@@ -36,6 +36,12 @@ long long ceilDiv(long long x, long long q){
   return d.quot + (d.rem != 0LL);
 }
 
+int ceilDiv(int x, int q){
+  div_t d = div(x, q);
+  return d.quot + (d.rem != 0);
+}
+
+
 double normalQuantile(double u, double v, double p){
   return u + sqrt(2*v) * erf_inv(2*p - 1);
 }

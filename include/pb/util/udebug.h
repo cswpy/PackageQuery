@@ -4,8 +4,10 @@
 #include <string>
 #include <chrono>
 #include <iostream>
+#include <cfloat>
 
 #include "Eigen/Dense"
+#include "umisc.h"
 
 using std::cout;
 using std::vector;
@@ -27,12 +29,8 @@ string showClassification(double x);
 template <typename T>
 string print(Matrix<T, Dynamic, 1> v) {
   string s = "[";
-  for (int i = 0; i < v.size() - 1; i++) {
-    s += to_string(v(i)) + " ";
-  }
-  if (v.size() > 0) {
-    s += to_string(v(v.size() - 1));
-  }
+  for (int i = 0; i < v.size() - 1; i++)  s += infAlias((double) v(i), -1) + " ";
+  if (v.size() > 0) s += infAlias((double) v(v.size() - 1), -1);
   s += "]\n";
   cout << s;
   return s;

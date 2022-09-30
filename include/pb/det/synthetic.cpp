@@ -37,7 +37,7 @@ void Synthetic::createSubtable(string table_name, double order, vector<string>& 
     assert(PQstatus(conn) == CONNECTION_OK);
     PGresult *res = NULL;
 
-    sql = fmt::format("DROP TABLE IF EXISTS {} CASCADE;", subtable_name);
+    sql = fmt::format("DROP TABLE IF EXISTS \"{}\" CASCADE;", subtable_name);
     res = PQexec(conn, sql.c_str());
     PQclear(res);
 
@@ -46,7 +46,7 @@ void Synthetic::createSubtable(string table_name, double order, vector<string>& 
     for (int i = 0; i < (int) cols.size(); i ++) declare_inject += fmt::format(inject, cols[i]);
 
     sql = fmt::format(""
-      "CREATE TABLE IF NOT EXISTS {} ("
+      "CREATE TABLE IF NOT EXISTS \"{}\" ("
       "	{} BIGINT"
       " {}"
       ");", subtable_name, kId, declare_inject);
@@ -57,7 +57,7 @@ void Synthetic::createSubtable(string table_name, double order, vector<string>& 
   pro.stop(1);
   pro.clock(2);
   long long size = pg->getSize(table_name);
-  long long chunk = ceilDiv(size, kPCore);
+  long long chunk = ceilDiv(size, (long long) kPCore);
   double n = pow(10.0, order);
   double probability = n / size;
   unsigned int local_seed;
@@ -147,7 +147,7 @@ void Synthetic::createSubtable(string table_name, double order, vector<string>& 
     assert(PQstatus(conn) == CONNECTION_OK);
     PGresult *res = NULL;
 
-    sql = fmt::format("ALTER TABLE {} ADD PRIMARY KEY ({});", subtable_name, kId);
+    sql = fmt::format("ALTER TABLE \"{}\" ADD PRIMARY KEY ({});", subtable_name, kId);
     res = PQexec(conn, sql.c_str());
     PQclear(res);
 
@@ -184,7 +184,7 @@ void Synthetic::create(long long N, int ucount, int ncount, vector<double> means
     assert(PQstatus(conn) == CONNECTION_OK);
     PGresult *res = NULL;
 
-    sql = fmt::format("DROP TABLE IF EXISTS {} CASCADE;", Synthetic::table_name);
+    sql = fmt::format("DROP TABLE IF EXISTS \"{}\" CASCADE;", Synthetic::table_name);
     res = PQexec(conn, sql.c_str());
     PQclear(res);
 
@@ -195,7 +195,7 @@ void Synthetic::create(long long N, int ucount, int ncount, vector<double> means
     for (int i = 1; i <= ncount; i ++) declare_inject += fmt::format(inject2, i);
 
     sql = fmt::format(""
-      "CREATE TABLE IF NOT EXISTS {} ("
+      "CREATE TABLE IF NOT EXISTS \"{}\" ("
       "	{} BIGINT"
       " {}"
       ");", Synthetic::table_name, kId, declare_inject);
@@ -206,7 +206,7 @@ void Synthetic::create(long long N, int ucount, int ncount, vector<double> means
   pro.stop(1);
 
   pro.clock(2);
-  long long chunk = ceilDiv(N, kPCore);
+  long long chunk = ceilDiv(N, (long long) kPCore);
   #pragma omp parallel num_threads(kPCore)
   {
     int seg = omp_get_thread_num();
@@ -247,7 +247,7 @@ void Synthetic::create(long long N, int ucount, int ncount, vector<double> means
     assert(PQstatus(conn) == CONNECTION_OK);
     PGresult *res = NULL;
 
-    sql = fmt::format("ALTER TABLE {} ADD PRIMARY KEY ({});", Synthetic::table_name, kId);
+    sql = fmt::format("ALTER TABLE \"{}\" ADD PRIMARY KEY ({});", Synthetic::table_name, kId);
     res = PQexec(conn, sql.c_str());
     PQclear(res);
 

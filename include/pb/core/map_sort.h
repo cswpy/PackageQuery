@@ -244,7 +244,7 @@ void MapSort<Type, kNumIntervals>
   #ifdef _OPENMP
   #pragma omp parallel for schedule(static, 1)
   #endif
-  for (int i = 0; i < kNumIntervals; ++i) {
+  for (int i = 0; i < (int) kNumIntervals; ++i) {
     std::sort(tmp_ + pos_[i], tmp_ + pos_[i + 1]);
   }
 }

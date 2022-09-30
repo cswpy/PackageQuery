@@ -14,6 +14,7 @@
 #include <map>
 #include <random>
 #include <float.h>
+#include <queue>
 #include <omp.h>
 #include <chrono>
 #include <ctime>
@@ -26,7 +27,7 @@
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> RMatrixXd;
 
 enum ConsSense { LowerBounded, UpperBounded, Bounded};
-enum SolStatus { NotFound, Found, Feasible, Infeasible, Unbounded, DualUnbounded, Timeout};
+enum SolStatus { NotFound, Found, Feasible, Infeasible, Unbounded, DualUnbounded, Timeout, NoPartitionFound, IncompatiblePartition};
 enum FeasStatus { Unsolved, Feasibility, Infeasibility, LbConstraint, UbConstraint, LbVariable, UbVariable, Integrality};
 enum GroupStatus { Unitialized, Unlocked, Locked};
 
@@ -37,6 +38,7 @@ namespace pb{
 
   using std::unordered_map;
   using std::unordered_set;
+  using std::priority_queue;
   using std::vector;
   using std::string;
   using std::pair;

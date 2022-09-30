@@ -25,4 +25,5 @@ public:
   void tableGenerate(string table_name, vector<string>& cols, bool is_maximize, int n, int seed=-1);
   double boundGenerate(double E, double alpha, double hardness);
   void normalizeObjective();
+  void truncate();
 };

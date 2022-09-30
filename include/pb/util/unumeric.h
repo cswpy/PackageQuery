@@ -10,6 +10,7 @@ bool isGreaterEqual(double x, double y, double eps=kNumericEps);
 bool isInteger(double x, double eps=kNumericEps);
 
 long long ceilDiv(long long x, long long q);
+int ceilDiv(int x, int q);
 
 double normalQuantile(double u, double v, double p);
 double normalCdf(double u, double v, double x);

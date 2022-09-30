@@ -3,6 +3,7 @@
 #include <omp.h>
 #include <regex>
 #include <cfloat>
+#include <string>
 #include "fmt/core.h"
 #include "umisc.h"
 #include "boost/algorithm/string.hpp"
@@ -12,12 +13,14 @@ using boost::is_any_of;
 using std::stod;
 using std::regex;
 using std::smatch;
+using std::to_string;
 
 const string kPgDelim = ",";
 
 string infAlias(double val, int precision){
   if (val == -DBL_MAX) return "-infinity";
   if (val == DBL_MAX) return "infinity";
+  if (precision < 0) return to_string(val);
   return fmt::format("{:.{}Lf}", val, precision);
 }
 
@@ -117,6 +120,12 @@ bool endsWith(string full, string sub){
   return false;
 }
 
+bool isIn(vector<string> arr, string s){
+  for (string a : arr){
+    if (a == s) return true;
+  }
+  return false;
+}
 
 // Return the number of threads that would be executed in parallel regions
 int GetMaxThreads() {

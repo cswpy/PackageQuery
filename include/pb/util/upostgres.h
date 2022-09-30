@@ -1,13 +1,14 @@
 #pragma once
 
+#include "pb/util/uconfig.h"
+#include "pb/det/lsr_prob.h"
+
 #include "libpq-fe.h"
 #include "Eigen/Dense"
 
 using std::string;
 using std::vector;
 using Eigen::VectorXd;
-
-const string kDefaultSchema = "public";
 
 void showError(PGconn *conn);
 
@@ -30,17 +31,19 @@ private:
   string _sql;
   PGconn *_conn;
   PGresult *_res;
+private:
+  bool checkStats(string table_name);
+  void writeStats(string table_name, Stat *stat);
+  Stat* computeStats(string table_name, const vector<string> &cols);
 public:
   string conninfo;
   ~PgManager();
   PgManager();
   long long getSize(string table_name);
-  vector<string> listTables(string schema_name=kDefaultSchema);
+  vector<string> listTables(string schema_name=kPgSchema);
+  vector<string> listColumns(string table_name);
   bool existTable(string table_name);
   void dropTable(string table_name);
   vector<string> getNumericCols(string table_name);
-  bool checkStats(string table_name);
-  void writeStats(string table_name, Stat *stat);
   Stat* readStats(string table_name);
-  Stat* computeStats(string table_name, const vector<string> &cols);
 };

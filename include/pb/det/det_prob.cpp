@@ -100,7 +100,7 @@ void DetProb::normalGenerate(int n, int expected_n, double att_var, double outli
 void DetProb::tableGenerate(string table_name, vector<string>& cols, bool is_maximize, int n, int seed){
   PgManager pg = PgManager();
   long long size = pg.getSize(table_name);
-  long long chunk = ceilDiv(size, kPCore);
+  long long chunk = ceilDiv(size, (long long) kPCore);
   double probability = n / (double) size;
   unsigned int local_seed;
   if (seed < 0){
@@ -150,8 +150,8 @@ void DetProb::tableGenerate(string table_name, vector<string>& cols, bool is_max
     for (int i = 0; i < PQntuples(res); i++){
       int index = i + start_index;
       ids[index] = atol(PQgetvalue(res, i, 0));
-      if (is_maximize) c(index) = fabs(atof(PQgetvalue(res, i, 1)));
-      else c(index) = -fabs(atof(PQgetvalue(res, i, 1)));
+      if (is_maximize) c(index) = atof(PQgetvalue(res, i, 1));
+      else c(index) = -atof(PQgetvalue(res, i, 1));
       VectorXd x (3);
       for (int j = 0; j < 3; j ++){
         A(j, index) = atof(PQgetvalue(res, i, j+2));
@@ -181,4 +181,30 @@ void DetProb::normalizeObjective(){
   double max_abs = 0;
   for (int i = 0; i < c.size(); i ++) max_abs = max(fabs(c(i)), max_abs);
   if (max_abs > 0) c /= max_abs;
+}
+
+void DetProb::truncate(){
+  int n = (int) c.size();
+  int m = (int) bl.size();
+  int new_m = 0;
+  for (int i = 0; i < m; i ++){
+    if (bl(i) != -DBL_MAX || bu(i) != DBL_MAX) new_m ++;
+  }
+  if (new_m < m){
+    RMatrixXd new_A; new_A.resize(new_m, n);
+    VectorXd new_bl (new_m);
+    VectorXd new_bu (new_m);
+    int index = 0;
+    for (int i = 0; i < m; i ++){
+      if (bl(i) != -DBL_MAX || bu(i) != DBL_MAX){
+        memcpy(&(new_A(index, 0)), &(A(i, 0)), n*sizeof(double));
+        new_bl(index) = bl(i);
+        new_bu(index) = bu(i);
+        index ++;
+      }
+    }
+    A = new_A;
+    bl = new_bl;
+    bu = new_bu;
+  } 
 }

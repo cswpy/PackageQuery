@@ -35,6 +35,7 @@ int getLayerIndex(string table_name);
 
 bool startsWith(string full, string sub);
 bool endsWith(string full, string sub);
+bool isIn(vector<string> arr, string s);
 
 // Return the number of threads that would be executed in parallel regions
 int GetMaxThreads();

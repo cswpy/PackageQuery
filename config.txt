@@ -4,6 +4,7 @@ port = 5433
 username = alm818
 database = postgres
 password = 
+schema = public
 
 # Parameters for PackageQuery
 physical_core = 80
@@ -13,5 +14,6 @@ max_multicolumn_indexes = 2
 main_memory_size = 300
 lp_size = 100000
 precision = 20
+global_seed = 42
 # Id column is based-1
 id_column = id

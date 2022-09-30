@@ -7,7 +7,9 @@
 #include "pb/det/det_bound.h"
 #include "pb/det/dlv.h"
 #include "pb/det/synthetic.h"
+#include "pb/det/lsr_prob.h"
 #include "pb/util/upostgres.h"
+#include "pb/det/lsr.h"
 
 using namespace pb;
 
@@ -73,12 +75,6 @@ void main2(){
 void main3(){
   string table_name = "ssds";
   PgManager pg = PgManager();
-  if (!pg.checkStats(table_name)){
-    vector<string> cols = pg.getNumericCols(table_name);
-    Stat *stat = pg.computeStats(table_name, cols);
-    pg.writeStats(table_name, stat);
-    delete stat;
-  }
   pg.readStats(table_name);
 }
 
@@ -114,7 +110,55 @@ void main5(){
   // dlv.dropPartition(table_name, partition_name);
 }
 
+void main5p5(){
+  double group_ratio = 0.01;
+  string partition_name = "P1";
+  string table_name = "ssds_7_1";
+  DynamicLowVariance dlv = DynamicLowVariance(group_ratio);
+  dlv.partition(table_name, partition_name);
+  dlv.pro.print();
+}
+
+void main6(){
+  string table_name = "tpch_6_1";
+  string partition_name = "P0";
+  string obj_col = "price";
+  bool is_maximize = true;
+  vector<string> cols = {"quantity", "discount", "tax"};
+  vector<int> consSense = {LowerBounded, UpperBounded, Bounded};
+  LsrProb prob = LsrProb(table_name, partition_name, obj_col, is_maximize, cols, consSense);
+  double E = 50;
+  double alpha = 0;
+  double hardness = 1;
+  prob.boundGenerate(E, alpha, hardness);
+  LayeredSketchRefine lsr = LayeredSketchRefine(kPCore, prob);
+  lsr.pro.print();
+}
+
+void main7(){
+  int m = 3;
+  int n = 2;
+  DetProb prob = DetProb(m, n);
+  for (int i = 0; i < m; i ++){
+    for (int j = 0; j < n; j ++){
+      prob.A(i, j) = i*n+j;
+    }
+  }
+  prob.bl(0) = 1;
+  prob.bu(1) = 2;
+  prob.truncate();
+  cout << prob.A << endl;
+  print(prob.bu);
+  print(prob.bl);
+  DetProb prob2 = prob;
+  prob.A(0, 0) = 100;
+  cout << prob2.A << endl;
+}
+
 int main(){
   // main4();
-  main5();
+  //main5();
+  // main5p5();
+  main6();
+  //main7();
 }

@@ -33,8 +33,12 @@ PgManager::PgManager(){
   assert(PQstatus(_conn) == CONNECTION_OK);
   _res = NULL;
 
+  _sql = fmt::format("SET client_min_messages = warning;");
+  _res = PQexec(_conn, _sql.c_str());
+  PQclear(_res);
+
   _sql = fmt::format(""
-    "CREATE TABLE IF NOT EXISTS {}("
+    "CREATE TABLE IF NOT EXISTS \"{}\"("
     "	table_name VARCHAR(63) UNIQUE NOT NULL,"
     "	size BIGINT,"
     " cols TEXT[],"
@@ -43,10 +47,6 @@ PgManager::PgManager(){
     "	amin DOUBLE PRECISION[],"
     "	amax DOUBLE PRECISION[]"
     ")", kStatTable);
-  _res = PQexec(_conn, _sql.c_str());
-  PQclear(_res);
-
-  _sql = fmt::format("SET client_min_messages = warning;");
   _res = PQexec(_conn, _sql.c_str());
   PQclear(_res);
 }
@@ -82,7 +82,7 @@ vector<string> PgManager::getNumericCols(string table_name){
 Stat* PgManager::computeStats(string table_name, const vector<string> &cols){
   long long size = getSize(table_name);
   // cout << table_name << " " << size << endl;
-  long long chunk = ceilDiv(size, kPCore);
+  long long chunk = ceilDiv(size, (long long) kPCore);
   Stat* stat = new Stat(cols);
   #pragma omp parallel num_threads(kPCore)
   {
@@ -127,16 +127,17 @@ Stat* PgManager::computeStats(string table_name, const vector<string> &cols){
 }
 
 bool PgManager::checkStats(string table_name){
-  _sql = fmt::format("SELECT COUNT(*) FROM {} WHERE table_name='{}';", kStatTable, table_name);
+  _sql = fmt::format("SELECT COUNT(*) FROM \"{}\" WHERE table_name='{}';", kStatTable, table_name);
   _res = PQexec(_conn, _sql.c_str());
-  int count = atoi(PQgetvalue(_res, 0, 0));
+  bool exists = false;
+  if (PQntuples(_res)) exists = true;
   PQclear(_res);
-  return count;
+  return exists;
 }
 
 void PgManager::writeStats(string table_name, Stat *stat){
   _sql = fmt::format(""
-    "INSERT INTO {}(table_name, size, cols, mean, M2, amin, amax) "
+    "INSERT INTO \"{}\"(table_name, size, cols, mean, M2, amin, amax) "
     "VALUES ('{}', {}, {}, {}, {}, {}, {}) "
     "ON CONFLICT (table_name) "
     "DO UPDATE SET size=EXCLUDED.size,cols=EXCLUDED.cols,mean=EXCLUDED.mean,M2=EXCLUDED.M2,amin=EXCLUDED.amin,amax=EXCLUDED.amax;", 
@@ -146,6 +147,13 @@ void PgManager::writeStats(string table_name, Stat *stat){
 }
 
 Stat* PgManager::readStats(string table_name){
+  if (!checkStats(table_name)){
+    // cout << "First time, need to find stats" << endl;
+    vector<string> cols = getNumericCols(table_name);
+    Stat *stat = computeStats(table_name, cols);
+    writeStats(table_name, stat);
+    return stat;
+  }
   _sql = fmt::format("SELECT size, cols, mean, M2, amin, amax FROM \"{}\" WHERE table_name='{}';", kStatTable, table_name);
   _res = PQexec(_conn, _sql.c_str());
   Stat* stat = new Stat(pgStringSplit(PQgetvalue(_res, 0, 1)));
@@ -177,6 +185,17 @@ vector<string> PgManager::listTables(string schema_name){
   }
   PQclear(_res);
   return tables;
+}
+
+vector<string> PgManager::listColumns(string table_name){
+  _sql = fmt::format("SELECT column_name FROM information_schema.columns WHERE table_schema='{}' AND table_name='{}';", kPgSchema, table_name);
+  _res = PQexec(_conn, _sql.c_str());
+  vector<string> cols (PQntuples(_res));
+  for (int i = 0; i < (int) cols.size(); i ++){
+    cols[i] = PQgetvalue(_res, i, 0);
+  }
+  PQclear(_res);
+  return cols;
 }
 
 // Deprecated since Postgres does not allow inter-multithreaded
