@@ -3,42 +3,7 @@
 #include "pb/util/uconfig.h"
 #include "pb/core/dual_reducer.h"
 
-const string kTempPrefix = "tmp";
-
-DLVPartition::~DLVPartition(){
-  delete pg;
-  PQfinish(_conn);
-}
-
-DLVPartition::DLVPartition(string table_name, string partition_name, vector<string> cols, double group_ratio, long long lp_size, int layer_count)
-  : table_name(table_name), partition_name(partition_name), cols(cols), group_ratio(group_ratio), lp_size(lp_size), layer_count(layer_count){
-  pg = new PgManager();
-  _conn = PQconnectdb(pg->conninfo.c_str());
-  assert(PQstatus(_conn) == CONNECTION_OK);
-  _res = NULL;
-}
-
-string DLVPartition::getPName(int layer){
-  return fmt::format("[{}P]{}_{}", layer, table_name, partition_name);
-}
-
-string DLVPartition::getGName(int layer, bool is_filtered){
-  if (!is_filtered) return fmt::format("[{}G]{}_{}", layer, table_name, partition_name);
-  else return fmt::format("{}_[{}G]{}_{}", kTempPrefix, layer, table_name, partition_name);
-}
-
-bool DLVPartition::isCompatible(const LsrProb &prob){
-  bool res = isIn(cols, prob.obj_col);
-  for (string s : prob.cols) res &= isIn(cols, s);
-  vector<string> col_names = pg->listColumns(prob.table_name);
-  for (string s : prob.filter_cols) res &= isIn(col_names, s);
-  return res;
-}
-
-long long DLVPartition::getGroupSize(int layer, long long id, bool is_filtered){
-  string current_gtable = getGName(layer, is_filtered);
-  return 0;
-}
+const int kSleepPeriod = 25; // In ms
 
 void LayeredSketchRefine::init(){
   vector<string> names = {"Init", "All", "All", "FetchData", "ProcessData", "WriteData", "CreateIndex", "CreateTable", "gist", "id", "tid", "gid"};
@@ -52,11 +17,11 @@ void LayeredSketchRefine::init(){
   pro.stop(0);
 }
 
-DLVPartition* LayeredSketchRefine::getDLVPartition(string table_name, string partition_name){
-  _sql = fmt::format("SELECT cols, group_ratio, lp_size, layer_count FROM {} WHERE table_name='{}' AND partition_name='{}';", kPartitionTable, table_name, partition_name);
+DLVPartition* LayeredSketchRefine::getDLVPartition(const LsrProb* prob){
+  _sql = fmt::format("SELECT cols, group_ratio, lp_size, layer_count FROM {} WHERE table_name='{}' AND partition_name='{}';", kPartitionTable, prob->table_name, prob->partition_name);
   _res = PQexec(_conn, _sql.c_str());
   if (PQntuples(_res)){
-    DLVPartition* partition = new DLVPartition(table_name, partition_name, pgStringSplit(PQgetvalue(_res, 0, 0)), 
+    DLVPartition* partition = new DLVPartition(prob, pgStringSplit(PQgetvalue(_res, 0, 0)), 
       atof(PQgetvalue(_res, 0, 1)), atoll(PQgetvalue(_res, 0, 2)), atoi(PQgetvalue(_res, 0, 3)));
     PQclear(_res);
     return partition;
@@ -119,63 +84,182 @@ void LayeredSketchRefine::formulateDetProb(int core, const LsrProb &prob, DetPro
 LayeredSketchRefine::LayeredSketchRefine(int core, const LsrProb &prob){
   init();
   pro.clock(1);
-  partition = getDLVPartition(prob.table_name, prob.partition_name);
+  std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+  partition = getDLVPartition(&prob);
   if (!partition){
     status = NoPartitionFound;
     return;
   }
-  if (!partition->isCompatible(prob)){
+  if (!partition->isCompatible()){
     status = IncompatiblePartition;
     return;
   }
   // Phase-0: Filtering
-  bool is_filtering = prob.filter_cols.size() > 0;
-  if (is_filtering){
+  string current_gtable = partition->getGName(partition->layer_count);
+  int n = pg->getSize(current_gtable);
+  vector<long long> last_layer_ids (n);
+  if (partition->is_filtering){
     // Filtering
+  } else{
+    iota(last_layer_ids.begin(), last_layer_ids.end(), 1);
   }
   DetProb det_prob;
-  if (is_filtering){
-  } else{ // No filter
-    // Phase-1: Retrieve last layer
-    {
-      string current_gtable = partition->getGName(partition->layer_count);
-      int n = pg->getSize(current_gtable);
-      vector<long long> ids (n);
-      iota(ids.begin(), ids.end(), 1);
-      formulateDetProb(core, prob, det_prob, current_gtable, ids);
+  // Phase-1: Retrieve last layer
+  formulateDetProb(core, prob, det_prob, current_gtable, last_layer_ids);
+  // Phase-2: Iteratively go to next layer
+  for (int layer = partition->layer_count; layer >= 1; layer --){
+    int n = (int) det_prob.c.size();
+    // Phase-2a: Sketch
+    DualReducer dr = DualReducer(core, det_prob);
+    if (dr.status != Found){
+      status = dr.status;
+      return;
     }
-    // Phase-2: Iteratively go to next layer
-    for (int layer = partition->layer_count; layer >= 1; layer --){
-      int m = (int) det_prob.bl.size();
-      int n = (int) det_prob.c.size();
-      // Phase-2a: Sketch
-      DualReducer dr = DualReducer(core, det_prob);
-      if (dr.status != Found){
-        status = dr.status;
-        return;
-      }
-      priority_queue<pair<double, long long>> pq;
-      unordered_set<long long> ids_set;
-      long long total_size = 0;
-      #pragma omp parallel num_threads(core)
-      {
-        DLVPartition *loc_partition = new DLVPartition(partition->table_name, partition->partition_name, partition->cols, partition->group_ratio, partition->lp_size, partition->layer_count);
-        #pragma omp for
-        for (int i = 0; i < n; i ++){
-          // Condition for sketch
-          if (dr.lp_sol(i) > 0 || dr.ilp_sol(i) > 0){
-            #pragma omp critical
+    priority_queue<pair<double, long long>> pq;
+    unordered_set<long long> group_ids_set;
+    vector<long long> ids;
+    long long total_size = 0;
+    long long global_start_index = 0;
+    int active_count = 0;
+    #pragma omp parallel num_threads(core)
+    {
+      DLVPartition *loc_partition = new DLVPartition(&prob, partition->cols, partition->group_ratio, partition->lp_size, partition->layer_count);
+      vector<long long> loc_ids;
+      #pragma omp for
+      for (int i = 0; i < n; i ++){
+        // Condition for sketch
+        if (dr.lp_sol(i) > 0 || dr.ilp_sol(i) > 0){
+          long long group_id = det_prob.ids[i];
+          long long size = loc_partition->getGroupSize(layer, group_id);
+          #pragma omp critical (c1)
+          {
+            if (total_size <= partition->lp_size) total_size += size;
+            else size = 0;
+          }
+          if (size){
+            loc_partition->getGroupComp(loc_ids, layer, group_id);
+            #pragma omp critical (c2)
             {
-              pq.emplace(det_prob.c(i), det_prob.ids[i]);
-              ids_set.insert(det_prob.ids[i]);
+              pq.emplace(det_prob.c(i), group_id);
+              group_ids_set.insert(group_id);
             }
           }
         }
-        delete loc_partition;
       }
       // Phase-2b: Shade
-      break;
+      bool is_active = false;
+      while (true){
+        if (total_size > partition->lp_size) break;
+        long long group_id = -1;
+        #pragma omp critical (c3)
+        {
+          if (pq.size()){
+            group_id = pq.top().second;
+            pq.pop();
+            if (!is_active){
+              active_count ++;
+              // cout << "CURRENT ACTIVE: " << active_count << endl;
+              is_active = true;
+            }
+          } else if (is_active){
+            active_count --;
+            is_active = false;
+          }
+        }
+        if (group_id < 0){
+          // is_active = false
+          std::this_thread::sleep_for(std::chrono::milliseconds(kSleepPeriod));
+          if (!active_count) break;
+        } else{
+          unordered_set<long long> group_ids;
+          loc_partition->getNeighboringGroups(group_ids, layer, group_id);
+          for (const auto& gid : group_ids){
+            if (total_size <= partition->lp_size){
+              bool is_adding = false;
+              #pragma omp critical (c4)
+              {
+                if (group_ids_set.find(gid) == group_ids_set.end()){
+                  is_adding = true;
+                  group_ids_set.insert(gid);
+                }
+              }
+              if (is_adding){
+                auto[size, worth] = loc_partition->getGroupWorthness(layer, gid);
+                loc_partition->getGroupComp(loc_ids, layer, gid);
+                #pragma omp atomic
+                total_size += size;
+                #pragma omp critical (c3)
+                {
+                  pq.emplace(worth, gid);
+                }
+              }
+            }
+          }
+          // Debug
+          // #pragma omp critical
+          // {
+          //   cout << "ORIGIN: " << group_id << endl;
+          //   for (const auto &elem : group_ids) cout << elem << " ";
+          //   cout << endl;
+          // }
+        }
+      }
+
+      // Debug
+      // #pragma omp critical
+      // {
+      //   cout << "SIZE: " << loc_ids.size() << endl;
+      //   for (auto id : loc_ids){
+      //     cout << id << " ";
+      //   }
+      //   cout << endl;
+      // }
+
+      // Phase-2c: Refine
+      long long start_index = 0;
+      #pragma omp critical
+      {
+        start_index = global_start_index;
+        global_start_index += loc_ids.size();
+      }
+      #pragma omp barrier
+      #pragma omp master
+      {
+        ids.resize(total_size);
+      }
+      #pragma omp barrier
+      if (loc_ids.size()) memcpy(&(ids[start_index]), &(loc_ids[0]), loc_ids.size()*sizeof(long long));
+      delete loc_partition;
+    }
+
+    string next_gtable;
+    if (layer > 1) next_gtable = partition->getGName(layer-1);
+    else next_gtable = prob.table_name;
+    formulateDetProb(core, prob, det_prob, next_gtable, ids);
+    // Debug
+    // for (auto v : ids) cout << v << " ";
+    // cout << endl;
+    // cout << ids.size() << endl;
+  }
+
+  // Phase-3: Final solution
+  DualReducer dr = DualReducer(core, det_prob);
+  if (dr.status != Found){
+    status = dr.status;
+    return;
+  }
+  ilp_score = lp_score = 0;
+  for (int i = 0; i < (int) det_prob.c.size(); i ++){
+    if (isGreater(dr.ilp_sol(i), 0)){
+      ilp_sol[det_prob.ids[i]] = (long long) dr.ilp_sol(i);
+      ilp_score += ilp_sol[det_prob.ids[i]]*det_prob.c(i);
+    }
+    if (isGreater(dr.lp_sol(i), 0)){
+      lp_sol[det_prob.ids[i]] = dr.lp_sol(i);
+      lp_score += lp_sol[det_prob.ids[i]]*det_prob.c(i);
     }
   }
+  exe_ilp = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start).count() / 1000000.0;
+  exe_lp = exe_ilp - (dr.exe_ilp - dr.exe_lp);
   pro.stop(1);
 }

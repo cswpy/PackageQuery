@@ -17,6 +17,8 @@ inline char separator(){
 
 using std::vector;
 using std::string;
+using std::to_string;
+using std::pair;
 using Eigen::VectorXd;
 
 static const char* space = " \t\n\r\f\v";
@@ -29,6 +31,7 @@ string pgJoin(vector<string> names);
 string pgJoin(VectorXd vals, int precision);
 vector<string> pgStringSplit(char *s);
 VectorXd pgValueSplit(char *s);
+pair<double, double> atop(char *s);
 string nextGName(string table_name);
 string nextPName(string table_name);
 int getLayerIndex(string table_name);
@@ -36,6 +39,14 @@ int getLayerIndex(string table_name);
 bool startsWith(string full, string sub);
 bool endsWith(string full, string sub);
 bool isIn(vector<string> arr, string s);
+
+void allocate(char **vals, int index, const char *s);
+void free(char** vals, int length);
+
+template <typename T>
+void assign(char **vals, int index, T v){
+  allocate(vals, index, to_string(v).c_str());
+}
 
 // Return the number of threads that would be executed in parallel regions
 int GetMaxThreads();

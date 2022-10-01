@@ -68,5 +68,7 @@ const string kId = configs["id_column"]; // Must not equal to "tid"
 const string kStatTable = "stats";
 const string kPartitionTable = "dlv_partitions";
 const string kNullLiteral = "null";
+const string kIntervalType = "floatrange";
+const string kTempPrefix = "tmp";
 
 long long getTupleCount(int tuple_size, int core_count=kPCore);

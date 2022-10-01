@@ -7,6 +7,7 @@
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
+#include <map>
 #include <utility>
 #include <string>
 #include <numeric>
@@ -17,6 +18,7 @@
 #include <queue>
 #include <omp.h>
 #include <chrono>
+#include <thread>
 #include <ctime>
 #include <cfloat>
 #include <stdexcept>
@@ -32,10 +34,7 @@ enum FeasStatus { Unsolved, Feasibility, Infeasibility, LbConstraint, UbConstrai
 enum GroupStatus { Unitialized, Unlocked, Locked};
 
 namespace pb{
-  using std::cout;
-  using std::cin;
-  using std::endl;
-
+  using std::map;
   using std::unordered_map;
   using std::unordered_set;
   using std::priority_queue;
@@ -64,6 +63,9 @@ namespace pb{
 
   using std::fstream;
   using std::ios;
+  using std::cout;
+  using std::cin;
+  using std::endl;
 
   using std::invalid_argument;
 }

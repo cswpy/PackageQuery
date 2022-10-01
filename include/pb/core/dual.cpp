@@ -313,7 +313,7 @@ Dual::Dual(int core, const DetProb &prob){
               }
             }
           }
-          #pragma omp critical
+          #pragma omp critical (c1)
           {
             local_init_start = init_size;
             init_size += local_init_size;
@@ -362,7 +362,7 @@ Dual::Dual(int core, const DetProb &prob){
               }
             }
           }
-          #pragma omp critical
+          #pragma omp critical (c1)
           {
             local_init_start = init_size;
             init_size += local_init_size;

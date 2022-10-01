@@ -1,5 +1,6 @@
 #define FMT_HEADER_ONLY
 
+#include <math.h>
 #include <omp.h>
 #include <regex>
 #include <cfloat>
@@ -78,6 +79,16 @@ VectorXd pgValueSplit(char *s){
   return vals;
 }
 
+pair<double, double> atop(char *s){
+  VectorXd vals = pgValueSplit(s);
+  double left = -DBL_MAX;
+  if (!isinf(vals(0))) left = vals(0);
+  double right = DBL_MAX;
+  if (!isinf(vals(1))) right = vals(1);
+  return {left, right};
+}
+
+
 string nextName(string table_name, string symbol){
   regex expr ("^\\[([0-9]+).+\\](.+)");
   smatch m;
@@ -125,6 +136,15 @@ bool isIn(vector<string> arr, string s){
     if (a == s) return true;
   }
   return false;
+}
+
+void allocate(char **vals, int index, const char *s){
+  vals[index] = new char[strlen(s)];
+  strcpy(vals[index], s);
+}
+
+void free(char** vals, int length){
+  for (int i = 0; i < length; i ++) delete vals[i];
 }
 
 // Return the number of threads that would be executed in parallel regions

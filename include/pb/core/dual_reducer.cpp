@@ -74,7 +74,7 @@ DualReducer::DualReducer(int core, const DetProb &prob){
           }
           local_max_abs_c = max(local_max_abs_c, fabs(prob.c(j)));
         }
-        #pragma omp critical
+        #pragma omp critical (c1)
         {
           max_abs_c = max(max_abs_c, local_max_abs_c);
         }
@@ -123,7 +123,7 @@ DualReducer::DualReducer(int core, const DetProb &prob){
             }
           }
           int local_start = -1;
-          #pragma omp critical
+          #pragma omp critical (c2)
           {
             local_start = excess_count;
             excess_count += local_count;
@@ -181,14 +181,16 @@ DualReducer::DualReducer(int core, const DetProb &prob){
             }
           }
         }
-        #pragma omp critical
+        #pragma omp critical (c3)
         {
           local_start_index = start_stay_count;
           start_stay_count += local_stay_count;
         }
-        for (int i = local_start_index; i < local_start_index + local_stay_count; i ++){
-          reduced_index(i) = local_stay_index(i-local_start_index);
-        }
+        if (local_stay_count) memcpy(&(reduced_index(local_start_index)), &(local_stay_index(0)), local_stay_count*sizeof(int));
+        // for (int i = local_start_index; i < local_start_index + local_stay_count; i ++){
+        //   reduced_index(i) = local_stay_index(i-local_start_index);
+        //   assert(reduced_index(i) == local_stay_index(i-local_start_index));
+        // }
         #pragma omp barrier
         for (int i = 0; i < m; i ++){
           if (prob.bl(i) != -DBL_MAX){
@@ -401,7 +403,7 @@ DualReducer::DualReducer(int core, const DetProb &prob, VectorXd oracle){
             }
           }
         }
-        #pragma omp critical
+        #pragma omp critical (c1)
         {
           local_start_index = start_stay_count;
           start_stay_count += local_stay_count;

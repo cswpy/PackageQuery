@@ -120,19 +120,24 @@ void main5p5(){
 }
 
 void main6(){
-  string table_name = "tpch_6_1";
-  string partition_name = "P0";
-  string obj_col = "price";
-  bool is_maximize = true;
-  vector<string> cols = {"quantity", "discount", "tax"};
-  vector<int> consSense = {LowerBounded, UpperBounded, Bounded};
-  LsrProb prob = LsrProb(table_name, partition_name, obj_col, is_maximize, cols, consSense);
-  double E = 50;
-  double alpha = 0;
-  double hardness = 1;
-  prob.boundGenerate(E, alpha, hardness);
-  LayeredSketchRefine lsr = LayeredSketchRefine(kPCore, prob);
-  lsr.pro.print();
+  for (int rep = 0; rep < 10000; rep ++){
+    string table_name = "tpch_6_1";
+    string partition_name = "P0";
+    string obj_col = "price";
+    bool is_maximize = true;
+    vector<string> cols = {"quantity", "discount", "tax"};
+    vector<int> consSense = {LowerBounded, UpperBounded, Bounded};
+    LsrProb prob = LsrProb(table_name, partition_name, obj_col, is_maximize, cols, consSense);
+    double E = 50;
+    double alpha = 0;
+    double hardness = 1;
+    prob.boundGenerate(E, alpha, hardness);
+    LayeredSketchRefine lsr = LayeredSketchRefine(kPCore, prob);
+    print(lsr.lp_sol);
+    print(lsr.ilp_sol);
+    cout << fmt::format("{:.8Lf} {:.8Lf} {:.4Lf}%\n", lsr.lp_score, lsr.ilp_score, fabs((lsr.lp_score-lsr.ilp_score)/lsr.lp_score*100));
+    cout << fmt::format("{:.2Lf}ms {:.2Lf}ms\n", lsr.exe_lp, lsr.exe_ilp);
+  }
 }
 
 void main7(){
@@ -155,10 +160,21 @@ void main7(){
   cout << prob2.A << endl;
 }
 
+void main8(){
+  int n = 4;
+  VectorXi a (n);
+  for (int i = 0; i < n; i ++) a(i) = i+1;
+  VectorXi b (n*2); b.fill(0);
+  memcpy(&b(2), &a(0), n*sizeof(int));
+  print(a);
+  print(b);
+}
+
 int main(){
   // main4();
   //main5();
   // main5p5();
   main6();
   //main7();
+  // main8();
 }

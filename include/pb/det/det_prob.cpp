@@ -127,7 +127,7 @@ void DetProb::tableGenerate(string table_name, vector<string>& cols, bool is_max
       if (dist(gen) <= probability) selected_ids.push_back(id);
     }
     int start_index;
-    #pragma omp critical
+    #pragma omp critical (c1)
     {
       start_index = global_size;
       global_size += selected_ids.size();
@@ -162,7 +162,7 @@ void DetProb::tableGenerate(string table_name, vector<string>& cols, bool is_max
     }
     PQclear(res);
     PQfinish(conn);
-    #pragma omp critical
+    #pragma omp critical (c2)
     {
       mv.add(local_mv);
     }
@@ -185,6 +185,7 @@ void DetProb::normalizeObjective(){
 
 void DetProb::truncate(){
   int n = (int) c.size();
+  if (!n) return;
   int m = (int) bl.size();
   int new_m = 0;
   for (int i = 0; i < m; i ++){

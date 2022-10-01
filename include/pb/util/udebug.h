@@ -5,12 +5,16 @@
 #include <chrono>
 #include <iostream>
 #include <cfloat>
+#include <unordered_map>
+#include <map>
 
 #include "Eigen/Dense"
 #include "umisc.h"
 
 using std::cout;
 using std::vector;
+using std::unordered_map;
+using std::map;
 using std::string;
 using std::to_string;
 using Eigen::VectorXd;
@@ -32,6 +36,28 @@ string print(Matrix<T, Dynamic, 1> v) {
   for (int i = 0; i < v.size() - 1; i++)  s += infAlias((double) v(i), -1) + " ";
   if (v.size() > 0) s += infAlias((double) v(v.size() - 1), -1);
   s += "]\n";
+  cout << s;
+  return s;
+}
+
+template <typename T>
+string print(unordered_map<long long, T> sol){
+  string s = "{ ";
+  for (const auto& [key, value] : sol){
+    s += to_string(key) + ":" + to_string(value) + " ";
+  }
+  s += "}\n";
+  cout << s;
+  return s;
+}
+
+template <typename T>
+string print(map<long long, T> sol){
+  string s = "{ ";
+  for (const auto& [key, value] : sol){
+    s += to_string(key) + ":" + to_string(value) + " ";
+  }
+  s += "}\n";
   cout << s;
   return s;
 }
