@@ -1,5 +1,7 @@
 #pragma once
 
+#define DEBUG 1
+
 #include <string>
 #include <unordered_map>
 #include <unistd.h>
@@ -46,29 +48,56 @@ static int readConfigs(unordered_map<string, string>& configs){
 static unordered_map<string, string> configs;
 static int _ = readConfigs(configs);
 
-const string kProjectHome = configs["project_home"];
+#if DEBUG
+  static string kProjectHome = configs["project_home"];
 
-static const int kPCore = stoi(configs["physical_core"]);
-static const int kLCore = stoi(configs["logical_core"]);
-static const int kMaxMultiColumnIndexes = stoi(configs["max_multicolumn_indexes"]);
-static const int kPgPort = stoi(configs["port"]);
-static const int kPrecision = stoi(configs["precision"]);
-static const int kGlobalSeed = stoi(configs["global_seed"]);
-static const long long kLpSize = stoll(configs["lp_size"]);
-static const long long kMainMemorySize = stoll(configs["main_memory_size"]);
-// static const long long kInMemorySize = stoll(configs["in_memory_size"]); // In Memory Size for all cores in term of number of tuples
+  static int kPCore = stoi(configs["physical_core"]);
+  static int kLCore = stoi(configs["logical_core"]);
+  static int kMaxMultiColumnIndexes = stoi(configs["max_multicolumn_indexes"]);
+  static int kPgPort = stoi(configs["port"]);
+  static int kPrecision = stoi(configs["precision"]);
+  static int kGlobalSeed = stoi(configs["global_seed"]);
+  static long long kLpSize = stoll(configs["lp_size"]);
+  static long long kMainMemorySize = stoll(configs["main_memory_size"]);
+  // static const long long kInMemorySize = stoll(configs["in_memory_size"]); // In Memory Size for all cores in term of number of tuples
 
-const string kPgDatabase = configs["database"];
-const string kPgUser = configs["user"];
-const string kPgPassword = configs["password"];
-const string kPgHostaddr = configs["hostname"];
-const string kPgSchema = configs["schema"];
+  static string kPgDatabase = configs["database"];
+  static string kPgUser = configs["user"];
+  static string kPgPassword = configs["password"];
+  static string kPgHostaddr = configs["hostname"];
+  static string kPgSchema = configs["schema"];
 
-const string kId = configs["id_column"]; // Must not equal to "tid"
-const string kStatTable = "stats";
-const string kPartitionTable = "dlv_partitions";
-const string kNullLiteral = "null";
-const string kIntervalType = "floatrange";
-const string kTempPrefix = "tmp";
+  static string kId = configs["id_column"]; // Must not equal to "tid"
+  static string kStatTable = "stats";
+  static string kPartitionTable = "dlv_partitions";
+  static string kNullLiteral = "null";
+  static string kIntervalType = "floatrange";
+  static string kTempPrefix = "tmp";
+#else
+  static const string kProjectHome = configs["project_home"];
+
+  static const int kPCore = stoi(configs["physical_core"]);
+  static const int kLCore = stoi(configs["logical_core"]);
+  static const int kMaxMultiColumnIndexes = stoi(configs["max_multicolumn_indexes"]);
+  static const int kPgPort = stoi(configs["port"]);
+  static const int kPrecision = stoi(configs["precision"]);
+  static const int kGlobalSeed = stoi(configs["global_seed"]);
+  static const long long kLpSize = stoll(configs["lp_size"]);
+  static const long long kMainMemorySize = stoll(configs["main_memory_size"]);
+  // static const long long kInMemorySize = stoll(configs["in_memory_size"]); // In Memory Size for all cores in term of number of tuples
+
+  static const string kPgDatabase = configs["database"];
+  static const string kPgUser = configs["user"];
+  static const string kPgPassword = configs["password"];
+  static const string kPgHostaddr = configs["hostname"];
+  static const string kPgSchema = configs["schema"];
+
+  static const string kId = configs["id_column"]; // Must not equal to "tid"
+  static const string kStatTable = "stats";
+  static const string kPartitionTable = "dlv_partitions";
+  static const string kNullLiteral = "null";
+  static const string kIntervalType = "floatrange";
+  static const string kTempPrefix = "tmp";
+#endif
 
 long long getTupleCount(int tuple_size, int core_count=kPCore);

@@ -50,6 +50,11 @@ double normalCdf(double u, double v, double x){
   return 0.5 + 0.5 * erf((x-u) / (sqrt(2*v)));
 }
 
+double pctError(double x, double ground){
+  // Assume ground > x
+  return (ground - x) / fabs(ground) * 100.0;
+}
+
 MeanVar::MeanVar(){
 }
 

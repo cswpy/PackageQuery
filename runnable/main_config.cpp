@@ -13,43 +13,43 @@
 
 using namespace pb;
 
-void main1(){
-  // 19 20
-  string file_name = "/home/alm818/model.lp";
-  for (int seed = 1; seed <= 100; seed ++){
-    vector<string> cols = {"tmass_prox", "j", "h", "k"};
-    DetProb prob; prob.tableGenerate("ssds", cols, false, 200000, seed);
-    prob.boundGenerate(1000, 0, 2);
-    // vector<string> cols = {"price", "quantity", "discount", "tax"};
-    // DetProb prob; prob.tableGenerate("tpch", cols, true, 10000, 5000, 0.5, seed);
-    prob.normalizeObjective();
-    cout << seed << "\n";
-    // gs.writeModel(file_name);
-    DualReducer dr = DualReducer(4, prob);
-    printf("%.2f %.8f\n", dr.exe_lp, dr.lp_score);
-    printf("%.2f %.8f\n", dr.exe_ilp, dr.ilp_score);
-    GurobiSolver gs = GurobiSolver(prob);
-    gs.solveIlp();
-    DualReducer dr2 = DualReducer(4, prob, gs.ilp_sol);
-    printf("%.2f %.8f\n", dr2.exe_ilp, dr2.ilp_score);
-    if (dr.status != Found && dr2.status != Found && gs.ilp_status != Found) continue;
-    double a, b, c;
-    printf("%.2f %.8f %.4f%% %.4f%%\n", gs.getIlpTime(), gs.ilp_score, (dr.lp_score - dr.ilp_score)*100/(dr.lp_score - gs.ilp_score), (dr.lp_score - dr2.ilp_score)*100/(dr.lp_score - gs.ilp_score));
-    a = fabs((dr.ilp_score - dr.lp_score) / dr.lp_score)*100;
-    b = fabs((dr2.ilp_score - dr.lp_score) / dr.lp_score)*100;
-    c = fabs((gs.ilp_score - dr.lp_score) / dr.lp_score)*100;
-    printf("%.4f%% %.4f%% %.4f%% %.4f%% %.4f%%\n", a, b, c, a/c*100, b/c*100);
-    Checker ch = Checker(prob, dr.kEpsilon);
-    cout << solMessage(dr.status) << " " << solMessage(dr2.status) << endl;
-    cout << feasMessage(ch.checkIlpFeasibility(dr.ilp_sol)) << " " << feasMessage(ch.checkIlpFeasibility(dr2.ilp_sol)) << endl;
-    cout << ch.getScore(dr.ilp_sol) << " " << ch.getScore(dr2.ilp_sol) << " " << ch.getScore(gs.ilp_sol) << endl;
-    if (dr.ilp_sol.size() < 100){
-      cout << solCombination(dr.ilp_sol) << endl;
-      cout << solCombination(dr2.ilp_sol) << endl;
-      cout << solCombination(gs.ilp_sol) << endl;
-    }
-  }
-}
+// void main1(){
+//   // 19 20
+//   string file_name = "/home/alm818/model.lp";
+//   for (int seed = 1; seed <= 100; seed ++){
+//     vector<string> cols = {"tmass_prox", "j", "h", "k"};
+//     DetProb prob; prob.tableGenerate("ssds", cols, false, 200000, seed);
+//     prob.boundGenerate(1000, 0, 2);
+//     // vector<string> cols = {"price", "quantity", "discount", "tax"};
+//     // DetProb prob; prob.tableGenerate("tpch", cols, true, 10000, 5000, 0.5, seed);
+//     prob.normalizeObjective();
+//     cout << seed << "\n";
+//     // gs.writeModel(file_name);
+//     DualReducer dr = DualReducer(4, prob);
+//     printf("%.2f %.8f\n", dr.exe_lp, dr.lp_score);
+//     printf("%.2f %.8f\n", dr.exe_ilp, dr.ilp_score);
+//     GurobiSolver gs = GurobiSolver(prob);
+//     gs.solveIlp();
+//     DualReducer dr2 = DualReducer(4, prob, gs.ilp_sol);
+//     printf("%.2f %.8f\n", dr2.exe_ilp, dr2.ilp_score);
+//     if (dr.status != Found && dr2.status != Found && gs.ilp_status != Found) continue;
+//     double a, b, c;
+//     printf("%.2f %.8f %.4f%% %.4f%%\n", gs.getIlpTime(), gs.ilp_score, (dr.lp_score - dr.ilp_score)*100/(dr.lp_score - gs.ilp_score), (dr.lp_score - dr2.ilp_score)*100/(dr.lp_score - gs.ilp_score));
+//     a = fabs((dr.ilp_score - dr.lp_score) / dr.lp_score)*100;
+//     b = fabs((dr2.ilp_score - dr.lp_score) / dr.lp_score)*100;
+//     c = fabs((gs.ilp_score - dr.lp_score) / dr.lp_score)*100;
+//     printf("%.4f%% %.4f%% %.4f%% %.4f%% %.4f%%\n", a, b, c, a/c*100, b/c*100);
+//     Checker ch = Checker(prob, dr.kEpsilon);
+//     cout << solMessage(dr.status) << " " << solMessage(dr2.status) << endl;
+//     cout << feasMessage(ch.checkIlpFeasibility(dr.ilp_sol)) << " " << feasMessage(ch.checkIlpFeasibility(dr2.ilp_sol)) << endl;
+//     cout << ch.getScore(dr.ilp_sol) << " " << ch.getScore(dr2.ilp_sol) << " " << ch.getScore(gs.ilp_sol) << endl;
+//     if (dr.ilp_sol.size() < 100){
+//       cout << solCombination(dr.ilp_sol) << endl;
+//       cout << solCombination(dr2.ilp_sol) << endl;
+//       cout << solCombination(gs.ilp_sol) << endl;
+//     }
+//   }
+// }
 
 void main2(){
   vector<int> consSense = {UpperBounded, LowerBounded, Bounded, LowerBounded, UpperBounded};
@@ -102,7 +102,6 @@ void main5(){
         cout << table_name << " on order " << order << endl;
         DynamicLowVariance dlv = DynamicLowVariance(group_ratio);
         dlv.partition(real_table_name, partition_name);
-        dlv.pro.print();
       }
     }
   }
@@ -116,12 +115,12 @@ void main5p5(){
   string table_name = "ssds_7_1";
   DynamicLowVariance dlv = DynamicLowVariance(group_ratio);
   dlv.partition(table_name, partition_name);
-  dlv.pro.print();
 }
 
 void main6(){
   for (int rep = 0; rep < 1; rep ++){
-    string table_name = "tpch_6_1";
+    int order = 7;
+    string table_name = fmt::format("tpch_{}_1", order);
     string partition_name = "P0";
     string obj_col = "price";
     bool is_maximize = true;
@@ -133,23 +132,29 @@ void main6(){
     double hardness = 8;
     prob.boundGenerate(E, alpha, hardness);
     LayeredSketchRefine lsr = LayeredSketchRefine(kPCore, prob);
+    if (order <= 8){
+      cols.insert(cols.begin(), obj_col);
+      DetProb det_prob; det_prob.tableGenerate(table_name, cols, true, 2*pow(10.0, (double) order));
+      memcpy(&det_prob.bl(0), &prob.bl(0), prob.bl.size()*sizeof(double));
+      memcpy(&det_prob.bu(0), &prob.bu(0), prob.bu.size()*sizeof(double));
+      det_prob.bl(3) = prob.cl;
+      det_prob.bu(3) = prob.cu;
+      det_prob.truncate();
+      Checker ch = Checker(det_prob);
+      DualReducer dr = DualReducer(kPCore, det_prob);
+      double ground = dr.lp_score;
+      cout << feasMessage(ch.checkLpFeasibility(lsr.lp_sol)) << " " << feasMessage(ch.checkIlpFeasibility(lsr.ilp_sol)) << " " << feasMessage(ch.checkLpFeasibility(dr.lp_sol)) << " " << feasMessage(ch.checkIlpFeasibility(lsr.ilp_sol)) << endl;
+      cout << "LSR" << endl;
+      cout << fmt::format("{:.8Lf} {:.8Lf} {:.4Lf}% {:.4Lf}%\n", lsr.lp_score, lsr.ilp_score, pctError(lsr.lp_score, ground), pctError(lsr.ilp_score, ground));
+      cout << fmt::format("{:.2Lf}ms {:.2Lf}ms\n", lsr.exe_lp, lsr.exe_ilp);
+      cout << "DR" << endl;
+      cout << fmt::format("{:.8Lf} {:.8Lf} {:.4Lf}%\n", dr.lp_score, dr.ilp_score, pctError(dr.ilp_score, ground));
+      cout << fmt::format("{:.2Lf}ms {:.2Lf}ms\n", dr.exe_lp, dr.exe_ilp);
+    } else{
+
+    }
     // print(lsr.lp_sol);
     // print(lsr.ilp_sol);
-    cols.insert(cols.begin(), obj_col);
-    DetProb det_prob; det_prob.tableGenerate(table_name, cols, true, 2*1e6);
-    memcpy(&det_prob.bl(0), &prob.bl(0), prob.bl.size()*sizeof(double));
-    memcpy(&det_prob.bu(0), &prob.bu(0), prob.bu.size()*sizeof(double));
-    det_prob.bl(3) = prob.cl;
-    det_prob.bu(3) = prob.cu;
-    det_prob.truncate();
-    DualReducer dr = DualReducer(kPCore, det_prob);
-    double ground = dr.lp_score;
-    cout << "LSR" << endl;
-    cout << fmt::format("{:.8Lf} {:.8Lf} {:.4Lf}% {:.4Lf}%\n", lsr.lp_score, lsr.ilp_score, fabs((ground-lsr.lp_score)/ground*100), fabs((ground-lsr.ilp_score)/ground*100));
-    cout << fmt::format("{:.2Lf}ms {:.2Lf}ms\n", lsr.exe_lp, lsr.exe_ilp);
-    cout << "DR" << endl;
-    cout << fmt::format("{:.8Lf} {:.8Lf} {:.4Lf}%\n", dr.lp_score, dr.ilp_score, fabs((ground-dr.ilp_score)/ground*100));
-    cout << fmt::format("{:.2Lf}ms {:.2Lf}ms\n", dr.exe_lp, dr.exe_ilp);
   }
 }
 

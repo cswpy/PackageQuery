@@ -16,5 +16,5 @@ public:
 public:
   ~DualReducer();
   DualReducer(int core, const DetProb &prob);
-  DualReducer(int core, const DetProb &prob, VectorXd oracle);
+  // DualReducer(int core, const DetProb &prob, VectorXd oracle);
 };

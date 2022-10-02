@@ -35,7 +35,7 @@ DualReducer::DualReducer(int core, const DetProb &prob){
   } else{
     Dual dual = Dual(core, prob);
     if (dual.status == Found){
-      lp_sol = dual.sol;
+      memcpy(&(lp_sol(0)), &(dual.sol(0)), n*sizeof(double));
       lp_score = dual.score;
       exe_lp = dual.exe_solve;
       vector<int> stay (n, NotStay);
@@ -228,221 +228,221 @@ DualReducer::DualReducer(int core, const DetProb &prob){
 }
 
 // For debugging, should not be used in production
-DualReducer::DualReducer(int core, const DetProb &prob, VectorXd oracle){
-  std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-  int n = (int) prob.c.size();
-  int m = (int) prob.bl.size();
-  ilp_sol.resize(n); lp_sol.resize(n);
-  ilp_score = lp_score = 0;
-  status = NotFound;
-  if (n < kIlpSize){
-    // Gurobi
-  } else{
-    Dual dual = Dual(core, prob);
-    if (dual.status == Found){
-      lp_sol = dual.sol;
-      lp_score = dual.score;
-      exe_lp = dual.exe_solve;
-      VectorXd norms (n+m); norms.fill(0);
-      VectorXd sum_row(m); sum_row.fill(0);
-      vector<bool> stay (n, false);
-      int stay_count = 0;
-      vector<pair<double, int>>* deficit = new vector<pair<double, int>>(n); // Destruction is handled by ParallelPQ
-      for (int i = 0; i < m; i ++){
-        if (dual.bhead(i) < n){
-          stay[dual.bhead(i)] = true;
-          stay_count ++;
-        }
-      }
-      #pragma omp parallel num_threads(core)
-      {
-        #pragma omp for nowait
-        for (int i = 0; i < m+n; i ++){
-          if (!dual.inv_bhead[i]){
-            double norm = 0;
-            if (i < n){
-              norm ++;
-              for (int j = 0; j < m; j ++){
-                if (dual.bhead(j) < n){
-                  double val = 0;
-                  for (int k = 0; k < m; k ++){
-                    val += dual.Binv(j, k) * prob.A(k, i);
-                  }
-                  norm += val*val;
-                }
-              }
-            } else{
-              int index = i - n;
-              for (int j = 0; j < m; j ++){
-                if (dual.bhead(j) < n){
-                  norm += dual.Binv(j, index)*dual.Binv(j, index);
-                }
-              }
-            }
-            norms(i) = sqrt(norm);
-          }
-        }
-        #pragma omp barrier
-        for (int j = 0; j < m; j ++){
-          double local_sum_row = 0;
-          #pragma omp for nowait
-          for (int i = 0; i < m+n; i ++){
-            if (!dual.inv_bhead[i]){
-              // Non-basic
-              if (i < n){
-                if (isEqual(dual.sol(i), prob.l(i), kEpsilon)) local_sum_row += prob.A(j, i) / norms(i);
-                else local_sum_row -= prob.A(j, i) / norms(i);
-              } else{
-                int index = i - n;
-                if (index == j){
-                  if (isEqual(dual.sol(i), prob.bl(index), kEpsilon)) local_sum_row -= 1.0 / norms(i);
-                  else local_sum_row += 1.0 / norms(i);
-                }
-              }
-            }
-          }
-          #pragma omp atomic
-          sum_row(j) += local_sum_row;
-        }
-        #pragma omp for nowait
-        for (int i = 0; i < n; i ++){
-          if (!dual.inv_bhead[i]){
-            // Non-basic
-            // if (isEqual(dual.sol(i), prob.l(i), kEpsilon)) centroid_dir(i) = 1.0/norms(i)/n;
-            // else centroid_dir(i) = -1.0/norms(i)/n;
-            (*deficit)[i] = {1.0/norms(i), i};
-          }
-        }
-        #pragma omp barrier
-        #pragma omp master
-        {
-          //cout << "A1 " << layer_count << endl;
-          for (int i = 0; i < m; i ++){
-            if (dual.bhead(i) < n){
-              double val = 0;
-              for (int j = 0; j < m; j ++){
-                val += dual.Binv(i, j) * sum_row(j);
-              }
-              //cout << "HERE " << i << " " << dual->bhead(i) << " VAL:" << val << endl;
-              (*deficit)[i] = {fabs(val), i};
-            }
-          }
-        }
-      }
+// DualReducer::DualReducer(int core, const DetProb &prob, VectorXd oracle){
+//   std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+//   int n = (int) prob.c.size();
+//   int m = (int) prob.bl.size();
+//   ilp_sol.resize(n); lp_sol.resize(n);
+//   ilp_score = lp_score = 0;
+//   status = NotFound;
+//   if (n < kIlpSize){
+//     // Gurobi
+//   } else{
+//     Dual dual = Dual(core, prob);
+//     if (dual.status == Found){
+//       lp_sol = dual.sol;
+//       lp_score = dual.score;
+//       exe_lp = dual.exe_solve;
+//       VectorXd norms (n+m); norms.fill(0);
+//       VectorXd sum_row(m); sum_row.fill(0);
+//       vector<bool> stay (n, false);
+//       int stay_count = 0;
+//       vector<pair<double, int>>* deficit = new vector<pair<double, int>>(n); // Destruction is handled by ParallelPQ
+//       for (int i = 0; i < m; i ++){
+//         if (dual.bhead(i) < n){
+//           stay[dual.bhead(i)] = true;
+//           stay_count ++;
+//         }
+//       }
+//       #pragma omp parallel num_threads(core)
+//       {
+//         #pragma omp for nowait
+//         for (int i = 0; i < m+n; i ++){
+//           if (!dual.inv_bhead[i]){
+//             double norm = 0;
+//             if (i < n){
+//               norm ++;
+//               for (int j = 0; j < m; j ++){
+//                 if (dual.bhead(j) < n){
+//                   double val = 0;
+//                   for (int k = 0; k < m; k ++){
+//                     val += dual.Binv(j, k) * prob.A(k, i);
+//                   }
+//                   norm += val*val;
+//                 }
+//               }
+//             } else{
+//               int index = i - n;
+//               for (int j = 0; j < m; j ++){
+//                 if (dual.bhead(j) < n){
+//                   norm += dual.Binv(j, index)*dual.Binv(j, index);
+//                 }
+//               }
+//             }
+//             norms(i) = sqrt(norm);
+//           }
+//         }
+//         #pragma omp barrier
+//         for (int j = 0; j < m; j ++){
+//           double local_sum_row = 0;
+//           #pragma omp for nowait
+//           for (int i = 0; i < m+n; i ++){
+//             if (!dual.inv_bhead[i]){
+//               // Non-basic
+//               if (i < n){
+//                 if (isEqual(dual.sol(i), prob.l(i), kEpsilon)) local_sum_row += prob.A(j, i) / norms(i);
+//                 else local_sum_row -= prob.A(j, i) / norms(i);
+//               } else{
+//                 int index = i - n;
+//                 if (index == j){
+//                   if (isEqual(dual.sol(i), prob.bl(index), kEpsilon)) local_sum_row -= 1.0 / norms(i);
+//                   else local_sum_row += 1.0 / norms(i);
+//                 }
+//               }
+//             }
+//           }
+//           #pragma omp atomic
+//           sum_row(j) += local_sum_row;
+//         }
+//         #pragma omp for nowait
+//         for (int i = 0; i < n; i ++){
+//           if (!dual.inv_bhead[i]){
+//             // Non-basic
+//             // if (isEqual(dual.sol(i), prob.l(i), kEpsilon)) centroid_dir(i) = 1.0/norms(i)/n;
+//             // else centroid_dir(i) = -1.0/norms(i)/n;
+//             (*deficit)[i] = {1.0/norms(i), i};
+//           }
+//         }
+//         #pragma omp barrier
+//         #pragma omp master
+//         {
+//           //cout << "A1 " << layer_count << endl;
+//           for (int i = 0; i < m; i ++){
+//             if (dual.bhead(i) < n){
+//               double val = 0;
+//               for (int j = 0; j < m; j ++){
+//                 val += dual.Binv(i, j) * sum_row(j);
+//               }
+//               //cout << "HERE " << i << " " << dual->bhead(i) << " VAL:" << val << endl;
+//               (*deficit)[i] = {fabs(val), i};
+//             }
+//           }
+//         }
+//       }
       
-      ParallelPQ pq = ParallelPQ(core, deficit);
+//       ParallelPQ pq = ParallelPQ(core, deficit);
 
-      // cout << "SAME ORIENT:";
-      // for (int i = 0; i < n; i ++){
-      //   if (oracle(i) > 0 && dual.sol(i) > 0){
-      //     cout << i << " ";
-      //   }
-      // }
-      // cout << endl;
+//       // cout << "SAME ORIENT:";
+//       // for (int i = 0; i < n; i ++){
+//       //   if (oracle(i) > 0 && dual.sol(i) > 0){
+//       //     cout << i << " ";
+//       //   }
+//       // }
+//       // cout << endl;
 
-      // cout << "DIF ORIENT:";
-      // for (int i = 0; i < n; i ++){
-      //   if (oracle(i) > 0 && dual.sol(i) == 0){
-      //     cout << i << " ";
-      //   }
-      // }
-      // cout << endl;
+//       // cout << "DIF ORIENT:";
+//       // for (int i = 0; i < n; i ++){
+//       //   if (oracle(i) > 0 && dual.sol(i) == 0){
+//       //     cout << i << " ";
+//       //   }
+//       // }
+//       // cout << endl;
 
-      // cout << " OPPOSE:";
-      // for (int i = 0; i < n; i ++){
-      //   if (oracle(i) == 0 && dual.sol(i) == 1){
-      //     cout << i << " ";
-      //   }
-      // }
-      // cout << endl;
+//       // cout << " OPPOSE:";
+//       // for (int i = 0; i < n; i ++){
+//       //   if (oracle(i) == 0 && dual.sol(i) == 1){
+//       //     cout << i << " ";
+//       //   }
+//       // }
+//       // cout << endl;
 
-      vector<int> ranks;
-      vector<int> addr;
-      int r = 0;
-      while (pq.size() > 0){
-        r ++;
-        auto p = pq.peak();
-        if (oracle(p.second) > 0){
-          ranks.push_back(r);
-          addr.push_back(p.second);
-        }
-        if (!stay[p.second] && stay_count < kIlpSize){
-          stay[p.second] = true;
-          stay_count ++;
-        }
-        pq.pop();
-      }
-      // cout << "RANKS:";
-      // for (int i = 0; i < ranks.size(); i ++){
-      //   cout << ranks[i] << "(" << addr[i] << ") ";
-      // }
-      // cout << endl;
-      // Filtering
-      VectorXi reduced_index (stay_count);
-      DetProb reduced_prob = DetProb(m, stay_count);
-      reduced_prob.bl = prob.bl;
-      reduced_prob.bu = prob.bu;
-      int start_stay_count = 0;
-      #pragma omp parallel num_threads(core)
-      {
-        int local_start_index = -1;
-        int local_stay_count = 0;
-        VectorXi local_stay_index (stay_count);
-        VectorXd local_change_b (m); local_change_b.fill(0);
-        #pragma omp for nowait
-        for (int i = 0; i < n; i ++){
-          if (stay[i]){
-            local_stay_index(local_stay_count) = i;
-            local_stay_count ++;
-          } else{
-            ilp_sol(i) = dual.sol(i);
-            #pragma omp atomic
-            ilp_score += dual.sol(i) * prob.c(i);
-            for (int j = 0; j < m; j ++){
-              local_change_b(j) += prob.A(j, i) * dual.sol(i);
-            }
-          }
-        }
-        #pragma omp critical (c1)
-        {
-          local_start_index = start_stay_count;
-          start_stay_count += local_stay_count;
-        }
-        for (int i = local_start_index; i < local_start_index + local_stay_count; i ++){
-          reduced_index(i) = local_stay_index(i-local_start_index);
-        }
-        #pragma omp barrier
-        for (int i = 0; i < m; i ++){
-          if (prob.bl(i) != -DBL_MAX){
-            #pragma omp atomic
-            reduced_prob.bl(i) -= local_change_b(i);
-          }
-          if (prob.bu(i) != DBL_MAX){
-            #pragma omp atomic
-            reduced_prob.bu(i) -= local_change_b(i);
-          }
-        }
-      }
-      for (int i = 0; i < start_stay_count; i ++){
-        for (int j = 0; j < m; j ++){
-          reduced_prob.A(j, i) = prob.A(j, reduced_index(i));
-        }
-        reduced_prob.c(i) = prob.c(reduced_index(i));
-        reduced_prob.l(i) = prob.l(reduced_index(i));
-        reduced_prob.u(i) = prob.u(reduced_index(i));
-      }
-      GurobiSolver gs = GurobiSolver(reduced_prob);
-      gs.solveIlp(kMipGap, kTimeLimit);
-      status = gs.ilp_status;
-      if (gs.ilp_status == Found){
-        for (int i = 0; i < gs.ilp_sol.size(); i ++){
-          ilp_sol(reduced_index(i)) = gs.ilp_sol(i);
-          ilp_score += gs.ilp_sol(i) * reduced_prob.c(i);
-        }
-      }
-    } else{
-      status = dual.status;
-    }
-  }
-  exe_ilp = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start).count() / 1000000.0;
-}
+//       vector<int> ranks;
+//       vector<int> addr;
+//       int r = 0;
+//       while (pq.size() > 0){
+//         r ++;
+//         auto p = pq.peak();
+//         if (oracle(p.second) > 0){
+//           ranks.push_back(r);
+//           addr.push_back(p.second);
+//         }
+//         if (!stay[p.second] && stay_count < kIlpSize){
+//           stay[p.second] = true;
+//           stay_count ++;
+//         }
+//         pq.pop();
+//       }
+//       // cout << "RANKS:";
+//       // for (int i = 0; i < ranks.size(); i ++){
+//       //   cout << ranks[i] << "(" << addr[i] << ") ";
+//       // }
+//       // cout << endl;
+//       // Filtering
+//       VectorXi reduced_index (stay_count);
+//       DetProb reduced_prob = DetProb(m, stay_count);
+//       reduced_prob.bl = prob.bl;
+//       reduced_prob.bu = prob.bu;
+//       int start_stay_count = 0;
+//       #pragma omp parallel num_threads(core)
+//       {
+//         int local_start_index = -1;
+//         int local_stay_count = 0;
+//         VectorXi local_stay_index (stay_count);
+//         VectorXd local_change_b (m); local_change_b.fill(0);
+//         #pragma omp for nowait
+//         for (int i = 0; i < n; i ++){
+//           if (stay[i]){
+//             local_stay_index(local_stay_count) = i;
+//             local_stay_count ++;
+//           } else{
+//             ilp_sol(i) = dual.sol(i);
+//             #pragma omp atomic
+//             ilp_score += dual.sol(i) * prob.c(i);
+//             for (int j = 0; j < m; j ++){
+//               local_change_b(j) += prob.A(j, i) * dual.sol(i);
+//             }
+//           }
+//         }
+//         #pragma omp critical (c1)
+//         {
+//           local_start_index = start_stay_count;
+//           start_stay_count += local_stay_count;
+//         }
+//         for (int i = local_start_index; i < local_start_index + local_stay_count; i ++){
+//           reduced_index(i) = local_stay_index(i-local_start_index);
+//         }
+//         #pragma omp barrier
+//         for (int i = 0; i < m; i ++){
+//           if (prob.bl(i) != -DBL_MAX){
+//             #pragma omp atomic
+//             reduced_prob.bl(i) -= local_change_b(i);
+//           }
+//           if (prob.bu(i) != DBL_MAX){
+//             #pragma omp atomic
+//             reduced_prob.bu(i) -= local_change_b(i);
+//           }
+//         }
+//       }
+//       for (int i = 0; i < start_stay_count; i ++){
+//         for (int j = 0; j < m; j ++){
+//           reduced_prob.A(j, i) = prob.A(j, reduced_index(i));
+//         }
+//         reduced_prob.c(i) = prob.c(reduced_index(i));
+//         reduced_prob.l(i) = prob.l(reduced_index(i));
+//         reduced_prob.u(i) = prob.u(reduced_index(i));
+//       }
+//       GurobiSolver gs = GurobiSolver(reduced_prob);
+//       gs.solveIlp(kMipGap, kTimeLimit);
+//       status = gs.ilp_status;
+//       if (gs.ilp_status == Found){
+//         for (int i = 0; i < gs.ilp_sol.size(); i ++){
+//           ilp_sol(reduced_index(i)) = gs.ilp_sol(i);
+//           ilp_score += gs.ilp_sol(i) * reduced_prob.c(i);
+//         }
+//       }
+//     } else{
+//       status = dual.status;
+//     }
+//   }
+//   exe_ilp = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start).count() / 1000000.0;
+// }

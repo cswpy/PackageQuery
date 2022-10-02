@@ -198,6 +198,26 @@ vector<string> PgManager::listColumns(string table_name){
   return cols;
 }
 
+void PgManager::getTuples(RMatrixXd &out_tuples, vector<long long> &out_ids, string table_name, const vector<string> &cols, vector<long long> ids){
+  string col_names = join(cols, ",");
+  vector<string> str_ids (ids.size());
+  for (int i = 0; i < (int) ids.size(); i ++) str_ids[i] = to_string(ids[i]);
+  string id_names = join(str_ids, ",");
+  _sql = fmt::format("SELECT {},{} FROM \"{}\" WHERE {} IN ({});", kId, col_names, table_name, kId, id_names);
+  _res = PQexec(_conn, _sql.c_str());
+  int n = PQntuples(_res);
+  int m = (int) cols.size();
+  out_tuples.resize(n, m);
+  out_ids.resize(n);
+  for (int i = 0; i < n; i ++){
+    out_ids[i] = atoll(PQgetvalue(_res, i, 0));
+    for (int j = 0; j < m; i ++){
+      out_tuples(i, j) = atof(PQgetvalue(_res, i, j+1));
+    }
+  }
+  PQclear(_res);
+}
+
 // Deprecated since Postgres does not allow inter-multithreaded
 
 // Stat* PgManager::computeStats(string table_name, const vector<string> &cols){

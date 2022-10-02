@@ -46,4 +46,5 @@ public:
   void dropTable(string table_name);
   vector<string> getNumericCols(string table_name);
   Stat* readStats(string table_name);
+  void getTuples(RMatrixXd &out_tuples, vector<long long> &out_ids, string table_name, const vector<string> &cols, vector<long long> ids);
 };

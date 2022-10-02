@@ -6,15 +6,11 @@
 const int kSleepPeriod = 25; // In ms
 
 void LayeredSketchRefine::init(){
-  vector<string> names = {"Init", "All", "All", "FetchData", "ProcessData", "WriteData", "CreateIndex", "CreateTable", "gist", "id", "tid", "gid"};
-  pro = Profiler(names);
-  pro.clock(0);
   pg = new PgManager();
   _conn = PQconnectdb(pg->conninfo.c_str());
   assert(PQstatus(_conn) == CONNECTION_OK);
   _res = NULL;
   status = NotFound;
-  pro.stop(0);
 }
 
 DLVPartition* LayeredSketchRefine::getDLVPartition(const LsrProb* prob){
@@ -83,7 +79,6 @@ void LayeredSketchRefine::formulateDetProb(int core, const LsrProb &prob, DetPro
 
 LayeredSketchRefine::LayeredSketchRefine(int core, const LsrProb &prob){
   init();
-  pro.clock(1);
   std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
   partition = getDLVPartition(&prob);
   if (!partition){
@@ -261,5 +256,4 @@ LayeredSketchRefine::LayeredSketchRefine(int core, const LsrProb &prob){
   }
   exe_ilp = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start).count() / 1000000.0;
   exe_lp = exe_ilp - (dr.exe_ilp - dr.exe_lp);
-  pro.stop(1);
 }

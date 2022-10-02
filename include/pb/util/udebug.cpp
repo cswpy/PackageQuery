@@ -145,3 +145,38 @@ void Profiler::print(){
     }
   }
 }
+
+void Profiler::addProfiler(Profiler &profiler){
+  assert(n == profiler.n);
+  time += profiler.time;
+  count += profiler.count;
+}
+
+#ifdef _WIN32
+  #include "windows.h"
+  #include "psapi.h"
+
+  double currentRAM(){
+    PROCESS_MEMORY_COUNTERS_EX pmc;
+    SIZE_T ram = pmc.WorkingSetSize; // In bytes
+    return (double) ram / (1 << 30);
+  }
+#else
+  double currentRAM(){
+    FILE* file = fopen("/proc/self/status", "r");
+    double result = -1;
+    char line[128];
+
+    while (fgets(line, 128, file) != NULL){
+      if (strncmp(line, "VmRSS:", 6) == 0){
+        string s = line;
+        s = s.substr(7, s.find('k') - 7);
+        trim(s); // In Kbytes
+        result = stod(s) / (1 << 20);
+        break;
+      }
+    }
+    fclose(file);
+    return result;
+  }
+#endif

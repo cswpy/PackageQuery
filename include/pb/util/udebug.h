@@ -90,4 +90,7 @@ public:
   void clock(int i, bool is_parallel=false);
   void stop(int i, bool is_parallel=false);
   void print();
+  void addProfiler(Profiler &profiler);
 };
+
+double currentRAM();

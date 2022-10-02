@@ -37,13 +37,10 @@ DynamicLowVariance::~DynamicLowVariance(){
 }
 
 DynamicLowVariance::DynamicLowVariance(double group_ratio): group_ratio(group_ratio){
-  vector<string> names = {"Init", "ComputeStat", "All", "FetchData", "ProcessData", "WriteData", "CreateIndex", "CreateTable", "gist", "id", "tid", "gid"};
-  pro = Profiler(names);
   init();
 }
 
 void DynamicLowVariance::init(){
-  pro.clock(0);
   pg = new PgManager();
 
   _conn = PQconnectdb(pg->conninfo.c_str());
@@ -80,7 +77,6 @@ void DynamicLowVariance::init(){
     ");", kPartitionTable);
   _res = PQexec(_conn, _sql.c_str());
   PQclear(_res);
-  pro.stop(0);
 }
 
 void DynamicLowVariance::dropTempTables(){
@@ -112,7 +108,6 @@ void DynamicLowVariance::partition(string table_name, string partition_name){
 }
 
 void DynamicLowVariance::partition(string table_name, string partition_name, const vector<string> &cols){
-  pro.clock(2);
   dropPartition(table_name, partition_name);
   long long size = doPartition(table_name, partition_name, cols);
   if (!size) return;
@@ -130,8 +125,6 @@ void DynamicLowVariance::partition(string table_name, string partition_name, con
     kPartitionTable, table_name, partition_name, pgJoin(cols), group_ratio, kLpSize, kMainMemorySize, kPCore, layer_count);
   _res = PQexec(_conn, _sql.c_str());
   PQclear(_res);
-
-  pro.stop(2);
 }
 
 long long DynamicLowVariance::doPartition(string table_name, string suffix, const vector<string> &cols){
@@ -305,7 +298,6 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
 
   // cout << "End 1a" << endl;
 
-  pro.clock(3);
   pg->dropTable(g_name);
   string atts_names = fmt::format("{} BIGINT,", kId);
   for (auto col : cols){
@@ -323,7 +315,6 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
     ");", p_name);
   _res = PQexec(_conn, _sql.c_str());
   PQclear(_res);
-  pro.stop(3);
 
   // cout << "Begin 1b" << endl;
 

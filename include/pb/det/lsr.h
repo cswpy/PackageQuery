@@ -24,7 +24,6 @@ public:
   map<long long, double> lp_sol;
   double ilp_score, exe_ilp, lp_score, exe_lp;
   int status;
-  Profiler pro;
 private:
   void init();
   void formulateDetProb(int core, const LsrProb &prob, DetProb &det_prob, string current_gtable, const vector<long long> &ids);

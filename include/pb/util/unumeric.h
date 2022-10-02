@@ -15,6 +15,8 @@ int ceilDiv(int x, int q);
 double normalQuantile(double u, double v, double p);
 double normalCdf(double u, double v, double x);
 
+double pctError(double x, double ground);
+
 template <typename T>
 double sign(T value) {
   if (value < 0) return -1.0;
