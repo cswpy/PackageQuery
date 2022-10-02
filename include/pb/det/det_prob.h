@@ -26,4 +26,5 @@ public:
   double boundGenerate(double E, double alpha, double hardness);
   void normalizeObjective();
   void truncate();
+  void setSeed(int seed);
 };

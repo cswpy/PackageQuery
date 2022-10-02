@@ -209,3 +209,7 @@ void DetProb::truncate(){
     bu = new_bu;
   } 
 }
+
+void DetProb::setSeed(int seed){
+  detBound.setSeed(seed);
+}

@@ -120,7 +120,7 @@ void main5p5(){
 }
 
 void main6(){
-  for (int rep = 0; rep < 10000; rep ++){
+  for (int rep = 0; rep < 1; rep ++){
     string table_name = "tpch_6_1";
     string partition_name = "P0";
     string obj_col = "price";
@@ -130,13 +130,26 @@ void main6(){
     LsrProb prob = LsrProb(table_name, partition_name, obj_col, is_maximize, cols, consSense);
     double E = 50;
     double alpha = 0;
-    double hardness = 1;
+    double hardness = 8;
     prob.boundGenerate(E, alpha, hardness);
     LayeredSketchRefine lsr = LayeredSketchRefine(kPCore, prob);
-    print(lsr.lp_sol);
-    print(lsr.ilp_sol);
-    cout << fmt::format("{:.8Lf} {:.8Lf} {:.4Lf}%\n", lsr.lp_score, lsr.ilp_score, fabs((lsr.lp_score-lsr.ilp_score)/lsr.lp_score*100));
+    // print(lsr.lp_sol);
+    // print(lsr.ilp_sol);
+    cols.insert(cols.begin(), obj_col);
+    DetProb det_prob; det_prob.tableGenerate(table_name, cols, true, 2*1e6);
+    memcpy(&det_prob.bl(0), &prob.bl(0), prob.bl.size()*sizeof(double));
+    memcpy(&det_prob.bu(0), &prob.bu(0), prob.bu.size()*sizeof(double));
+    det_prob.bl(3) = prob.cl;
+    det_prob.bu(3) = prob.cu;
+    det_prob.truncate();
+    DualReducer dr = DualReducer(kPCore, det_prob);
+    double ground = dr.lp_score;
+    cout << "LSR" << endl;
+    cout << fmt::format("{:.8Lf} {:.8Lf} {:.4Lf}% {:.4Lf}%\n", lsr.lp_score, lsr.ilp_score, fabs((ground-lsr.lp_score)/ground*100), fabs((ground-lsr.ilp_score)/ground*100));
     cout << fmt::format("{:.2Lf}ms {:.2Lf}ms\n", lsr.exe_lp, lsr.exe_ilp);
+    cout << "DR" << endl;
+    cout << fmt::format("{:.8Lf} {:.8Lf} {:.4Lf}%\n", dr.lp_score, dr.ilp_score, fabs((ground-dr.ilp_score)/ground*100));
+    cout << fmt::format("{:.2Lf}ms {:.2Lf}ms\n", dr.exe_lp, dr.exe_ilp);
   }
 }
 

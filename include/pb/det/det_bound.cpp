@@ -59,17 +59,13 @@ DetBound::DetBound(vector<int> consSense, vector<double> means, vector<double> v
   computeRotationMatrix();
 }
 
-DetBound::DetBound(vector<int> consSense, VectorXd means, VectorXd vars, int seed, double eps): consSense(consSense), seed(seed), eps(eps){
+DetBound::DetBound(vector<int> consSense, VectorXd means, VectorXd vars, int seed, double eps): consSense(consSense), eps(eps){
   m = consSense.size();
   DetBound::means.resize(m);
   VectorXd::Map(&DetBound::means[0], m) = means;
   DetBound::vars.resize(m);
   VectorXd::Map(&DetBound::vars[0], m) = vars;
-  if (seed < 0) {
-    random_device rd;
-    DetBound::seed = rd();
-  }
-  gen.seed(DetBound::seed);
+  setSeed(seed);
   computeRotationMatrix();
 }
 
@@ -164,4 +160,13 @@ double DetBound::sampleHardness(double E, double alpha, double hardness, VectorX
     else left = mid;
   }
   return (left + right) / 2;
+}
+
+void DetBound::setSeed(int seed){
+  DetBound::seed = seed;
+  if (seed < 0) {
+    random_device rd;
+    DetBound::seed = rd();
+  }
+  gen.seed(DetBound::seed);
 }

@@ -27,4 +27,5 @@ public:
   LsrProb(string table_name, string partition_name, string obj_col, bool is_maximize, vector<string> cols, vector<int> consSense, long long u=1LL);
   double boundGenerate(double E, double alpha, double hardness);
   void addFilter(string col, double l, double u);
+  void setSeed(int seed);
 };

@@ -40,3 +40,7 @@ void LsrProb::addFilter(string col, double l, double u){
   filter_cols.push_back(col);
   filter_intervals.emplace_back(l, u);
 }
+
+void LsrProb::setSeed(int seed){
+  detBound.setSeed(seed);
+}

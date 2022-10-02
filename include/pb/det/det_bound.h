@@ -29,4 +29,5 @@ public:
   double minHardness(double& minE, const VectorXd& bl, const VectorXd& bu);
   double sample(double E, double rho, double alpha, VectorXd& bl, VectorXd& bu); // Return hardness
   double sampleHardness(double E, double alpha, double hardness, VectorXd& bl, VectorXd& bu, double rho=kRho); // Return rho
+  void setSeed(int seed);
 };
