@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "udebug.h"
+#include "pb/util/uconfig.h"
 #include "fmt/core.h"
 
 using std::min;
@@ -161,7 +162,7 @@ void Profiler::addProfiler(Profiler &profiler){
     SIZE_T ram = pmc.WorkingSetSize; // In bytes
     return (double) ram / (1 << 30);
   }
-#else
+#else // Assuming Linux
   double currentRAM(){
     FILE* file = fopen("/proc/self/status", "r");
     double result = -1;

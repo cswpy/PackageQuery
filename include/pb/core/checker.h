@@ -21,21 +21,22 @@ public:
   virtual double getScore(const VectorXd &sol);
   virtual int checkLpFeasibility(const VectorXd &sol);
   virtual int checkIlpFeasibility(const VectorXd &sol);
-  double getScore(map<long long, double>& sol);
-  double getScore(map<long long, long long>& sol);
-  int checkLpFeasibility(map<long long, double>& sol);
-  int checkIlpFeasibility(map<long long, long long>& sol);
+  double getScore(map<long long, double> &sol);
+  double getScore(map<long long, long long> &sol);
+  int checkLpFeasibility(map<long long, double> &sol);
+  int checkIlpFeasibility(map<long long, long long> &sol);
 };
 
 class LsrChecker{
 private:
   const LsrProb &prob;
   double epsilon;
-  PgManager pg;
+  PgManager *pg;
 public:
+  ~LsrChecker();
   LsrChecker(const LsrProb &prob, double epsilon=kCheckerEpsilon);
-  double getScore(map<long long, double>& sol);
-  double getScore(map<long long, long long>& sol);
-  int checkLpFeasibility(map<long long, double>& sol);
-  int checkIlpFeasibility(map<long long, long long>& sol);
+  double getScore(map<long long, double> &sol);
+  double getScore(map<long long, long long> &sol);
+  int checkLpFeasibility(map<long long, double> &sol);
+  int checkIlpFeasibility(map<long long, long long> &sol);
 };

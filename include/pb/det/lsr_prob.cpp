@@ -6,41 +6,48 @@
 LsrProb::~LsrProb(){
 }
 
-LsrProb::LsrProb(){
-}
-
-LsrProb::LsrProb(string table_name, string partition_name, string obj_col, bool is_maximize, vector<string> cols, vector<int> consSense, long long u)
-  :table_name(table_name), partition_name(partition_name), obj_col(obj_col), is_maximize(is_maximize), cols(cols), consSense(consSense), u(u){
-  int m = (int) cols.size();
+LsrProb::LsrProb(DetSql &det_sql, string partition_name, int seed): det_sql(det_sql), partition_name(partition_name){
+  setSeed(seed);
+  int m = (int) det_sql.att_cols.size();
   bl.resize(m); bl.fill(-DBL_MAX);
   bu.resize(m); bu.fill(DBL_MAX);
   cl = -DBL_MAX;
   cu = DBL_MAX;
   PgManager pg = PgManager();
-  Stat* stat = pg.readStats(table_name);
-  vector<double> means (m);
-  vector<double> vars (m);
-  for (int i = 0; i < m; i ++){
-    int index = stat->getIndex(cols[i]);
-    means[i] = stat->mean(index);
-    vars[i] = stat->getVar(index);
+  if (det_sql.isFiltering()){
+    // Filtering and compute means, vars
+  } else{
+    Stat* stat = pg.readStats(det_sql.table_name);
+    vector<double> means (m);
+    vector<double> vars (m);
+    for (int i = 0; i < m; i ++){
+      int index = stat->getIndex(det_sql.att_cols[i]);
+      means[i] = stat->mean(index);
+      vars[i] = stat->getVar(index);
+    }
+    delete stat;
+    det_bound = DetBound(det_sql.att_senses, means, vars, LsrProb::seed);
   }
-  delete stat;
-  detBound = DetBound(consSense, means, vars, kGlobalSeed);
 }
 
-double LsrProb::boundGenerate(double E, double alpha, double hardness){
-  cl = E/2.0;
-  cu = E*3/2.0;
-  return detBound.sampleHardness(E, alpha, hardness, bl, bu);
-}
-
-void LsrProb::addFilter(string col, double l, double u){
-  if (l == -DBL_MAX && u == DBL_MAX) return;
-  filter_cols.push_back(col);
-  filter_intervals.emplace_back(l, u);
+double LsrProb::generateBounds(double E, double alpha, double hardness){
+  if (det_sql.has_count_constraint){
+    cl = E*kLowerCountFactor;
+    cu = E*kUpperCountFactor;
+  } else {
+    cl = -DBL_MAX;
+    cu = DBL_MAX;
+  }
+  bl.fill(-DBL_MAX);
+  bu.fill(DBL_MAX);
+  return det_bound.sampleHardness(E, alpha, hardness, bl, bu);
 }
 
 void LsrProb::setSeed(int seed){
-  detBound.setSeed(seed);
+  LsrProb::seed = seed;
+  if (seed < 0) {
+    random_device rd;
+    LsrProb::seed = rd();
+  }
+  det_bound.setSeed(seed);
 }

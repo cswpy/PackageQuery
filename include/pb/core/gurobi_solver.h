@@ -19,7 +19,7 @@ public:
   int iteration_count;
 public:
   ~GurobiSolver();
-  GurobiSolver(const DetProb &prob);
+  GurobiSolver(const DetProb &prob, bool with_objective=true);
   void solveIlp(double mipGap=1e-4, double time_limit=-1.0);
   void solveLp();
   double getLpTime();
@@ -28,4 +28,5 @@ public:
   int checkLpFeasibility(const VectorXd &sol);
   int checkIlpFeasibility(const VectorXd &sol);
   void writeModel(string file_name);
+  bool hasIlpSolution();
 };

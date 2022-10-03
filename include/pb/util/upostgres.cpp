@@ -6,7 +6,6 @@
 #include <fmt/core.h>
 
 #include "upostgres.h"
-#include "pb/util/uconfig.h"
 #include "pb/util/umisc.h"
 #include "pb/util/unumeric.h"
 
@@ -198,12 +197,16 @@ vector<string> PgManager::listColumns(string table_name){
   return cols;
 }
 
-void PgManager::getTuples(RMatrixXd &out_tuples, vector<long long> &out_ids, string table_name, const vector<string> &cols, vector<long long> ids){
+void PgManager::getTuples(RMatrixXd &out_tuples, vector<long long> &out_ids, string table_name, vector<long long> &ids, vector<string> cols, vector<string> filter_cols, vector<pair<double, double>> filter_intervals){
   string col_names = join(cols, ",");
   vector<string> str_ids (ids.size());
   for (int i = 0; i < (int) ids.size(); i ++) str_ids[i] = to_string(ids[i]);
   string id_names = join(str_ids, ",");
-  _sql = fmt::format("SELECT {},{} FROM \"{}\" WHERE {} IN ({});", kId, col_names, table_name, kId, id_names);
+  string filter_conds = "";
+  for (int i = 0; i < (int) filter_cols.size(); i ++){
+    
+  }
+  _sql = fmt::format("SELECT {},{} FROM \"{}\" WHERE {} IN ({}){};", kId, col_names, table_name, kId, id_names, filter_conds);
   _res = PQexec(_conn, _sql.c_str());
   int n = PQntuples(_res);
   int m = (int) cols.size();
@@ -211,7 +214,7 @@ void PgManager::getTuples(RMatrixXd &out_tuples, vector<long long> &out_ids, str
   out_ids.resize(n);
   for (int i = 0; i < n; i ++){
     out_ids[i] = atoll(PQgetvalue(_res, i, 0));
-    for (int j = 0; j < m; i ++){
+    for (int j = 0; j < m; j ++){
       out_tuples(i, j) = atof(PQgetvalue(_res, i, j+1));
     }
   }

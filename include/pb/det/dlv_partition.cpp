@@ -19,7 +19,7 @@ DLVPartition::DLVPartition(const LsrProb *prob, vector<string> cols, double grou
   assert(PQstatus(_conn) == CONNECTION_OK);
   _res = NULL;
 
-  is_filtering = prob->filter_cols.size() > 0;
+  is_filtering = prob->det_sql.filter_cols.size() > 0;
 
   vector<string> intervals (cols.size());
   for (int i = 0; i < (int) cols.size(); i ++) intervals[i] = "interval_" + cols[i];
@@ -35,7 +35,7 @@ DLVPartition::DLVPartition(const LsrProb *prob, vector<string> cols, double grou
     _res = PQprepare(_conn, fmt::format("size_{}", current_gtable).c_str(), _sql.c_str(), 1, NULL);
     assert(PQresultStatus(_res) == PGRES_COMMAND_OK);
     PQclear(_res);
-    _sql = fmt::format("SELECT size,{} FROM \"{}\" WHERE id=$1::bigint;", prob->obj_col, current_gtable);
+    _sql = fmt::format("SELECT size,{} FROM \"{}\" WHERE id=$1::bigint;", prob->det_sql.obj_col, current_gtable);
     _res = PQprepare(_conn, fmt::format("worth_{}", current_gtable).c_str(), _sql.c_str(), 1, NULL);
     assert(PQresultStatus(_res) == PGRES_COMMAND_OK);
     PQclear(_res);
@@ -57,14 +57,14 @@ DLVPartition::DLVPartition(const LsrProb *prob, vector<string> cols, double grou
       if (layer == 1){
         // Special filtering for original layer
         string and_conds = "";
-        for (int i = 0; i < (int) prob->filter_cols.size(); i ++){
-          and_conds += fmt::format(" AND g.{} ", prob->filter_cols[i]);
-          auto [left, right] = prob->filter_intervals[i];
+        for (int i = 0; i < (int) prob->det_sql.filter_cols.size(); i ++){
+          and_conds += fmt::format(" AND g.{} ", prob->det_sql.filter_cols[i]);
+          auto [left, right] = prob->det_sql.filter_intervals[i];
           if (left != -DBL_MAX && right != DBL_MAX) and_conds += fmt::format("BETWEEN {:.{}Lf} AND {:.{}Lf}", left, kPrecision, right, kPrecision);
           else if (left != -DBL_MAX) and_conds += fmt::format(">= {:.{}Lf}", left, kPrecision);
           else and_conds += fmt::format("<= {:.{}Lf}", right, kPrecision);
         }
-        _sql = fmt::format("SELECT p.tid FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid=$1::bigint{};", current_ptable, prob->table_name, and_conds);
+        _sql = fmt::format("SELECT p.tid FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid=$1::bigint{};", current_ptable, prob->det_sql.table_name, and_conds);
       } else{
         _sql = fmt::format("SELECT p.tid FROM \"{}\" p WHERE p.gid=$1::bigint AND p.tid IN (SELECT id FROM \"{}\");", current_ptable, getGName(layer-1));
       }
@@ -76,23 +76,21 @@ DLVPartition::DLVPartition(const LsrProb *prob, vector<string> cols, double grou
 }
 
 string DLVPartition::getPName(int layer){
-  return fmt::format("[{}P]{}_{}", layer, prob->table_name, prob->partition_name);
+  return fmt::format("[{}P]{}_{}", layer, prob->det_sql.table_name, prob->partition_name);
 }
 
 string DLVPartition::getGName(int layer){
-  if (!is_filtering) return fmt::format("[{}G]{}_{}", layer, prob->table_name, prob->partition_name);
-  else return fmt::format("{}_[{}G]{}_{}", kTempPrefix, layer, prob->table_name, prob->partition_name);
+  if (!is_filtering) return fmt::format("[{}G]{}_{}", layer, prob->det_sql.table_name, prob->partition_name);
+  else return fmt::format("{}_[{}G]{}_{}", kTempPrefix, layer, prob->det_sql.table_name, prob->partition_name);
 }
 
 string DLVPartition::getInitialGName(int layer){
-  return fmt::format("[{}G]{}_{}", layer, prob->table_name, prob->partition_name);
+  return fmt::format("[{}G]{}_{}", layer, prob->det_sql.table_name, prob->partition_name);
 }
 
 bool DLVPartition::isCompatible(){
-  bool res = isIn(cols, prob->obj_col);
-  for (string s : prob->cols) res &= isIn(cols, s);
-  vector<string> col_names = pg->listColumns(prob->table_name);
-  for (string s : prob->filter_cols) res &= isIn(col_names, s);
+  bool res = isIn(cols, prob->det_sql.obj_col);
+  for (string s : prob->det_sql.att_cols) res &= isIn(cols, s);
   return res;
 }
 
@@ -121,7 +119,7 @@ pair<long long, double> DLVPartition::getGroupWorthness(int layer, long long gro
   if (PQntuples(_res)){
     size = atoll(PQgetvalue(_res, 0, 0));
     worth = atof(PQgetvalue(_res, 0, 1));
-    if (!prob->is_maximize) worth = -worth;
+    if (!prob->det_sql.is_maximize) worth = -worth;
   }
   PQclear(_res);
   return {size, worth};

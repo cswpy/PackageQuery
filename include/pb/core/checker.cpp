@@ -38,63 +38,67 @@ int Checker::checkIlpFeasibility(const VectorXd &sol){
   return checkLpFeasibility(sol);
 }
 
-double Checker::getScore(map<long long, double>& sol){
+double Checker::getScore(map<long long, double> &sol){
   VectorXd vsol (n); vsol.fill(0);
   for (const auto& [i, v] : sol) vsol(id_map[i]) = v;
   return getScore(vsol);
 }
 
-double Checker::getScore(map<long long, long long>& sol){
+double Checker::getScore(map<long long, long long> &sol){
   VectorXd vsol (n); vsol.fill(0);
   for (const auto& [i, v] : sol) vsol(id_map[i]) = (double) v;
   return getScore(vsol);
 }
 
-int Checker::checkLpFeasibility(map<long long, double>& sol){
+int Checker::checkLpFeasibility(map<long long, double> &sol){
   VectorXd vsol (n); vsol.fill(0);
   for (const auto& [i, v] : sol) vsol(id_map[i]) = v;
   return checkLpFeasibility(vsol);
 }
 
-int Checker::checkIlpFeasibility(map<long long, long long>& sol){
+int Checker::checkIlpFeasibility(map<long long, long long> &sol){
   VectorXd vsol (n); vsol.fill(0);
   for (const auto& [i, v] : sol) vsol(id_map[i]) = (double) v;
   return checkIlpFeasibility(vsol);
 }
 
-LsrChecker::LsrChecker(const LsrProb &prob, double epsilon): prob(prob), epsilon(epsilon){
-  pg = PgManager();
+LsrChecker::~LsrChecker(){
+  delete pg;
 }
 
-double LsrChecker::getScore(map<long long, double>& sol){
+LsrChecker::LsrChecker(const LsrProb &prob, double epsilon): prob(prob), epsilon(epsilon){
+  pg = new PgManager();
+}
+
+double LsrChecker::getScore(map<long long, double> &sol){
   RMatrixXd out_tuples; vector<long long> out_ids;
   vector<long long> ids; ids.reserve(sol.size());
   for (const auto& [k, v] : sol) ids.push_back(k);
-  pg.getTuples(out_tuples, out_ids, prob.table_name, {prob.obj_col}, ids);
+  pg->getTuples(out_tuples, out_ids, prob.det_sql.table_name, ids, {prob.det_sql.obj_col});
   long long score = 0.0;
   for (int i = 0; i < (int) out_ids.size(); i ++){
     score += out_tuples(i, 0)*sol[out_ids[i]];
   }
-  if (!prob.is_maximize) score = -score;
+  if (!prob.det_sql.is_maximize) score = -score;
   return score;
 }
 
-double LsrChecker::getScore(map<long long, long long>& sol){
+double LsrChecker::getScore(map<long long, long long> &sol){
   map<long long, double> dsol;
   for (const auto& [k, v] : sol) dsol[k] = (double) v;
   return getScore(dsol);
 }
 
-int LsrChecker::checkLpFeasibility(map<long long, double>& sol){
+int LsrChecker::checkLpFeasibility(map<long long, double> &sol){
   RMatrixXd out_tuples; vector<long long> out_ids;
   vector<long long> ids; ids.reserve(sol.size());
   for (const auto& [k, v] : sol){
     if (isLess(v, 0, epsilon)) return LbVariable;
-    if (isGreater(v, prob.u, epsilon)) return UbVariable;
+    if (isGreater(v, prob.det_sql.u, epsilon)) return UbVariable;
     ids.push_back(k);
   }
-  pg.getTuples(out_tuples, out_ids, prob.table_name, prob.cols, ids);
-  int m = (int) prob.cols.size();
+  pg->getTuples(out_tuples, out_ids, prob.det_sql.table_name, ids, prob.det_sql.att_cols);
+  int m = (int) prob.det_sql.att_cols.size();
   VectorXd Ax (m); Ax.fill(0);
   double count = 0;
   for (int i = 0; i < (int) out_ids.size(); i ++){
@@ -112,7 +116,7 @@ int LsrChecker::checkLpFeasibility(map<long long, double>& sol){
   return Feasibility;
 }
 
-int LsrChecker::checkIlpFeasibility(map<long long, long long>& sol){
+int LsrChecker::checkIlpFeasibility(map<long long, long long> &sol){
   map<long long, double> dsol;
   for (const auto& [k, v] : sol) dsol[k] = (double) v;
   return checkLpFeasibility(dsol);

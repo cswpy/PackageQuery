@@ -7,7 +7,7 @@ GurobiSolver::~GurobiSolver(){
   GRBfreeenv(env);
 }
 
-GurobiSolver::GurobiSolver(const DetProb &prob): Checker(prob){
+GurobiSolver::GurobiSolver(const DetProb &prob, bool with_objective): Checker(prob){
   std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
   lp_status = NotFound;
   ilp_status = NotFound;
@@ -17,9 +17,12 @@ GurobiSolver::GurobiSolver(const DetProb &prob): Checker(prob){
   assert(!GRBsetparam(env, "OutputFlag", "0"));
   assert(!GRBstartenv(env));
   assert(!GRBnewmodel(env, &model, "origin", 0, NULL, NULL, NULL, NULL, NULL));
-  for (int i = 0; i < n; i++) {
-    assert(!GRBaddvar(model, 0, NULL, NULL, prob.c(i), prob.l(i), prob.u(i), GRB_INTEGER, NULL));
+  if (with_objective){
+    for (int i = 0; i < n; i++) assert(!GRBaddvar(model, 0, NULL, NULL, prob.c(i), prob.l(i), prob.u(i), GRB_INTEGER, NULL));
+  } else{
+    for (int i = 0; i < n; i++) assert(!GRBaddvar(model, 0, NULL, NULL, 0.0, prob.l(i), prob.u(i), GRB_INTEGER, NULL));
   }
+
   assert(!GRBsetintattr(model, GRB_INT_ATTR_MODELSENSE, GRB_MAXIMIZE));
   for (int i = 0; i < m; i++) {
     int *ind = new int[n];
@@ -119,4 +122,10 @@ int GurobiSolver::checkIlpFeasibility(const VectorXd &sol){
     if (!isInteger(sol(i), epsilon)) return Integrality;
   }
   return checkLpFeasibility(sol);
+}
+
+bool GurobiSolver::hasIlpSolution(){
+  GurobiSolver gs = GurobiSolver(prob, false);
+  gs.solveIlp();
+  return gs.ilp_status == Found;
 }

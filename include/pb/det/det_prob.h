@@ -3,6 +3,7 @@
 #include "det_bound.h"
 
 #include "pb/util/udeclare.h"
+#include "pb/det/det_sql.h"
 
 using namespace pb;
 
@@ -11,19 +12,21 @@ using namespace pb;
 // Maximizing cx
 class DetProb{
 public:
+  DetSql *det_sql;
   RMatrixXd A;
   VectorXd bl, bu, c, l, u;
   vector<long long> ids;
-  DetBound detBound;
+  DetBound det_bound;
+  int seed;
 public:
   ~DetProb();
   DetProb();
   DetProb(int m, int n);
+  DetProb(DetSql &det_sql, long long n, int seed=-1);
   void resize(int m, int n);
   void uniformGenerate(int n, int expected_n, double att_var, double outlier_prob, bool restrict_count=true, bool is_positive=false, bool is_translate=false, int seed=-1);
   void normalGenerate(int n, int expected_n, double att_var, double outlier_prob, bool restrict_count=true, int seed=-1);
-  void tableGenerate(string table_name, vector<string>& cols, bool is_maximize, int n, int seed=-1);
-  double boundGenerate(double E, double alpha, double hardness);
+  double generateBounds(double E, double alpha, double hardness);
   void normalizeObjective();
   void truncate();
   void setSeed(int seed);

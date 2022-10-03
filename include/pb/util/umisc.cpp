@@ -27,6 +27,7 @@ string infAlias(double val, int precision){
 
 string join(vector<string> names, string delim){
   string res = "";
+  if (names.size() == 0) return res;
   for (int i = 0; i < (int)(names.size()-1); i++) res += names[i] + delim;
   res += names[names.size()-1];
   return res;

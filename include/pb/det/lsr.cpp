@@ -14,7 +14,7 @@ void LayeredSketchRefine::init(){
 }
 
 DLVPartition* LayeredSketchRefine::getDLVPartition(const LsrProb* prob){
-  _sql = fmt::format("SELECT cols, group_ratio, lp_size, layer_count FROM {} WHERE table_name='{}' AND partition_name='{}';", kPartitionTable, prob->table_name, prob->partition_name);
+  _sql = fmt::format("SELECT cols, group_ratio, lp_size, layer_count FROM {} WHERE table_name='{}' AND partition_name='{}';", kPartitionTable, prob->det_sql.table_name, prob->partition_name);
   _res = PQexec(_conn, _sql.c_str());
   if (PQntuples(_res)){
     DLVPartition* partition = new DLVPartition(prob, pgStringSplit(PQgetvalue(_res, 0, 0)), 
@@ -32,10 +32,10 @@ LayeredSketchRefine::~LayeredSketchRefine(){
 }
 
 void LayeredSketchRefine::formulateDetProb(int core, const LsrProb &prob, DetProb &det_prob, string current_gtable, const vector<long long> &ids){
-  int m = prob.cols.size() + 1;
+  int m = prob.det_sql.att_cols.size() + 1;
   int n = (int) ids.size();
   det_prob.resize(m, n);
-  det_prob.u.fill((double) prob.u);
+  det_prob.u.fill((double) prob.det_sql.u);
   for (int i = 0; i < m; i ++){
     if (i < m - 1){
       det_prob.bl(i) = prob.bl(i);
@@ -46,7 +46,7 @@ void LayeredSketchRefine::formulateDetProb(int core, const LsrProb &prob, DetPro
     }
   }
   int chunk = ceilDiv(n, core);
-  string col_names = join(prob.cols, ",");
+  string col_names = join(prob.det_sql.att_cols, ",");
   #pragma omp parallel num_threads(core)
   {
     string sql;
@@ -60,7 +60,7 @@ void LayeredSketchRefine::formulateDetProb(int core, const LsrProb &prob, DetPro
     for (int i = start_id; i < end_id; i ++) string_ids += to_string(ids[i]) + ",";
     if (end_id >= start_id) string_ids += to_string(ids[end_id]);
     sql = fmt::format("SELECT {},{},{} FROM \"{}\" WHERE {} IN ({});",
-      kId, prob.obj_col, col_names, current_gtable, kId, string_ids);
+      kId, prob.det_sql.obj_col, col_names, current_gtable, kId, string_ids);
     res = PQexec(conn, sql.c_str());
     for (int i = 0; i < PQntuples(res); i++){
       int index = i + start_id;
@@ -229,7 +229,7 @@ LayeredSketchRefine::LayeredSketchRefine(int core, const LsrProb &prob){
 
     string next_gtable;
     if (layer > 1) next_gtable = partition->getGName(layer-1);
-    else next_gtable = prob.table_name;
+    else next_gtable = prob.det_sql.table_name;
     formulateDetProb(core, prob, det_prob, next_gtable, ids);
     // Debug
     // for (auto v : ids) cout << v << " ";

@@ -26,7 +26,7 @@ double DetBound::computeLowerBound(double E, double rho){
       double ov = fabs(E) * vars[i];
       double u = c * means[i];
       double v = fabs(c) * vars[i];
-      switch (consSense[i]){
+      switch (att_senses[i]){
         case LowerBounded:
           min_prob = min(min_prob, 1 - normalCdf(ou, ov, normalQuantile(u, v, 1-rho)));
           break;
@@ -49,18 +49,14 @@ double DetBound::computeLowerBound(double E, double rho){
 DetBound::DetBound(){
 }
 
-DetBound::DetBound(vector<int> consSense, vector<double> means, vector<double> vars, int seed, double eps): consSense(consSense), means(means), vars(vars), seed(seed), eps(eps){
-  m = consSense.size();
-  if (seed < 0) {
-    random_device rd;
-    DetBound::seed = rd();
-  }
-  gen.seed(DetBound::seed);
+DetBound::DetBound(vector<int> att_senses, vector<double> means, vector<double> vars, int seed, double eps): att_senses(att_senses), means(means), vars(vars), seed(seed), eps(eps){
+  m = att_senses.size();
+  setSeed(seed);
   computeRotationMatrix();
 }
 
-DetBound::DetBound(vector<int> consSense, VectorXd means, VectorXd vars, int seed, double eps): consSense(consSense), eps(eps){
-  m = consSense.size();
+DetBound::DetBound(vector<int> att_senses, VectorXd means, VectorXd vars, int seed, double eps): att_senses(att_senses), eps(eps){
+  m = att_senses.size();
   DetBound::means.resize(m);
   VectorXd::Map(&DetBound::means[0], m) = means;
   DetBound::vars.resize(m);
@@ -123,7 +119,7 @@ void DetBound::assignBound(double rho, const VectorXd& center, VectorXd& bl, Vec
   for (int i = 0; i < m; i ++){
     double u = center(i) * means[i];
     double v = fabs(center(i)) * vars[i];
-    switch (consSense[i]){
+    switch (att_senses[i]){
       case LowerBounded:
         bl(i) = normalQuantile(u, v, 1-rho);
         bu(i) = DBL_MAX;

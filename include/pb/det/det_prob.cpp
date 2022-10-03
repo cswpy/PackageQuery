@@ -1,4 +1,5 @@
 #include "det_prob.h"
+
 #include "pb/util/uconfig.h"
 #include "pb/util/upostgres.h"
 #include "pb/util/unumeric.h"
@@ -11,6 +12,76 @@ DetProb::DetProb(){
 
 DetProb::DetProb(int m, int n){
   resize(m, n);
+}
+
+DetProb::DetProb(DetSql &det_sql, long long n, int seed): det_sql(&det_sql){
+  setSeed(seed);
+  PgManager pg = PgManager();
+  long long size = pg.getSize(det_sql.table_name);
+  long long chunk = ceilDiv(size, (long long) kPCore);
+  double probability = n / (double) size;
+  seed_seq seq{DetProb::seed};
+  vector<unsigned int> local_seeds (kPCore);
+  seq.generate(local_seeds.begin(), local_seeds.end());
+  string col_names = det_sql.obj_col + "," + join(det_sql.att_cols, ",");
+  if (det_sql.isFiltering()){
+    col_names += "," + join(det_sql.filter_cols, ",");
+  }
+  long long global_size = 0;
+  MeanVar mv = MeanVar(det_sql.att_cols.size());
+  #pragma omp parallel num_threads(kPCore)
+  {
+    int seg = omp_get_thread_num();
+    default_random_engine gen (local_seeds[seg]);
+    uniform_real_distribution dist (0.0, 1.0);
+    long long start_id = seg * chunk + 1;
+    long long end_id = (seg + 1) * chunk;
+    vector<long long> selected_ids; selected_ids.reserve((int)(chunk * probability));
+    for (long long id = start_id; id <= end_id; id ++){
+      if (dist(gen) <= probability) selected_ids.push_back(id);
+    }
+    int start_index;
+    #pragma omp critical (c1)
+    {
+      start_index = global_size;
+      global_size += selected_ids.size();
+    }
+    #pragma omp barrier
+    #pragma omp master
+    {
+      resize(det_sql.att_cols.size()+(int)(det_sql.has_count_constraint==true), global_size);
+    }
+    #pragma omp barrier
+    vector<string> sids;
+    for (auto id : selected_ids) sids.push_back(to_string(id));
+    string sql = fmt::format("SELECT {},{} FROM \"{}\" WHERE {} IN ({})", kId, col_names, det_sql.table_name, kId, join(sids, ","));
+    PGconn *conn = PQconnectdb(pg.conninfo.c_str());
+    assert(PQstatus(conn) == CONNECTION_OK);
+    PGresult *res = NULL;
+    res = PQexec(conn, sql.c_str());
+
+    MeanVar local_mv = MeanVar(det_sql.att_cols.size());
+    for (int i = 0; i < PQntuples(res); i++){
+      int index = i + start_index;
+      ids[index] = atol(PQgetvalue(res, i, 0));
+      if (det_sql.is_maximize) c(index) = atof(PQgetvalue(res, i, 1));
+      else c(index) = -atof(PQgetvalue(res, i, 1));
+      VectorXd x (3);
+      for (int j = 0; j < 3; j ++){
+        A(j, index) = atof(PQgetvalue(res, i, j+2));
+        x(j) = A(j, index);
+      }
+      local_mv.add(x);
+      A(3, index) = 1;
+    }
+    PQclear(res);
+    PQfinish(conn);
+    #pragma omp critical (c2)
+    {
+      mv.add(local_mv);
+    }
+  }
+  det_bound = DetBound(det_sql.att_senses, mv.getMean(), mv.getVar(), DetProb::seed);
 }
 
 void DetProb::resize(int m, int n){
@@ -51,7 +122,6 @@ void DetProb::uniformGenerate(int n, int expected_n, double att_var, double outl
     c(i) = dist(gen);
   }
   normal_distribution bound_dist((left+right)/2*expected_n, sqrt(att_var*expected_n));
-  //uniform_real_distribution dist(left*sqrt(expected_n), right*sqrt(expected_n));
   double tol = sqrt(att_var*expected_n/outlier_prob);
   double v = bound_dist(gen);
   bl(0) = v-tol;
@@ -96,85 +166,14 @@ void DetProb::normalGenerate(int n, int expected_n, double att_var, double outli
   }
 }
 
-// First column is the objective
-void DetProb::tableGenerate(string table_name, vector<string>& cols, bool is_maximize, int n, int seed){
-  PgManager pg = PgManager();
-  long long size = pg.getSize(table_name);
-  long long chunk = ceilDiv(size, (long long) kPCore);
-  double probability = n / (double) size;
-  unsigned int local_seed;
-  if (seed < 0){
-    random_device rd;
-    local_seed = rd();
-  } else{
-    local_seed = seed;
+double DetProb::generateBounds(double E, double alpha, double hardness){
+  bl.fill(-DBL_MAX);
+  bu.fill(DBL_MAX);
+  if (det_sql->has_count_constraint){
+    bl(bl.size() - 1) = E*kLowerCountFactor;
+    bu(bu.size() - 1) = E*kUpperCountFactor;
   }
-  seed_seq seq{local_seed};
-  vector<unsigned int> local_seeds (kPCore);
-  seq.generate(local_seeds.begin(), local_seeds.end());
-  string col_name = join(cols, ",");
-  int global_size = 0;
-  MeanVar mv = MeanVar(3);
-  #pragma omp parallel num_threads(kPCore)
-  {
-    int seg = omp_get_thread_num();
-    default_random_engine gen (local_seeds[seg]);
-    uniform_real_distribution dist (0.0, 1.0);
-    long long start_id = seg * chunk + 1;
-    long long end_id = (seg + 1) * chunk;
-    vector<long long> selected_ids; selected_ids.reserve((int)(chunk * probability));
-    for (long long id = start_id; id <= end_id; id ++){
-      if (dist(gen) <= probability) selected_ids.push_back(id);
-    }
-    int start_index;
-    #pragma omp critical (c1)
-    {
-      start_index = global_size;
-      global_size += selected_ids.size();
-    }
-    #pragma omp barrier
-    #pragma omp master
-    {
-      resize(4, global_size);
-    }
-    #pragma omp barrier
-    vector<string> sids;
-    for (auto id : selected_ids) sids.push_back(to_string(id));
-    string sql = fmt::format("SELECT {},{} FROM \"{}\" WHERE {} IN ({})", kId, col_name, table_name, kId, join(sids, ","));
-    PGconn *conn = PQconnectdb(pg.conninfo.c_str());
-    assert(PQstatus(conn) == CONNECTION_OK);
-    PGresult *res = NULL;
-    res = PQexec(conn, sql.c_str());
-
-    MeanVar local_mv = MeanVar(3);
-    for (int i = 0; i < PQntuples(res); i++){
-      int index = i + start_index;
-      ids[index] = atol(PQgetvalue(res, i, 0));
-      if (is_maximize) c(index) = atof(PQgetvalue(res, i, 1));
-      else c(index) = -atof(PQgetvalue(res, i, 1));
-      VectorXd x (3);
-      for (int j = 0; j < 3; j ++){
-        A(j, index) = atof(PQgetvalue(res, i, j+2));
-        x(j) = A(j, index);
-      }
-      local_mv.add(x);
-      A(3, index) = 1;
-    }
-    PQclear(res);
-    PQfinish(conn);
-    #pragma omp critical (c2)
-    {
-      mv.add(local_mv);
-    }
-  }
-  vector<int> consSense = {LowerBounded, UpperBounded, Bounded};
-  detBound = DetBound(consSense, mv.getMean(), mv.getVar(), seed);
-}
-
-double DetProb::boundGenerate(double E, double alpha, double hardness){
-  bl(3) = E/2;
-  bu(3) = E*3/2;
-  return detBound.sampleHardness(E, alpha, hardness, bl, bu);
+  return det_bound.sampleHardness(E, alpha, hardness, bl, bu);
 }
 
 void DetProb::normalizeObjective(){
@@ -211,5 +210,10 @@ void DetProb::truncate(){
 }
 
 void DetProb::setSeed(int seed){
-  detBound.setSeed(seed);
+  DetProb::seed = seed;
+  if (seed < 0) {
+    random_device rd;
+    DetProb::seed = rd();
+  }
+  det_bound.setSeed(seed);
 }
