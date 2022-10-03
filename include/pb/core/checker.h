@@ -7,7 +7,7 @@
 
 using namespace pb;
 
-static const double kCheckerEpsilon = 1e-6;
+static const double kCheckerEpsilon = 1e-4;
 
 class Checker{
 private:

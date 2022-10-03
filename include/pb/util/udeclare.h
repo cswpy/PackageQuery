@@ -30,7 +30,7 @@ typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> R
 
 enum ConsSense { LowerBounded, UpperBounded, Bounded};
 enum SolStatus { NotFound, Found, Feasible, Infeasible, Unbounded, DualUnbounded, Timeout, NoPartitionFound, IncompatiblePartition};
-enum FeasStatus { Unsolved, Feasibility, Infeasibility, LbConstraint, UbConstraint, LbVariable, UbVariable, Integrality};
+enum FeasStatus { Unsolved, Feasibility, Infeasibility, LbConstraint, UbConstraint, LbVariable, UbVariable, Integrality, BadFilter};
 enum GroupStatus { Unitialized, Unlocked, Locked};
 
 namespace pb{

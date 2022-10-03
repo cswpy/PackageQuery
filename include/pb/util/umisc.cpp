@@ -139,6 +139,18 @@ bool isIn(vector<string> arr, string s){
   return false;
 }
 
+string getFilterConds(vector<string> filter_cols, vector<pair<double, double>> filter_intervals, int precision){
+  string filter_conds = "";
+  for (int i = 0; i < (int) filter_cols.size(); i ++){
+    filter_conds += fmt::format(" AND g.{} ", filter_cols[i]);
+    auto [left, right] = filter_intervals[i];
+    if (left != -DBL_MAX && right != DBL_MAX) filter_conds += fmt::format("BETWEEN {:.{}Lf} AND {:.{}Lf}", left, precision, right, precision);
+    else if (left != -DBL_MAX) filter_conds += fmt::format(">= {:.{}Lf}", left, precision);
+    else filter_conds += fmt::format("<= {:.{}Lf}", right, precision);
+  }
+  return filter_conds;
+}
+
 void allocate(char **vals, int index, const char *s){
   vals[index] = new char[strlen(s)];
   strcpy(vals[index], s);

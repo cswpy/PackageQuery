@@ -77,7 +77,7 @@ double LsrChecker::getScore(map<long long, double> &sol){
   pg->getTuples(out_tuples, out_ids, prob.det_sql.table_name, ids, {prob.det_sql.obj_col});
   long long score = 0.0;
   for (int i = 0; i < (int) out_ids.size(); i ++){
-    score += out_tuples(i, 0)*sol[out_ids[i]];
+    score += out_tuples(0, i)*sol[out_ids[i]];
   }
   if (!prob.det_sql.is_maximize) score = -score;
   return score;
@@ -97,14 +97,18 @@ int LsrChecker::checkLpFeasibility(map<long long, double> &sol){
     if (isGreater(v, prob.det_sql.u, epsilon)) return UbVariable;
     ids.push_back(k);
   }
-  pg->getTuples(out_tuples, out_ids, prob.det_sql.table_name, ids, prob.det_sql.att_cols);
+  pg->getTuples(out_tuples, out_ids, prob.det_sql.table_name, ids, prob.det_sql.att_cols, prob.det_sql.filter_cols, prob.det_sql.filter_intervals);
+  int n = (int) out_ids.size();
+  if (n != (int) ids.size()) return BadFilter;
   int m = (int) prob.det_sql.att_cols.size();
   VectorXd Ax (m); Ax.fill(0);
   double count = 0;
-  for (int i = 0; i < (int) out_ids.size(); i ++){
-    for (int j = 0; j < m; j ++){
-      Ax(j) += out_tuples(i, j)*sol[out_ids[i]];
+  for (int j = 0; j < m; j ++){
+    for (int i = 0; i < n; i ++){
+      Ax(j) += out_tuples(j, i)*sol[out_ids[i]];
     }
+  }
+  for (int i = 0; i < n; i ++){
     count += sol[out_ids[i]];
   }
   for (int i = 0; i < m; i ++){

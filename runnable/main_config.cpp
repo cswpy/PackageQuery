@@ -10,6 +10,7 @@
 #include "pb/det/lsr_prob.h"
 #include "pb/util/upostgres.h"
 #include "pb/det/lsr.h"
+#include "pb/det/det_sql.h"
 
 using namespace pb;
 
@@ -117,51 +118,53 @@ void main5p5(){
   dlv.partition(table_name, partition_name);
 }
 
-// void main6(){
-//   for (int rep = 0; rep < 1; rep ++){
-//     int order = 8;
-//     string table_name = fmt::format("tpch_{}_1", order);
-//     string partition_name = "P0";
-//     string obj_col = "price";
-//     bool is_maximize = true;
-//     vector<string> cols = {"quantity", "discount", "tax"};
-//     vector<int> consSense = {LowerBounded, UpperBounded, Bounded};
-//     LsrProb prob = LsrProb(table_name, partition_name, obj_col, is_maximize, cols, consSense);
-//     double E = 50;
-//     double alpha = 0;
-//     double hardness = 8;
-//     prob.boundGenerate(E, alpha, hardness);
-//     LayeredSketchRefine lsr = LayeredSketchRefine(kPCore, prob);
-//     if (order <= 7){
-//       cols.insert(cols.begin(), obj_col);
-//       DetProb det_prob; det_prob.tableGenerate(table_name, cols, true, 2*pow(10.0, (double) order));
-//       memcpy(&det_prob.bl(0), &prob.bl(0), prob.bl.size()*sizeof(double));
-//       memcpy(&det_prob.bu(0), &prob.bu(0), prob.bu.size()*sizeof(double));
-//       det_prob.bl(3) = prob.cl;
-//       det_prob.bu(3) = prob.cu;
-//       det_prob.truncate();
-//       Checker ch = Checker(det_prob);
-//       DualReducer dr = DualReducer(kPCore, det_prob);
-//       double ground = dr.lp_score;
-//       cout << feasMessage(ch.checkLpFeasibility(lsr.lp_sol)) << " " << feasMessage(ch.checkIlpFeasibility(lsr.ilp_sol)) << " " << feasMessage(ch.checkLpFeasibility(dr.lp_sol)) << " " << feasMessage(ch.checkIlpFeasibility(lsr.ilp_sol)) << endl;
-//       cout << "LSR" << endl;
-//       cout << fmt::format("{:.8Lf} {:.8Lf} {:.4Lf}% {:.4Lf}%\n", lsr.lp_score, lsr.ilp_score, pctError(lsr.lp_score, ground), pctError(lsr.ilp_score, ground));
-//       cout << fmt::format("{:.2Lf}ms {:.2Lf}ms\n", lsr.exe_lp, lsr.exe_ilp);
-//       cout << "DR" << endl;
-//       cout << fmt::format("{:.8Lf} {:.8Lf} {:.4Lf}%\n", dr.lp_score, dr.ilp_score, pctError(dr.ilp_score, ground));
-//       cout << fmt::format("{:.2Lf}ms {:.2Lf}ms\n", dr.exe_lp, dr.exe_ilp);
-//     } else{
-//       cout << "LSR" << endl;
-//       LsrChecker ch = LsrChecker(prob);
-//       double ground = lsr.lp_score;
-//       cout << feasMessage(ch.checkLpFeasibility(lsr.lp_sol)) << " " << feasMessage(ch.checkIlpFeasibility(lsr.ilp_sol)) << endl;
-//       cout << fmt::format("{:.8Lf} {:.8Lf} {:.4Lf}% {:.4Lf}%\n", lsr.lp_score, lsr.ilp_score, pctError(lsr.lp_score, ground), pctError(lsr.ilp_score, ground));
-//       cout << fmt::format("{:.2Lf}ms {:.2Lf}ms\n", lsr.exe_lp, lsr.exe_ilp);
-//     }
-//     // print(lsr.lp_sol);
-//     // print(lsr.ilp_sol);
-//   }
-// }
+void main6(){
+  for (int rep = 0; rep < 1; rep ++){
+    int order = 9;
+    string table_name = fmt::format("tpch_{}_1", order);
+    string partition_name = "P0";
+    string obj_col = "price";
+    bool is_maximize = true;
+    vector<string> att_cols = {"quantity", "discount", "tax"};
+    vector<int> att_senses = {LowerBounded, UpperBounded, Bounded};
+    int att_count = (int) att_cols.size();
+    DetSql det_sql = DetSql(table_name, obj_col, is_maximize, att_cols, att_senses);
+    LsrProb prob = LsrProb(det_sql, partition_name);
+    double E = 50;
+    double alpha = 0;
+    double hardness = 8;
+    prob.generateBounds(E, alpha, hardness);
+    LayeredSketchRefine lsr = LayeredSketchRefine(kPCore, prob);
+    if (order <= 7){
+      long long n = (long long) (2 * pow(10.0, order));
+      DetProb det_prob = DetProb(det_sql, n);
+      memcpy(&det_prob.bl(0), &prob.bl(0), prob.bl.size()*sizeof(double));
+      memcpy(&det_prob.bu(0), &prob.bu(0), prob.bu.size()*sizeof(double));
+      det_prob.bl(att_count) = prob.cl;
+      det_prob.bu(att_count) = prob.cu;
+      det_prob.truncate();
+      Checker ch = Checker(det_prob);
+      DualReducer dr = DualReducer(kPCore, det_prob);
+      double ground = dr.lp_score;
+      cout << feasMessage(ch.checkLpFeasibility(lsr.lp_sol)) << " " << feasMessage(ch.checkIlpFeasibility(lsr.ilp_sol)) << " " << feasMessage(ch.checkLpFeasibility(dr.lp_sol)) << " " << feasMessage(ch.checkIlpFeasibility(lsr.ilp_sol)) << endl;
+      cout << "LSR" << endl;
+      cout << fmt::format("{:.8Lf} {:.8Lf} {:.4Lf}% {:.4Lf}%\n", lsr.lp_score, lsr.ilp_score, pctError(lsr.lp_score, ground), pctError(lsr.ilp_score, ground));
+      cout << fmt::format("{:.2Lf}ms {:.2Lf}ms\n", lsr.exe_lp, lsr.exe_ilp);
+      cout << "DR" << endl;
+      cout << fmt::format("{:.8Lf} {:.8Lf} {:.4Lf}%\n", dr.lp_score, dr.ilp_score, pctError(dr.ilp_score, ground));
+      cout << fmt::format("{:.2Lf}ms {:.2Lf}ms\n", dr.exe_lp, dr.exe_ilp);
+    } else{
+      cout << "LSR" << endl;
+      LsrChecker ch = LsrChecker(prob);
+      double ground = lsr.lp_score;
+      cout << feasMessage(ch.checkLpFeasibility(lsr.lp_sol)) << " " << feasMessage(ch.checkIlpFeasibility(lsr.ilp_sol)) << endl;
+      cout << fmt::format("{:.8Lf} {:.8Lf} {:.4Lf}% {:.4Lf}%\n", lsr.lp_score, lsr.ilp_score, pctError(lsr.lp_score, ground), pctError(lsr.ilp_score, ground));
+      cout << fmt::format("{:.2Lf}ms {:.2Lf}ms\n", lsr.exe_lp, lsr.exe_ilp);
+    }
+    // print(lsr.lp_sol);
+    // print(lsr.ilp_sol);
+  }
+}
 
 void main7(){
   int m = 3;
@@ -194,15 +197,35 @@ void main8(){
 }
 
 void main9(){
-  
+  int r = 3;
+  int c = 4;
+  RMatrixXd A (r, c);
+  MatrixXd B (r, c);
+  for (int i = 0; i < r; i ++){
+    for (int j = 0; j < c; j ++){
+      A(i, j) = i * c + j + 1;
+      B(i, j) = A(i, j);
+    }
+  }
+  cout << A << endl << endl;
+  VectorXd C(5);
+  // Conclusion
+  // MatrixXd is column major meaning increasing address corresponding to row-first then to column
+  // RMatrixXd is row major meaning increasing address corresponding to column-first then to row
+  memcpy(&C(0), &A(1,0), 3*sizeof(double));
+  // If source is RMatrixXd m x sub_n
+  // Dest is RMatrixXd m x n 
+  // WE ARE GOOD HERE.
+  print(C);
+  // cout << B << endl;
 }
 
 int main(){
   // main4();
   //main5();
   // main5p5();
-  // main6();
+  main6();
   //main7();
   // main8();
-  main9();
+  // main9();
 }

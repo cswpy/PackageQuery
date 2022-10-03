@@ -23,12 +23,12 @@ DetProb::DetProb(DetSql &det_sql, long long n, int seed): det_sql(&det_sql){
   seed_seq seq{DetProb::seed};
   vector<unsigned int> local_seeds (kPCore);
   seq.generate(local_seeds.begin(), local_seeds.end());
-  string col_names = det_sql.obj_col + "," + join(det_sql.att_cols, ",");
-  if (det_sql.isFiltering()){
-    col_names += "," + join(det_sql.filter_cols, ",");
-  }
   long long global_size = 0;
-  MeanVar mv = MeanVar(det_sql.att_cols.size());
+  vector<string> cols = det_sql.att_cols;
+  cols.insert(cols.begin(), det_sql.obj_col);
+  int att_count = (int) det_sql.att_cols.size();
+  MeanVar mv = MeanVar(att_count);
+  int m = det_sql.att_cols.size() + (det_sql.has_count_constraint);
   #pragma omp parallel num_threads(kPCore)
   {
     int seg = omp_get_thread_num();
@@ -40,47 +40,44 @@ DetProb::DetProb(DetSql &det_sql, long long n, int seed): det_sql(&det_sql){
     for (long long id = start_id; id <= end_id; id ++){
       if (dist(gen) <= probability) selected_ids.push_back(id);
     }
-    int start_index;
-    #pragma omp critical (c1)
+    RMatrixXd local_A; vector<long long> local_ids;
+    PgManager _pg = PgManager();
+    _pg.getTuples(local_A, local_ids, det_sql.table_name, selected_ids, cols, det_sql.filter_cols, det_sql.filter_intervals);
+    MeanVar local_mv = MeanVar(att_count);
+    int local_size = (int) local_ids.size();
+    long long local_start = -1;
+    #pragma omp critical (c2)
     {
-      start_index = global_size;
-      global_size += selected_ids.size();
+      local_start = global_size;
+      global_size += local_size;
     }
     #pragma omp barrier
     #pragma omp master
     {
-      resize(det_sql.att_cols.size()+(int)(det_sql.has_count_constraint==true), global_size);
+      resize(m, global_size);
     }
     #pragma omp barrier
-    vector<string> sids;
-    for (auto id : selected_ids) sids.push_back(to_string(id));
-    string sql = fmt::format("SELECT {},{} FROM \"{}\" WHERE {} IN ({})", kId, col_names, det_sql.table_name, kId, join(sids, ","));
-    PGconn *conn = PQconnectdb(pg.conninfo.c_str());
-    assert(PQstatus(conn) == CONNECTION_OK);
-    PGresult *res = NULL;
-    res = PQexec(conn, sql.c_str());
-
-    MeanVar local_mv = MeanVar(det_sql.att_cols.size());
-    for (int i = 0; i < PQntuples(res); i++){
-      int index = i + start_index;
-      ids[index] = atol(PQgetvalue(res, i, 0));
-      if (det_sql.is_maximize) c(index) = atof(PQgetvalue(res, i, 1));
-      else c(index) = -atof(PQgetvalue(res, i, 1));
-      VectorXd x (3);
-      for (int j = 0; j < 3; j ++){
-        A(j, index) = atof(PQgetvalue(res, i, j+2));
-        x(j) = A(j, index);
+    VectorXd x (att_count);
+    for (int i = 0; i < local_size; i ++){
+      for (int j = 0; j < att_count; j ++){
+        x(j) = local_A(j+1, i);
       }
       local_mv.add(x);
-      A(3, index) = 1;
     }
-    PQclear(res);
-    PQfinish(conn);
-    #pragma omp critical (c2)
+    #pragma omp critical (c3)
     {
       mv.add(local_mv);
     }
+    if (local_size > 0){
+      memcpy(&(ids[local_start]), &(local_ids[0]), local_size*sizeof(long long));
+      memcpy(&c(local_start), &local_A(0, 0), local_size*sizeof(double));
+      for (int j = 0; j < att_count; j ++){
+        memcpy(&A(j, local_start), &local_A(j+1, 0), local_size*sizeof(double));
+      }
+    }
   }
+  if (!det_sql.is_maximize) c = -c;
+  if (det_sql.has_count_constraint) std::fill(&A(att_count, 0), (&A(att_count, 0))+global_size, 1.0);
   det_bound = DetBound(det_sql.att_senses, mv.getMean(), mv.getVar(), DetProb::seed);
 }
 

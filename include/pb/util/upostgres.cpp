@@ -202,20 +202,17 @@ void PgManager::getTuples(RMatrixXd &out_tuples, vector<long long> &out_ids, str
   vector<string> str_ids (ids.size());
   for (int i = 0; i < (int) ids.size(); i ++) str_ids[i] = to_string(ids[i]);
   string id_names = join(str_ids, ",");
-  string filter_conds = "";
-  for (int i = 0; i < (int) filter_cols.size(); i ++){
-    
-  }
+  string filter_conds = getFilterConds(filter_cols, filter_intervals, kPrecision);
   _sql = fmt::format("SELECT {},{} FROM \"{}\" WHERE {} IN ({}){};", kId, col_names, table_name, kId, id_names, filter_conds);
   _res = PQexec(_conn, _sql.c_str());
   int n = PQntuples(_res);
   int m = (int) cols.size();
-  out_tuples.resize(n, m);
+  out_tuples.resize(m, n);
   out_ids.resize(n);
   for (int i = 0; i < n; i ++){
     out_ids[i] = atoll(PQgetvalue(_res, i, 0));
     for (int j = 0; j < m; j ++){
-      out_tuples(i, j) = atof(PQgetvalue(_res, i, j+1));
+      out_tuples(j, i) = atof(PQgetvalue(_res, i, j+1));
     }
   }
   PQclear(_res);

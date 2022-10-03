@@ -56,15 +56,8 @@ DLVPartition::DLVPartition(const LsrProb *prob, vector<string> cols, double grou
     } else{
       if (layer == 1){
         // Special filtering for original layer
-        string and_conds = "";
-        for (int i = 0; i < (int) prob->det_sql.filter_cols.size(); i ++){
-          and_conds += fmt::format(" AND g.{} ", prob->det_sql.filter_cols[i]);
-          auto [left, right] = prob->det_sql.filter_intervals[i];
-          if (left != -DBL_MAX && right != DBL_MAX) and_conds += fmt::format("BETWEEN {:.{}Lf} AND {:.{}Lf}", left, kPrecision, right, kPrecision);
-          else if (left != -DBL_MAX) and_conds += fmt::format(">= {:.{}Lf}", left, kPrecision);
-          else and_conds += fmt::format("<= {:.{}Lf}", right, kPrecision);
-        }
-        _sql = fmt::format("SELECT p.tid FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid=$1::bigint{};", current_ptable, prob->det_sql.table_name, and_conds);
+        string filter_conds = getFilterConds(prob->det_sql.filter_cols, prob->det_sql.filter_intervals, kPrecision);
+        _sql = fmt::format("SELECT p.tid FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid=$1::bigint{};", current_ptable, prob->det_sql.table_name, filter_conds);
       } else{
         _sql = fmt::format("SELECT p.tid FROM \"{}\" p WHERE p.gid=$1::bigint AND p.tid IN (SELECT id FROM \"{}\");", current_ptable, getGName(layer-1));
       }

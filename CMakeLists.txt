@@ -56,18 +56,9 @@ INCLUDE_DIRECTORIES( ${PYTHON_INCLUDE_DIRS} )
 link_directories( ${PYTHON_LIBRARIES})
 
 # MAIN
-# set(MAIN_NAME "main_dual")
-#set(MAIN_NAME "main_dual_reducer")
-#set(MAIN_NAME "main_pqxx")
-#set(MAIN_NAME "main_reader")
-#set(MAIN_NAME "main_postgres")
 set(MAIN_NAME "main_config")
 
 # TEST
-#set(MAIN_NAME "test_gurobi_solver")
-#set(MAIN_NAME "test_dual")
-#set(MAIN_NAME "test_dual_reducer")
-#set(MAIN_NAME "test_cplex_solver")
 #set(MAIN_NAME "test_det_bound")
 
 message("PROJECT NAME: " ${PROJECT_NAME})

@@ -14,20 +14,18 @@ LsrProb::LsrProb(DetSql &det_sql, string partition_name, int seed): det_sql(det_
   cl = -DBL_MAX;
   cu = DBL_MAX;
   PgManager pg = PgManager();
-  if (det_sql.isFiltering()){
-    // Filtering and compute means, vars
-  } else{
-    Stat* stat = pg.readStats(det_sql.table_name);
-    vector<double> means (m);
-    vector<double> vars (m);
-    for (int i = 0; i < m; i ++){
-      int index = stat->getIndex(det_sql.att_cols[i]);
-      means[i] = stat->mean(index);
-      vars[i] = stat->getVar(index);
-    }
-    delete stat;
-    det_bound = DetBound(det_sql.att_senses, means, vars, LsrProb::seed);
+  // If there is filtering, our means, vars are wrong
+  // This leads to infeasible query if the filter ratio is high
+  Stat* stat = pg.readStats(det_sql.table_name);
+  vector<double> means (m);
+  vector<double> vars (m);
+  for (int i = 0; i < m; i ++){
+    int index = stat->getIndex(det_sql.att_cols[i]);
+    means[i] = stat->mean(index);
+    vars[i] = stat->getVar(index);
   }
+  delete stat;
+  det_bound = DetBound(det_sql.att_senses, means, vars, LsrProb::seed);
 }
 
 double LsrProb::generateBounds(double E, double alpha, double hardness){
