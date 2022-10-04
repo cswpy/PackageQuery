@@ -14,7 +14,7 @@ private:
 public:
   ~Synthetic();
   Synthetic();
-  void createSubtable(string table_name, double order, vector<string>& cols, int seed=-1);
+  void createSubtable(string table_name, double order, vector<string> cols, int seed=-1);
   void createUniform(long long N, int count, double mean, double var);
   void createNormal(long long N, int count, double mean, double var);
   void createMixed(long long N, int ucount, int ncount, double mean, double var);

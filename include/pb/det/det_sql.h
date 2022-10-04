@@ -27,5 +27,6 @@ public:
   ~DetSql();
   DetSql(string table_name, string obj_col, bool is_maximize, vector<string> att_cols, vector<int> att_senses, bool has_count_constraint=true, long long u=1);
   void addFilter(string col, double l, double u);
+  void addFilterWithRatio(string col, double F, int sense);
   bool isFiltering();
 };

@@ -101,7 +101,7 @@ void main5(){
       for (int seed = 1; seed <= seeds; seed++){
         string real_table_name = fmt::format("{}_{}_{}", table_name, order, seed);
         cout << table_name << " on order " << order << endl;
-        DynamicLowVariance dlv = DynamicLowVariance(group_ratio);
+        DynamicLowVariance dlv = DynamicLowVariance(kPCore, group_ratio);
         dlv.partition(real_table_name, partition_name);
       }
     }
@@ -114,13 +114,14 @@ void main5p5(){
   double group_ratio = 0.01;
   string partition_name = "P1";
   string table_name = "ssds_7_1";
-  DynamicLowVariance dlv = DynamicLowVariance(group_ratio);
+  DynamicLowVariance dlv = DynamicLowVariance(kPCore, group_ratio);
   dlv.partition(table_name, partition_name);
 }
 
 void main6(){
+  Profiler pro = Profiler({"DetProb"});
   for (int rep = 0; rep < 1; rep ++){
-    int order = 9;
+    int order = 7;
     string table_name = fmt::format("tpch_{}_1", order);
     string partition_name = "P0";
     string obj_col = "price";
@@ -137,7 +138,10 @@ void main6(){
     LayeredSketchRefine lsr = LayeredSketchRefine(kPCore, prob);
     if (order <= 7){
       long long n = (long long) (2 * pow(10.0, order));
+      pro.clock(0);
       DetProb det_prob = DetProb(det_sql, n);
+      pro.stop(0);
+      pro.print();
       memcpy(&det_prob.bl(0), &prob.bl(0), prob.bl.size()*sizeof(double));
       memcpy(&det_prob.bu(0), &prob.bu(0), prob.bu.size()*sizeof(double));
       det_prob.bl(att_count) = prob.cl;

@@ -6,6 +6,7 @@
 
 class DynamicLowVariance{
 private:
+  int core;
   double group_ratio;
   string _sql;
   PgManager *pg;
@@ -16,8 +17,9 @@ private:
   long long doPartition(string table_name, string suffix, const vector<string> &cols);
 public:
   ~DynamicLowVariance();
-  DynamicLowVariance(double group_ratio=0.01);
+  DynamicLowVariance(int core, double group_ratio=0.01);
   void dropTempTables();
+  bool existPartition(string table_name, string partition_name);
   void dropPartition(string table_name, string partition_name);
   void partition(string table_name, string partition_name);
   void partition(string table_name, string partition_name, const vector<string> &cols);

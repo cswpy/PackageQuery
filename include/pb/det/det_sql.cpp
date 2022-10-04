@@ -2,6 +2,7 @@
 
 #include "pb/util/uconfig.h"
 #include "pb/util/umisc.h"
+#include "pb/util/udebug.h"
 
 DetSql::~DetSql(){
   delete pg;
@@ -20,6 +21,13 @@ void DetSql::addFilter(string col, double l, double u){
   if (l == -DBL_MAX && u == DBL_MAX) return;
   filter_cols.push_back(col);
   filter_intervals.emplace_back(l, u);
+}
+
+void DetSql::addFilterWithRatio(string col, double F, int sense){
+  // TODO
+  UNUSED(col);
+  UNUSED(F);
+  UNUSED(sense);
 }
   
 bool DetSql::isFiltering(){

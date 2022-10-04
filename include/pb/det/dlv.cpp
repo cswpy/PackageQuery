@@ -14,10 +14,6 @@ const double kSizeBias = 0.5;
 const double kVarScale = 2.5;
 const double kBucketCompensate = 2.0;
 const int kTempReserveSize = 1000;
-// const string kTraverseFunction = "traverse";
-// const string kClearLockFunction = "clear_lock";
-// const string kProcessReserveFunction = "process_reserve";
-// const int kReserveSize = (int) ceilDiv(kInMemorySize, kPCore);
 
 #define at(row, col) (m*(col)+(row))
 
@@ -36,7 +32,7 @@ DynamicLowVariance::~DynamicLowVariance(){
   delete pg;
 }
 
-DynamicLowVariance::DynamicLowVariance(double group_ratio): group_ratio(group_ratio){
+DynamicLowVariance::DynamicLowVariance(int core, double group_ratio): core(core), group_ratio(group_ratio){
   init();
 }
 
@@ -88,6 +84,14 @@ void DynamicLowVariance::dropTempTables(){
   }
 }
 
+bool DynamicLowVariance::existPartition(string table_name, string partition_name){
+  _sql = fmt::format("SELECT COUNT(*) FROM \"{}\" WHERE table_name='{}' AND partition_name='{}';", kPartitionTable, table_name, partition_name);
+  _res = PQexec(_conn, _sql.c_str());
+  int count = atoi(PQgetvalue(_res, 0, 0));
+  PQclear(_res);
+  return count == 1;
+}
+
 void DynamicLowVariance::dropPartition(string table_name, string partition_name){
   _sql = fmt::format("DELETE FROM \"{}\" WHERE table_name='{}' AND partition_name='{}';", kPartitionTable, table_name, partition_name);
   _res = PQexec(_conn, _sql.c_str());
@@ -122,7 +126,7 @@ void DynamicLowVariance::partition(string table_name, string partition_name, con
   _sql = fmt::format(""
     "INSERT INTO \"{}\"(table_name, partition_name, cols, group_ratio, lp_size, main_memory_used, core_used, layer_count) "
     "VALUES ('{}', '{}', {}, {}, {}, {}, {}, {});",
-    kPartitionTable, table_name, partition_name, pgJoin(cols), group_ratio, kLpSize, kMainMemorySize, kPCore, layer_count);
+    kPartitionTable, table_name, partition_name, pgJoin(cols), group_ratio, kLpSize, kMainMemorySize, core, layer_count);
   _res = PQexec(_conn, _sql.c_str());
   PQclear(_res);
 }
@@ -149,11 +153,11 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   double max_att = stat->amax(stat_max_var_index);
 
   // In memory size for a local partition, meaning all 80 cores will share
-  double lower_in_memory_size_limit = kBucketCompensate * ceilDiv(kPCore * size * kTempReserveSize * (m + 1) * 8, kMainMemorySize * 1e9);
+  double lower_in_memory_size_limit = kBucketCompensate * ceilDiv(core * size * kTempReserveSize * (m + 1) * 8, kMainMemorySize * 1e9);
   long long in_memory_size = getTupleCount((m + 1) * 2, 2);
   assert(in_memory_size >= lower_in_memory_size_limit);
   long long bucket = (long long) (ceilDiv(size, in_memory_size) * kBucketCompensate); // Assuming bucket is within main memory otherwise above assert error will raise
-  long long chunk = ceilDiv(size, (long long) kPCore);
+  long long chunk = ceilDiv(size, (long long) core);
   long long partition_count = bucket;
   vector<MeanVar> bucket_stat (bucket, MeanVar(m));
   vector<pair<double, double>> intervals (bucket);
@@ -198,7 +202,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
 
   // cout << "Begin real 1a" << endl;
 
-  #pragma omp parallel num_threads(kPCore)
+  #pragma omp parallel num_threads(core)
   {
     string sql;
     PGconn *conn = PQconnectdb(pg->conninfo.c_str());
@@ -360,10 +364,10 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
         _sql = fmt::format("FETCH FORWARD {} IN tmp_cursor;", limit);
         _res = PQexec(_conn, _sql.c_str());
         assert(PQresultStatus(_res) == PGRES_TUPLES_OK);
-        long long recurse_chunk = ceilDiv(limit, (long long) kPCore);
+        long long recurse_chunk = ceilDiv(limit, (long long) core);
         // cout << "Begin slide " << sl << endl;
         // cout << "HERE " << PQntuples(_res) << endl;
-        #pragma omp parallel num_threads(kPCore)
+        #pragma omp parallel num_threads(core)
         {
           string sql;
           PGconn* conn = PQconnectdb(pg->conninfo.c_str());
@@ -581,7 +585,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
       long long current_group_index = 0;
       long long current_tuple_index = 0;
       long long current_col_index = 0;
-      #pragma omp parallel num_threads(kPCore)
+      #pragma omp parallel num_threads(core)
       {
         int local_group_index = -1;
         int n_tuple = 0;
@@ -641,20 +645,20 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
         assert(PQsendQuery(conn, _sql.c_str()));
       }
 
-      map_sort::Sort(pis, n, kPCore);
+      map_sort::Sort(pis, n, core);
       long long soft_group_lim = (long long) ceil(n * group_ratio);
       double var_ratio = group_ratio * group_ratio * kVarScale;
       int soft_partition_lim = (int) ceil(kVarScale / group_ratio);
-      long long hard_group_lim = soft_group_lim + kPCore + soft_partition_lim;
-      long long group_count = kPCore;
-      long long heap_length = kPCore;
+      long long hard_group_lim = soft_group_lim + core + soft_partition_lim;
+      long long group_count = core;
+      long long heap_length = core;
       vector<vector<double>> lows (m, vector<double>(hard_group_lim, -DBL_MAX));
       vector<vector<double>> highs (m, vector<double>(hard_group_lim, DBL_MAX));
       vector<tuple<double, int, long long>> max_heap (hard_group_lim);
       vector<vector<long long>*> groups (hard_group_lim, nullptr);
-      long long local_chunk = ceilDiv(n, (long long) kPCore);
+      long long local_chunk = ceilDiv(n, (long long) core);
 
-      #pragma omp parallel num_threads(kPCore)
+      #pragma omp parallel num_threads(core)
       {
         {
           int i = omp_get_thread_num();
@@ -664,7 +668,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
           long long right = min((i+1)*local_chunk, n);
           groups[i] = new vector<long long>(right - left);
           if (i > 0) lows[partition_index][i] = A[at(partition_index, pis[left].second)];
-          if (i < kPCore - 1) highs[partition_index][i] = A[at(partition_index, pis[right].second)];
+          if (i < core - 1) highs[partition_index][i] = A[at(partition_index, pis[right].second)];
 
           MeanVar mv = MeanVar(m);
           for (int j = left; j < right; j ++){
@@ -735,7 +739,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
             g_start_index = group_count;
             group_count += delim_count - 1;
             if (group_count > hard_group_lim){
-              hard_group_lim += kPCore * soft_partition_lim;
+              hard_group_lim += core * soft_partition_lim;
               for (int i = 0; i < m; i ++){
                 if (i == max_var_index){
                   lows[i].resize(hard_group_lim, agg_intervals[p].first);

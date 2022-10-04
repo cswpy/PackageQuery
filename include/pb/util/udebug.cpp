@@ -16,7 +16,9 @@ static vector<string> sol_messages = {
   "INFEASIBLE",
   "UNBOUNDED",
   "DUAL UNBOUNDED",
-  "TIMEOUT"
+  "TIMEOUT",
+  "NO PARTITION FOUND",
+  "INCOMPATIBLE PARTITION"
 };
 
 static vector<string> feas_messages = {
@@ -27,7 +29,8 @@ static vector<string> feas_messages = {
   "Upper bound constraint violation",
   "Lower bound variable violation",
   "Upper bound constraint violation",
-  "Integrality violation"
+  "Integrality violation",
+  "Filter condition violation"
 };
 
 void showHistogram(vector<int> x, int bucket_count, double start, double end){

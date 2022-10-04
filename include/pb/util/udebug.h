@@ -1,5 +1,7 @@
 #pragma once
 
+#define UNUSED(expr) (void)(expr)
+
 #include <vector>
 #include <string>
 #include <chrono>
@@ -8,8 +10,9 @@
 #include <unordered_map>
 #include <map>
 
+#include "pb/util/umisc.h"
+
 #include "Eigen/Dense"
-#include "umisc.h"
 
 using std::cout;
 using std::vector;
@@ -94,32 +97,3 @@ public:
 };
 
 double currentRAM();
-
-class DetExp{
-public:
-  // Expected number of tuples in solution package
-  double E;
-  // Variness of means of constraint bounds
-  double a;
-  // Hardness of the query
-  double H;
-  // Filter ratio of the base predicate
-  double F;
-  // Group ratio of the partition
-  double g;
-  // Main memory used in partition
-  double M;
-  // Targeted size of LP in partition
-  long long S;
-  // Number of cores used
-  int C;
-  vector<double> H3, H8, E2, M6, F5, o4;
-  vector<int> C6;
-  vector<long long> N5;
-
-  string dataset;
-  string obj_col;
-  vector<string> att_col;
-  bool is_maximize;
-};
-

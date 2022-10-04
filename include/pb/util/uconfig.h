@@ -58,8 +58,7 @@ static int _ = readConfigs(configs);
   static int kPrecision = stoi(configs["precision"]);
   static int kGlobalSeed = stoi(configs["global_seed"]);
   static long long kLpSize = stoll(configs["lp_size"]);
-  static long long kMainMemorySize = stoll(configs["main_memory_size"]);
-  // static const long long kInMemorySize = stoll(configs["in_memory_size"]); // In Memory Size for all cores in term of number of tuples
+  static double kMainMemorySize = stod(configs["main_memory_size"]);
 
   static string kPgDatabase = configs["database"];
   static string kPgUser = configs["user"];
@@ -83,8 +82,7 @@ static int _ = readConfigs(configs);
   static const int kPrecision = stoi(configs["precision"]);
   static const int kGlobalSeed = stoi(configs["global_seed"]);
   static const long long kLpSize = stoll(configs["lp_size"]);
-  static const long long kMainMemorySize = stoll(configs["main_memory_size"]);
-  // static const long long kInMemorySize = stoll(configs["in_memory_size"]); // In Memory Size for all cores in term of number of tuples
+  static const double kMainMemorySize = stod(configs["main_memory_size"]);
 
   static const string kPgDatabase = configs["database"];
   static const string kPgUser = configs["user"];

@@ -28,7 +28,7 @@ void Synthetic::init(){
   pg = new PgManager();
 }
 
-void Synthetic::createSubtable(string table_name, double order, vector<string>& cols, int seed){
+void Synthetic::createSubtable(string table_name, double order, vector<string> cols, int seed){
   pro.clock(1);
   string subtable_name = table_name + "_" + to_string((int) round(order)) + "_" + to_string(seed);
   {
