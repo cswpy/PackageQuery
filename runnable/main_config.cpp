@@ -241,8 +241,8 @@ void inspectRAM(){
 void main10(){
   std::thread ram (inspectRAM);
   double group_ratio = 0.01;
-  string partition_name = "P0";
-  string table_name = "ssds_7_1";
+  string partition_name = "P1";
+  string table_name = "tpch_7_1";
   DynamicLowVariance dlv = DynamicLowVariance(kPCore, group_ratio);
   dlv.partition(table_name, partition_name);
   dlv.pro.print();

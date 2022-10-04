@@ -67,7 +67,7 @@ void DynamicLowVariance::init(){
     "	cols TEXT[],"
     "	group_ratio DOUBLE PRECISION,"
     "	lp_size BIGINT,"
-    " main_memory_used INTEGER,"
+    " main_memory_used DOUBLE PRECISION,"
     " core_used INTEGER,"
     " layer_count INTEGER,"
     " UNIQUE (table_name, partition_name)"
@@ -120,6 +120,7 @@ void DynamicLowVariance::partition(string table_name, string partition_name, con
   string g_name = nextGName(table_name + "_" + partition_name);
   int layer_count = 0;
   while (size){
+    // cout << "OKg" << endl;
     size = doPartition(g_name, "", cols);
     g_name = nextGName(g_name);
     layer_count ++;
@@ -135,9 +136,13 @@ void DynamicLowVariance::partition(string table_name, string partition_name, con
 }
 
 long long DynamicLowVariance::doPartition(string table_name, string suffix, const vector<string> &cols){
+  // cout << "OKa" << endl;
   Stat *stat = pg->readStats(table_name);
+  // cout << "OKb" << endl;
   long long size = stat->size;
   if (size <= kLpSize) return 0;
+
+  // cout << "OK1" << endl;
 
   int stat_max_var_index = -1;
   int max_var_index = -1;
@@ -152,8 +157,11 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
       stat_max_var_index = index;
     }
   }
+  // cout << "OK2" << endl;
+
   double min_att = stat->amin(stat_max_var_index);
   double max_att = stat->amax(stat_max_var_index);
+  // cout << "OK3" << endl;
 
   // In memory size for a local partition, meaning all 80 cores will share
   double lower_in_memory_size_limit = kBucketCompensate * ceilDiv(core * size * kTempReserveSize * (m + 1) * 8, kMainMemorySize * 1e9);
@@ -167,6 +175,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   map<double, long long> key_indices;
   vector<double> keys (bucket);
   vector<PGconn*> wait_conns;
+  // cout << "OK4" << endl;
 
   string create_tmp_table;
   string drop_tmp_table = "DROP TABLE IF EXISTS \"{}{}\"";
@@ -180,6 +189,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
       " {}"
       ");", "{}{}", kId, join(att_names, ","));
   }
+  // cout << "OK5" << endl;
 
   string symbolic_name = table_name;
   if (suffix.length()) symbolic_name += "_" + suffix;
@@ -852,8 +862,10 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
 
         CREATE_CLOCK(local_pro);
 
+        // #pragma omp barrier
         // #pragma omp master
-        // cout << "Populate G/P" << endl;
+        // cout << "Populate G" << endl;
+
         // Populate G table
         string sql = fmt::format("COPY \"{}\" FROM STDIN with (delimiter '|', null '{}');", g_name, kNullLiteral);
         res = PQexec(conn, sql.c_str());
@@ -879,6 +891,10 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
         assert(PQresultStatus(res) == PGRES_COMMAND_OK);
         PQclear(res);
 
+        // #pragma omp barrier
+        // #pragma omp master
+        // cout << "Populate P" << endl;
+
         // Populate P table
         sql = fmt::format("COPY \"{}\" FROM STDIN with(delimiter ',');", p_name);
         res = PQexec(conn, sql.c_str());
@@ -893,6 +909,11 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
           }
           assert(PQputCopyData(conn, data.c_str(), (int) data.length()) == 1);
         }
+
+        // #pragma omp barrier
+        // #pragma omp master
+        // cout << "data 1" << endl;
+
         assert(PQputCopyEnd(conn, NULL) == 1);
         res = PQgetResult(conn);
         assert(PQresultStatus(res) == PGRES_COMMAND_OK);
@@ -910,6 +931,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
       delete[] A;
     }
   }
+  // cout << "INDEXING1" << endl;
   START_CLOCK(pro, 2);
   PGconn *conn;
   conn = PQconnectdb(pg->conninfo.c_str());
@@ -918,22 +940,27 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   _sql = fmt::format("CREATE INDEX \"{}_group_interval\" ON \"{}\" USING gist ({});", g_name, g_name, join(interval_names, ","));
   assert(PQsendQuery(conn, _sql.c_str()));
   wait_conns.push_back(conn);
+  // cout << "INDEXING2" << endl;
 
   conn = PQconnectdb(pg->conninfo.c_str());
   _sql = fmt::format("ALTER TABLE \"{}\" ADD PRIMARY KEY ({});", g_name, kId);
   assert(PQsendQuery(conn, _sql.c_str()));
   wait_conns.push_back(conn);
+  // cout << "INDEXING3" << endl;
 
   conn = PQconnectdb(pg->conninfo.c_str());
   _sql = fmt::format("CREATE INDEX \"{}_gid_index\" ON \"{}\" USING btree (gid);", p_name, p_name);
   assert(PQsendQuery(conn, _sql.c_str()));
   wait_conns.push_back(conn);
+  // cout << "INDEXING4" << endl;
+
 
   for (PGconn* conn : wait_conns){
     while (PQgetResult(conn));
     PQfinish(conn);
   }
   END_CLOCK(pro, 2);
+  // cout << "INDEXING5" << endl;
 
   return global_group_count;
 }

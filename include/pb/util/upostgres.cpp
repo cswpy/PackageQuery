@@ -126,7 +126,7 @@ Stat* PgManager::computeStats(string table_name, const vector<string> &cols){
 }
 
 bool PgManager::checkStats(string table_name){
-  _sql = fmt::format("SELECT COUNT(*) FROM \"{}\" WHERE table_name='{}';", kStatTable, table_name);
+  _sql = fmt::format("SELECT * FROM \"{}\" WHERE table_name='{}';", kStatTable, table_name);
   _res = PQexec(_conn, _sql.c_str());
   bool exists = false;
   if (PQntuples(_res)) exists = true;
@@ -146,6 +146,7 @@ void PgManager::writeStats(string table_name, Stat *stat){
 }
 
 Stat* PgManager::readStats(string table_name){
+  // cout << table_name << endl;
   if (!checkStats(table_name)){
     // cout << "First time, need to find stats" << endl;
     vector<string> cols = getNumericCols(table_name);
