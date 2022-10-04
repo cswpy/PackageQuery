@@ -10,10 +10,16 @@
 
 using namespace pb;
 
+// const string kIntervalType = "floatrange";
+const string kTempTable = "tmp";
 const double kSizeBias = 0.5;
 const double kVarScale = 2.5;
 const double kBucketCompensate = 2.0;
 const int kTempReserveSize = 1000;
+// const string kTraverseFunction = "traverse";
+// const string kClearLockFunction = "clear_lock";
+// const string kProcessReserveFunction = "process_reserve";
+// const int kReserveSize = (int) ceilDiv(kInMemorySize, kPCore);
 
 #define at(row, col) (m*(col)+(row))
 
@@ -32,12 +38,22 @@ DynamicLowVariance::~DynamicLowVariance(){
   delete pg;
 }
 
+bool DynamicLowVariance::existPartition(string table_name, string partition_name){
+  _sql = fmt::format("SELECT COUNT(*) FROM \"{}\" WHERE table_name='{}' AND partition_name='{}';", kPartitionTable, table_name, partition_name);
+  _res = PQexec(_conn, _sql.c_str());
+  int count = atoi(PQgetvalue(_res, 0, 0));
+  PQclear(_res);
+  return count == 1;
+}
+
 DynamicLowVariance::DynamicLowVariance(int core, double group_ratio): core(core), group_ratio(group_ratio){
-  INIT_CLOCK(pro);
+  // vector<string> names = {"Init", "ComputeStat", "All", "FetchData", "ProcessData", "WriteData", "CreateIndex", "CreateTable", "gist", "id", "tid", "gid"};
+  // pro = Profiler(names);
   init();
 }
 
 void DynamicLowVariance::init(){
+  // pro.clock(0);
   pg = new PgManager();
 
   _conn = PQconnectdb(pg->conninfo.c_str());
@@ -74,23 +90,16 @@ void DynamicLowVariance::init(){
     ");", kPartitionTable);
   _res = PQexec(_conn, _sql.c_str());
   PQclear(_res);
+  // pro.stop(0);
 }
 
 void DynamicLowVariance::dropTempTables(){
   vector<string> tables = pg->listTables();
   for (string table : tables){
-    if (startsWith(table, kTempPrefix)){
+    if (startsWith(table, kTempTable)){
       pg->dropTable(table);
     }
   }
-}
-
-bool DynamicLowVariance::existPartition(string table_name, string partition_name){
-  _sql = fmt::format("SELECT COUNT(*) FROM \"{}\" WHERE table_name='{}' AND partition_name='{}';", kPartitionTable, table_name, partition_name);
-  _res = PQexec(_conn, _sql.c_str());
-  int count = atoi(PQgetvalue(_res, 0, 0));
-  PQclear(_res);
-  return count == 1;
 }
 
 void DynamicLowVariance::dropPartition(string table_name, string partition_name){
@@ -113,7 +122,7 @@ void DynamicLowVariance::partition(string table_name, string partition_name){
 }
 
 void DynamicLowVariance::partition(string table_name, string partition_name, const vector<string> &cols){
-  std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+  // pro.clock(2);
   dropPartition(table_name, partition_name);
   long long size = doPartition(table_name, partition_name, cols);
   if (!size) return;
@@ -128,10 +137,11 @@ void DynamicLowVariance::partition(string table_name, string partition_name, con
   _sql = fmt::format(""
     "INSERT INTO \"{}\"(table_name, partition_name, cols, group_ratio, lp_size, main_memory_used, core_used, layer_count) "
     "VALUES ('{}', '{}', {}, {}, {}, {}, {}, {});",
-    kPartitionTable, table_name, partition_name, pgJoin(cols), group_ratio, kLpSize, kMainMemorySize, core, layer_count);
+    kPartitionTable, table_name, partition_name, pgJoin(cols), group_ratio, kLpSize, kMainMemorySize, kPCore, layer_count);
   _res = PQexec(_conn, _sql.c_str());
   PQclear(_res);
-  exe = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start).count() / 1000000.0;
+
+  // pro.stop(2);
 }
 
 long long DynamicLowVariance::doPartition(string table_name, string suffix, const vector<string> &cols){
@@ -156,11 +166,11 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   double max_att = stat->amax(stat_max_var_index);
 
   // In memory size for a local partition, meaning all 80 cores will share
-  double lower_in_memory_size_limit = kBucketCompensate * ceilDiv(core * size * kTempReserveSize * (m + 1) * 8, kMainMemorySize * 1e9);
+  double lower_in_memory_size_limit = kBucketCompensate * ceilDiv(kPCore * size * kTempReserveSize * (m + 1) * 8, kMainMemorySize * 1e9);
   long long in_memory_size = getTupleCount((m + 1) * 2, 2);
   assert(in_memory_size >= lower_in_memory_size_limit);
   long long bucket = (long long) (ceilDiv(size, in_memory_size) * kBucketCompensate); // Assuming bucket is within main memory otherwise above assert error will raise
-  long long chunk = ceilDiv(size, (long long) core);
+  long long chunk = ceilDiv(size, (long long) kPCore);
   long long partition_count = bucket;
   vector<MeanVar> bucket_stat (bucket, MeanVar(m));
   vector<pair<double, double>> intervals (bucket);
@@ -191,10 +201,10 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   // Phase-1a: Initial quick-partition for #bucket partitions
   double bucket_width = (max_att - min_att) / bucket;
   for (long long i = 0; i < bucket; i ++){
-    _sql = fmt::format(drop_tmp_table, kTempPrefix, i);
+    _sql = fmt::format(drop_tmp_table, kTempTable, i);
     _res = PQexec(_conn, _sql.c_str());
     PQclear(_res);
-    _sql = fmt::format(create_tmp_table, kTempPrefix, i);
+    _sql = fmt::format(create_tmp_table, kTempTable, i);
     _res = PQexec(_conn, _sql.c_str());
     PQclear(_res);
 
@@ -205,7 +215,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
 
   // cout << "Begin real 1a" << endl;
 
-  #pragma omp parallel num_threads(core)
+  #pragma omp parallel num_threads(kPCore)
   {
     string sql;
     PGconn *conn = PQconnectdb(pg->conninfo.c_str());
@@ -215,8 +225,6 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
     PGconn *_conn = PQconnectdb(pg->conninfo.c_str());
     assert(PQstatus(_conn) == CONNECTION_OK);
     PGresult *_res = NULL;
-
-    CREATE_CLOCK(local_pro);
 
     int seg = omp_get_thread_num();
     long long start_id = seg * chunk + 1;
@@ -232,10 +240,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
       long long slide_end_id = min(start_id + (sl + 1) * slide_size - 1, end_id);
       sql = fmt::format("SELECT {},{} FROM \"{}\" WHERE {} BETWEEN {} AND {};", kId, col_names, table_name, kId, slide_start_id, slide_end_id);
       // cout << sql << endl;
-
-      START_CLOCK(local_pro, 0);
       res = PQexec(conn, sql.c_str());
-      END_CLOCK(local_pro, 0);
       // #pragma omp critical
       // {
       //   cout << slide_start_id << " " << slide_end_id << " " << PQntuples(res) << " " << PQnfields(res) << endl;
@@ -258,8 +263,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
         sz[bucket_ind] ++;
         // cout << "AFT " << i << endl;
         if (sz[bucket_ind] == kTempReserveSize){
-          START_CLOCK(local_pro, 1);
-          sql = fmt::format("COPY \"{}{}\" FROM STDIN with(delimiter ',');", kTempPrefix, bucket_ind);
+          sql = fmt::format("COPY \"{}{}\" FROM STDIN with(delimiter ',');", kTempTable, bucket_ind);
           _res = PQexec(_conn, sql.c_str());
           assert(PQresultStatus(_res) == PGRES_COPY_IN);
           PQclear(_res);
@@ -270,7 +274,6 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
           _res = PQgetResult(_conn);
           assert(PQresultStatus(_res) == PGRES_COMMAND_OK);
           PQclear(_res);
-          END_CLOCK(local_pro, 1);
           sz[bucket_ind] = 0;
         }
       }
@@ -287,13 +290,12 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
     // #pragma omp barrier
 
     for (long long i = 0; i < bucket; i ++){
-      #pragma omp critical (c1)
+      #pragma omp critical
       {
         bucket_stat[i].add(cache_stat[i]);
       }
       if (sz[i]){
-        START_CLOCK(local_pro, 1);
-        sql = fmt::format("COPY \"{}{}\" FROM STDIN with(delimiter ',');", kTempPrefix, i);
+        sql = fmt::format("COPY \"{}{}\" FROM STDIN with(delimiter ',');", kTempTable, i);
         _res = PQexec(_conn, sql.c_str());
         assert(PQresultStatus(_res) == PGRES_COPY_IN);
         PQclear(_res);
@@ -304,11 +306,8 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
         _res = PQgetResult(_conn);
         assert(PQresultStatus(_res) == PGRES_COMMAND_OK);
         PQclear(_res);
-        END_CLOCK(local_pro, 1);
       }
     }
-
-    ADD_CLOCK(local_pro, core);
     
     PQfinish(conn);
     PQfinish(_conn);
@@ -316,6 +315,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
 
   // cout << "End 1a" << endl;
 
+  // pro.clock(3);
   pg->dropTable(g_name);
   string atts_names = fmt::format("{} BIGINT,", kId);
   for (auto col : cols){
@@ -333,6 +333,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
     ");", p_name);
   _res = PQexec(_conn, _sql.c_str());
   PQclear(_res);
+  // pro.stop(3);
 
   // cout << "Begin 1b" << endl;
 
@@ -349,10 +350,10 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
       double key_width = (end_key - start_key) / bucket;
       double bucket_width = (intervals[p].second - intervals[p].first) / bucket;
       for (long long i = 0; i < bucket; i ++){
-        _sql = fmt::format(drop_tmp_table, kTempPrefix, partition_count + i);
+        _sql = fmt::format(drop_tmp_table, kTempTable, partition_count + i);
         _res = PQexec(_conn, _sql.c_str());
         PQclear(_res);
-        _sql = fmt::format(create_tmp_table, kTempPrefix, partition_count + i);
+        _sql = fmt::format(create_tmp_table, kTempTable, partition_count + i);
         _res = PQexec(_conn, _sql.c_str());
         PQclear(_res);
         intervals.emplace_back(intervals[p].first + i*bucket_width, intervals[p].first + (i+1)*bucket_width);
@@ -364,7 +365,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
       // cout << "Begin real recurse on " << p << endl;
       _res = PQexec(_conn, "BEGIN");
       PQclear(_res);
-      _sql = fmt::format("DECLARE tmp_cursor CURSOR FOR SELECT * FROM \"{}{}\";", kTempPrefix, p);
+      _sql = fmt::format("DECLARE tmp_cursor CURSOR FOR SELECT * FROM \"{}{}\";", kTempTable, p);
       _res = PQexec(_conn, _sql.c_str());
       assert(PQresultStatus(_res) == PGRES_COMMAND_OK);
       PQclear(_res);
@@ -374,23 +375,19 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
       for (long long sl = 0; sl < slide_count; sl ++){
         long long offset = sl * slide_size;
         long long limit = min((sl + 1) * slide_size - 1, recurse_size - 1) - offset + 1;
-        // _sql = fmt::format("SELECT * FROM {}{} ORDER BY {} LIMIT {} OFFSET {};", kTempPrefix, p, kId, limit, offset);
+        // _sql = fmt::format("SELECT * FROM {}{} ORDER BY {} LIMIT {} OFFSET {};", kTempTable, p, kId, limit, offset);
         _sql = fmt::format("FETCH FORWARD {} IN tmp_cursor;", limit);
-        START_CLOCK(pro, 0);
         _res = PQexec(_conn, _sql.c_str());
-        END_CLOCK(pro, 0);
         assert(PQresultStatus(_res) == PGRES_TUPLES_OK);
-        long long recurse_chunk = ceilDiv(limit, (long long) core);
+        long long recurse_chunk = ceilDiv(limit, (long long) kPCore);
         // cout << "Begin slide " << sl << endl;
         // cout << "HERE " << PQntuples(_res) << endl;
-        #pragma omp parallel num_threads(core)
+        #pragma omp parallel num_threads(kPCore)
         {
           string sql;
           PGconn* conn = PQconnectdb(pg->conninfo.c_str());
           assert(PQstatus(conn) == CONNECTION_OK);
           PGresult *res = NULL;
-
-          CREATE_CLOCK(local_pro);
 
           int seg = omp_get_thread_num();
           long long start_tuple_id = seg * recurse_chunk;
@@ -411,8 +408,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
             cache_stat[bucket_ind].add(vs);
             sz[bucket_ind] ++;
             if (sz[bucket_ind] == kTempReserveSize){
-              START_CLOCK(local_pro, 1);
-              sql = fmt::format("COPY \"{}{}\" FROM STDIN with(delimiter ',');", kTempPrefix, partition_count + bucket_ind);
+              sql = fmt::format("COPY \"{}{}\" FROM STDIN with(delimiter ',');", kTempTable, partition_count + bucket_ind);
               res = PQexec(conn, sql.c_str());
               assert(PQresultStatus(res) == PGRES_COPY_IN);
               PQclear(res);
@@ -424,18 +420,16 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
               assert(PQresultStatus(res) == PGRES_COMMAND_OK);
               PQclear(res);
               sz[bucket_ind] = 0;
-              END_CLOCK(local_pro, 1);
             }
           }
 
           for (long long i = 0; i < bucket; i ++){
-            #pragma omp critical (c2)
+            #pragma omp critical
             {
               bucket_stat[partition_count + i].add(cache_stat[i]);
             }
             if (sz[i]){
-              START_CLOCK(local_pro, 1);
-              sql = fmt::format("COPY \"{}{}\" FROM STDIN with(delimiter ',');", kTempPrefix, partition_count + i);
+              sql = fmt::format("COPY \"{}{}\" FROM STDIN with(delimiter ',');", kTempTable, partition_count + i);
               res = PQexec(conn, sql.c_str());
               assert(PQresultStatus(res) == PGRES_COPY_IN);
               PQclear(res);
@@ -446,12 +440,8 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
               res = PQgetResult(conn);
               assert(PQresultStatus(res) == PGRES_COMMAND_OK);
               PQclear(res);
-              END_CLOCK(local_pro, 1);
             }
           }
-
-          ADD_CLOCK(local_pro, core);
-
           PQfinish(conn);
         }
         PQclear(_res);
@@ -465,7 +455,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
       PGconn* conn = PQconnectdb(pg->conninfo.c_str());
       assert(PQstatus(conn) == CONNECTION_OK);
       wait_conns.push_back(conn);
-      _sql = fmt::format("DROP TABLE \"{}{}\";", kTempPrefix, p);
+      _sql = fmt::format("DROP TABLE \"{}{}\";", kTempTable, p);
       assert(PQsendQuery(conn, _sql.c_str()));
       partition_count += bucket;
       bucket_stat[p].reset();
@@ -591,7 +581,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
       for (long long i = 0; i < (long long) agg_groups[p].size(); i ++){
         conns[i] = PQconnectdb(pg->conninfo.c_str());
         assert(PQstatus(conns[i]) == CONNECTION_OK);
-        string select_sql = fmt::format("SELECT * FROM \"{}{}\";", kTempPrefix, agg_groups[p][i]);
+        string select_sql = fmt::format("SELECT * FROM \"{}{}\";", kTempTable, agg_groups[p][i]);
         assert(PQsendQuery(conns[i], select_sql.c_str()));
       }
       // A is column-wise
@@ -610,7 +600,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
       long long current_group_index = 0;
       long long current_tuple_index = 0;
       long long current_col_index = 0;
-      #pragma omp parallel num_threads(core)
+      #pragma omp parallel num_threads(kPCore)
       {
         int local_group_index = -1;
         int n_tuple = 0;
@@ -618,7 +608,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
         long long local_col_index = -1;
         bool is_done = false;
         while (true){
-          #pragma omp critical (c3)
+          #pragma omp critical
           {
             if (current_group_index < (long long) agg_groups[p].size()){
               local_group_index = current_group_index;
@@ -638,7 +628,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
             // cout << is_done << " " << p << " " << local_group_index << " " << local_tuple_index << " " << local_col_index << " " << omp_get_thread_num() << endl;
           }
           if (is_done) break;
-          #pragma omp critical (c3)
+          #pragma omp critical
           {
             if (ress[local_group_index] == nullptr){
               ress[local_group_index] = PQgetResult(conns[local_group_index]);
@@ -666,24 +656,24 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
         PGconn* conn = PQconnectdb(pg->conninfo.c_str());
         assert(PQstatus(conn) == CONNECTION_OK);
         wait_conns.push_back(conn);
-        _sql = fmt::format("DROP TABLE \"{}{}\";", kTempPrefix, group_ind);
+        _sql = fmt::format("DROP TABLE \"{}{}\";", kTempTable, group_ind);
         assert(PQsendQuery(conn, _sql.c_str()));
       }
 
-      map_sort::Sort(pis, n, core);
+      map_sort::Sort(pis, n, kPCore);
       long long soft_group_lim = (long long) ceil(n * group_ratio);
       double var_ratio = group_ratio * group_ratio * kVarScale;
       int soft_partition_lim = (int) ceil(kVarScale / group_ratio);
-      long long hard_group_lim = soft_group_lim + core + soft_partition_lim;
-      long long group_count = core;
-      long long heap_length = core;
+      long long hard_group_lim = soft_group_lim + kPCore + soft_partition_lim;
+      long long group_count = kPCore;
+      long long heap_length = kPCore;
       vector<vector<double>> lows (m, vector<double>(hard_group_lim, -DBL_MAX));
       vector<vector<double>> highs (m, vector<double>(hard_group_lim, DBL_MAX));
       vector<tuple<double, int, long long>> max_heap (hard_group_lim);
       vector<vector<long long>*> groups (hard_group_lim, nullptr);
-      long long local_chunk = ceilDiv(n, (long long) core);
+      long long local_chunk = ceilDiv(n, (long long) kPCore);
 
-      #pragma omp parallel num_threads(core)
+      #pragma omp parallel num_threads(kPCore)
       {
         {
           int i = omp_get_thread_num();
@@ -693,7 +683,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
           long long right = min((i+1)*local_chunk, n);
           groups[i] = new vector<long long>(right - left);
           if (i > 0) lows[partition_index][i] = A[at(partition_index, pis[left].second)];
-          if (i < core - 1) highs[partition_index][i] = A[at(partition_index, pis[right].second)];
+          if (i < kPCore - 1) highs[partition_index][i] = A[at(partition_index, pis[right].second)];
 
           MeanVar mv = MeanVar(m);
           for (int j = left; j < right; j ++){
@@ -724,7 +714,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
           int mi = -1;
           long long gi = -1;
           double max_total_var = 0;
-          #pragma omp critical (c5)
+          #pragma omp critical
           {
             while (heap_length > 0 && max_total_var == 0){
               tie(max_total_var, mi, gi) = max_heap[0];
@@ -759,12 +749,12 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
           delim_count ++;
 
           long long g_start_index;
-          #pragma omp critical (c5)
+          #pragma omp critical
           {
             g_start_index = group_count;
             group_count += delim_count - 1;
             if (group_count > hard_group_lim){
-              hard_group_lim += core * soft_partition_lim;
+              hard_group_lim += kPCore * soft_partition_lim;
               for (int i = 0; i < m; i ++){
                 if (i == max_var_index){
                   lows[i].resize(hard_group_lim, agg_intervals[p].first);
@@ -808,7 +798,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
               }
             }
             if (m_index != -1){
-              #pragma omp critical (c5)
+              #pragma omp critical
               {
                 max_heap[heap_length] = {m_var, m_index, g_index};
                 heap_length ++;
@@ -836,7 +826,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
               }
             }
             if (m_index != -1){
-              #pragma omp critical (c5)
+              #pragma omp critical
               {
                 max_heap[heap_length] = {m_var, m_index, gi};
                 heap_length ++;
@@ -850,8 +840,6 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
         assert(PQstatus(conn) == CONNECTION_OK);
         PGresult *res = NULL;
 
-        CREATE_CLOCK(local_pro);
-
         // #pragma omp master
         // cout << "Populate G/P" << endl;
         // Populate G table
@@ -859,7 +847,6 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
         res = PQexec(conn, sql.c_str());
         assert(PQresultStatus(res) == PGRES_COPY_IN);
         PQclear(res);
-        START_CLOCK(local_pro, 1);
         #pragma omp for nowait
         for (long long i = 0; i < group_count; i ++){
           const auto& g = *groups[i];
@@ -898,10 +885,6 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
         assert(PQresultStatus(res) == PGRES_COMMAND_OK);
         PQclear(res);
         PQfinish(conn);
-        END_CLOCK(local_pro, 1);
-
-        ADD_CLOCK(local_pro, core);
-
         #pragma omp barrier
         #pragma omp for nowait
         for (long long i = 0; i < group_count; i ++) delete groups[i];
@@ -909,9 +892,9 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
       global_group_count += group_count;
       delete[] A;
     }
-  }
-  START_CLOCK(pro, 2);
+  }  
   PGconn *conn;
+
   conn = PQconnectdb(pg->conninfo.c_str());
   vector<string> interval_names;
   for (int i = 0; i < min(m, kMaxMultiColumnIndexes); i ++) interval_names.push_back("interval_" + cols[i]);
@@ -933,7 +916,6 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
     while (PQgetResult(conn));
     PQfinish(conn);
   }
-  END_CLOCK(pro, 2);
 
   return global_group_count;
 }

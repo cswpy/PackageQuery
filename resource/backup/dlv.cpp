@@ -116,6 +116,7 @@ void DynamicLowVariance::partition(string table_name, string partition_name, con
   std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
   dropPartition(table_name, partition_name);
   long long size = doPartition(table_name, partition_name, cols);
+  return ;
   if (!size) return;
   string g_name = nextGName(table_name + "_" + partition_name);
   int layer_count = 0;
@@ -187,7 +188,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   string p_name = nextPName(symbolic_name);
   string col_names = join(cols, ",");
 
-  // cout << "Begin 1a" << endl;
+  cout << "Begin 1a" << endl;
   // Phase-1a: Initial quick-partition for #bucket partitions
   double bucket_width = (max_att - min_att) / bucket;
   for (long long i = 0; i < bucket; i ++){
@@ -203,7 +204,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
     keys[i] = i;
   }
 
-  // cout << "Begin real 1a" << endl;
+  cout << "Begin real 1a" << endl;
 
   #pragma omp parallel num_threads(core)
   {
@@ -314,7 +315,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
     PQfinish(_conn);
   }
 
-  // cout << "End 1a" << endl;
+  cout << "End 1a" << endl;
 
   pg->dropTable(g_name);
   string atts_names = fmt::format("{} BIGINT,", kId);
@@ -334,7 +335,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   _res = PQexec(_conn, _sql.c_str());
   PQclear(_res);
 
-  // cout << "Begin 1b" << endl;
+  cout << "Begin 1b" << endl;
 
   // Phase-1b: Recursive quick-partition for partition with size > #kInMemorySize
   long long global_group_count = 0;
@@ -472,7 +473,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
     }
   }
 
-  // cout << "End 1b" << endl;
+  cout << "End 1b" << endl;
 
 
   // Debug
@@ -482,7 +483,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
 
   // Phase-2a: Aggregate and compute group count for each local partition
 
-  // cout << "Begin 2a" << endl;
+  cout << "Begin 2a" << endl;
   vector<MeanVar> agg_bucket_stat;
   vector<pair<double, double>> agg_intervals;
   vector<vector<long long>> agg_groups;
@@ -524,7 +525,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   // cout << s << endl;
 
   // Phase-2b: Size assignment problem
-  // cout << "Begin 2b" << endl;
+  cout << "Begin 2b" << endl;
   long long max_size = -1;
   long long agg_count = (long long) agg_bucket_stat.size();
   max_var = -1;
@@ -566,7 +567,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   //   }
   // }
 
-  // cout << "Begin 2c" << endl;
+  cout << "Begin 2c" << endl;
   // Phase-2c: Local DLV
   string condition_names, rec_names, t_names;
   {
@@ -638,7 +639,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
             // cout << is_done << " " << p << " " << local_group_index << " " << local_tuple_index << " " << local_col_index << " " << omp_get_thread_num() << endl;
           }
           if (is_done) break;
-          #pragma omp critical (c3)
+          #pragma omp critical (c4)
           {
             if (ress[local_group_index] == nullptr){
               ress[local_group_index] = PQgetResult(conns[local_group_index]);
@@ -670,6 +671,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
         assert(PQsendQuery(conn, _sql.c_str()));
       }
 
+      cout << "BEF SORT" << endl;
       map_sort::Sort(pis, n, core);
       long long soft_group_lim = (long long) ceil(n * group_ratio);
       double var_ratio = group_ratio * group_ratio * kVarScale;
@@ -682,7 +684,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
       vector<tuple<double, int, long long>> max_heap (hard_group_lim);
       vector<vector<long long>*> groups (hard_group_lim, nullptr);
       long long local_chunk = ceilDiv(n, (long long) core);
-
+      cout << "AFT SORT " << endl;
       #pragma omp parallel num_threads(core)
       {
         {
@@ -716,6 +718,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
         #pragma omp barrier
         #pragma omp master
         {
+          cout << "MAKE HEAP" << endl;
           delete[] pis;
           make_heap(max_heap.begin(), max_heap.begin() + heap_length);
         }
@@ -759,7 +762,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
           delim_count ++;
 
           long long g_start_index;
-          #pragma omp critical (c5)
+          #pragma omp critical (c6)
           {
             g_start_index = group_count;
             group_count += delim_count - 1;
@@ -808,7 +811,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
               }
             }
             if (m_index != -1){
-              #pragma omp critical (c5)
+              #pragma omp critical (c7)
               {
                 max_heap[heap_length] = {m_var, m_index, g_index};
                 heap_length ++;
@@ -816,6 +819,13 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
               }
             }
           }
+
+          #pragma omp barrier
+          #pragma omp master
+          {
+            cout << "ASSIGNED " << endl;
+          }
+          #pragma omp barrier
 
           {
             if (delim_count != 1) highs[mi][gi] = A[at(mi, g[delims[0]])];
@@ -836,7 +846,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
               }
             }
             if (m_index != -1){
-              #pragma omp critical (c5)
+              #pragma omp critical (c8)
               {
                 max_heap[heap_length] = {m_var, m_index, gi};
                 heap_length ++;
@@ -852,8 +862,11 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
 
         CREATE_CLOCK(local_pro);
 
-        // #pragma omp master
-        // cout << "Populate G/P" << endl;
+        #pragma omp barrier
+        #pragma omp master
+        cout << "Populate G" << endl;
+        #pragma omp barrier
+
         // Populate G table
         string sql = fmt::format("COPY \"{}\" FROM STDIN with (delimiter '|', null '{}');", g_name, kNullLiteral);
         res = PQexec(conn, sql.c_str());
@@ -865,75 +878,92 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
           const auto& g = *groups[i];
           MeanVar mv = MeanVar(m);
           string data = fmt::format("{}|", global_group_count+i+1);
-          for (long long j : g) mv.add(A + at(0, j));
-          VectorXd mean = mv.getMean();
-          VectorXd M2 = mv.getM2();
-          for (int j = 0; j < m; j ++){
-            data += fmt::format("[{},{}]|{:.{}Lf}|{:.{}Lf}|", infAlias(lows[j][i], kPrecision), infAlias(highs[j][i], kPrecision), mean(j), kPrecision, M2(j), kPrecision);
-          }
-          data += fmt::format("{}\n", mv.sample_count);
-          assert(PQputCopyData(conn, data.c_str(), (int) data.length()) == 1);
-        }
-        assert(PQputCopyEnd(conn, NULL) == 1);
-        res = PQgetResult(conn);
-        assert(PQresultStatus(res) == PGRES_COMMAND_OK);
-        PQclear(res);
-
-        // Populate P table
-        sql = fmt::format("COPY \"{}\" FROM STDIN with(delimiter ',');", p_name);
-        res = PQexec(conn, sql.c_str());
-        assert(PQresultStatus(res) == PGRES_COPY_IN);
-        PQclear(res);
-        #pragma omp for nowait
-        for (long long i = 0; i < group_count; i ++){
-          const auto& g = *groups[i];
-          string data = "";
+          #pragma omp critical
+          cout << g.size() << endl;
           for (long long j : g){
-            data += fmt::format("{},{}\n", tids[j], global_group_count+i+1);
+            // #pragma omp critical
+            // cout << 1 << endl;
+            // cout << m*j << " " << n << " " << m << " " << n*m << endl; 
+            // assert(at(0, j) < (n-1)*m);
+            // mv.add(A + at(0, j));
+            // break;
           }
-          assert(PQputCopyData(conn, data.c_str(), (int) data.length()) == 1);
+          // #pragma omp critical
+          // cout << "PASSED " << omp_get_thread_num() << endl;
+          // VectorXd mean = mv.getMean();
+          // VectorXd M2 = mv.getM2();
+          // for (int j = 0; j < m; j ++){
+          //   data += fmt::format("[{},{}]|{:.{}Lf}|{:.{}Lf}|", infAlias(lows[j][i], kPrecision), infAlias(highs[j][i], kPrecision), mean(j), kPrecision, M2(j), kPrecision);
+          // }
+          // data += fmt::format("{}\n", mv.sample_count);
+          // assert(PQputCopyData(conn, data.c_str(), (int) data.length()) == 1);
         }
+
         assert(PQputCopyEnd(conn, NULL) == 1);
         res = PQgetResult(conn);
         assert(PQresultStatus(res) == PGRES_COMMAND_OK);
         PQclear(res);
-        PQfinish(conn);
-        END_CLOCK(local_pro, 1);
-
-        ADD_CLOCK(local_pro, core);
 
         #pragma omp barrier
-        #pragma omp for nowait
-        for (long long i = 0; i < group_count; i ++) delete groups[i];
+        #pragma omp master
+        cout << "Populate P" << endl;
+        #pragma omp barrier
+
+        // Populate P table
+        // sql = fmt::format("COPY \"{}\" FROM STDIN with(delimiter ',');", p_name);
+        // res = PQexec(conn, sql.c_str());
+        // assert(PQresultStatus(res) == PGRES_COPY_IN);
+        // PQclear(res);
+        // #pragma omp for nowait
+        // for (long long i = 0; i < group_count; i ++){
+        //   const auto& g = *groups[i];
+        //   string data = "";
+        //   for (long long j : g){
+        //     data += fmt::format("{},{}\n", tids[j], global_group_count+i+1);
+        //   }
+        //   assert(PQputCopyData(conn, data.c_str(), (int) data.length()) == 1);
+        // }
+        // assert(PQputCopyEnd(conn, NULL) == 1);
+        // res = PQgetResult(conn);
+        // assert(PQresultStatus(res) == PGRES_COMMAND_OK);
+        // PQclear(res);
+        // PQfinish(conn);
+        // END_CLOCK(local_pro, 1);
+
+        // ADD_CLOCK(local_pro, core);
+
+        // #pragma omp barrier
+        // #pragma omp for nowait
+        // for (long long i = 0; i < group_count; i ++) delete groups[i];
       }
       global_group_count += group_count;
       delete[] A;
     }
   }
-  START_CLOCK(pro, 2);
-  PGconn *conn;
-  conn = PQconnectdb(pg->conninfo.c_str());
-  vector<string> interval_names;
-  for (int i = 0; i < min(m, kMaxMultiColumnIndexes); i ++) interval_names.push_back("interval_" + cols[i]);
-  _sql = fmt::format("CREATE INDEX \"{}_group_interval\" ON \"{}\" USING gist ({});", g_name, g_name, join(interval_names, ","));
-  assert(PQsendQuery(conn, _sql.c_str()));
-  wait_conns.push_back(conn);
+  // START_CLOCK(pro, 2);
+  // PGconn *conn;
+  // conn = PQconnectdb(pg->conninfo.c_str());
+  // vector<string> interval_names;
+  // for (int i = 0; i < min(m, kMaxMultiColumnIndexes); i ++) interval_names.push_back("interval_" + cols[i]);
+  // _sql = fmt::format("CREATE INDEX \"{}_group_interval\" ON \"{}\" USING gist ({});", g_name, g_name, join(interval_names, ","));
+  // assert(PQsendQuery(conn, _sql.c_str()));
+  // wait_conns.push_back(conn);
 
-  conn = PQconnectdb(pg->conninfo.c_str());
-  _sql = fmt::format("ALTER TABLE \"{}\" ADD PRIMARY KEY ({});", g_name, kId);
-  assert(PQsendQuery(conn, _sql.c_str()));
-  wait_conns.push_back(conn);
+  // conn = PQconnectdb(pg->conninfo.c_str());
+  // _sql = fmt::format("ALTER TABLE \"{}\" ADD PRIMARY KEY ({});", g_name, kId);
+  // assert(PQsendQuery(conn, _sql.c_str()));
+  // wait_conns.push_back(conn);
 
-  conn = PQconnectdb(pg->conninfo.c_str());
-  _sql = fmt::format("CREATE INDEX \"{}_gid_index\" ON \"{}\" USING btree (gid);", p_name, p_name);
-  assert(PQsendQuery(conn, _sql.c_str()));
-  wait_conns.push_back(conn);
+  // conn = PQconnectdb(pg->conninfo.c_str());
+  // _sql = fmt::format("CREATE INDEX \"{}_gid_index\" ON \"{}\" USING btree (gid);", p_name, p_name);
+  // assert(PQsendQuery(conn, _sql.c_str()));
+  // wait_conns.push_back(conn);
 
-  for (PGconn* conn : wait_conns){
-    while (PQgetResult(conn));
-    PQfinish(conn);
-  }
-  END_CLOCK(pro, 2);
+  // for (PGconn* conn : wait_conns){
+  //   while (PQgetResult(conn));
+  //   PQfinish(conn);
+  // }
+  // END_CLOCK(pro, 2);
 
   return global_group_count;
 }

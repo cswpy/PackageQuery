@@ -136,7 +136,9 @@ void main6(){
     double hardness = 8;
     prob.generateBounds(E, alpha, hardness);
     LayeredSketchRefine lsr = LayeredSketchRefine(kPCore, prob);
-    lsr.pro.print();
+    #if DEBUG
+      lsr.pro.print();
+    #endif
     if (order <= 7){
       long long n = (long long) (2 * pow(10.0, order));
       pro.clock(0);
@@ -225,12 +227,38 @@ void main9(){
   // cout << B << endl;
 }
 
+bool is_finished = false;
+double max_RAM = 0;
+const int kSleepPeriod = 10; // In ms
+
+void inspectRAM(){
+  while (!is_finished){
+    max_RAM = max(max_RAM, currentRAM());
+    std::this_thread::sleep_for(std::chrono::milliseconds(kSleepPeriod));
+  }
+}
+
+void main10(){
+  std::thread ram (inspectRAM);
+  double group_ratio = 0.01;
+  string partition_name = "P0";
+  string table_name = "ssds_7_1";
+  DynamicLowVariance dlv = DynamicLowVariance(kPCore, group_ratio);
+  dlv.partition(table_name, partition_name);
+  dlv.pro.print();
+  cout << dlv.exe << endl;
+  is_finished = true;
+  ram.join();
+  cout << "RAM:" << max_RAM << endl;
+}
+
 int main(){
   // main4();
   //main5();
   // main5p5();
-  main6();
+  // main6();
   //main7();
   // main8();
   // main9();
+  main10();
 }
