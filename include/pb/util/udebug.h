@@ -11,8 +11,30 @@
 #include <map>
 
 #include "pb/util/umisc.h"
+#include "pb/util/uconfig.h"
 
 #include "Eigen/Dense"
+
+#if DEBUG
+  #define INIT_CLOCK(pro) pro = Profiler(3)
+  #define CREATE_CLOCK(pro) Profiler pro = Profiler(3)
+  #define START_CLOCK(pro, i) pro.clock(i)
+  #define END_CLOCK(pro, i) pro.stop(i)
+  #define ADD_CLOCK(local_pro, core)\
+  ({                                \
+    _Pragma("omp critical")         \
+    {                               \
+      pro.add(local_pro, core);     \
+    }                               \
+  })
+
+#else
+  #define INIT_CLOCK(pro) (void)0
+  #define CREATE_CLOCK(pro) (void)0
+  #define START_CLOCK(pro, i) (void)0
+  #define END_CLOCK(pro, i) (void)0            
+  #define ADD_CLOCK(local_pro, core) (void)0
+#endif
 
 using std::cout;
 using std::vector;
@@ -87,13 +109,16 @@ public:
   VectorXi count;
   vector<std::chrono::high_resolution_clock::time_point> eps;
   vector<string> names;
+private:
+  void init(int n);
 public:
   Profiler();
+  Profiler(int n);
   Profiler(vector<string> names);
   void clock(int i, bool is_parallel=false);
   void stop(int i, bool is_parallel=false);
   void print();
-  void addProfiler(Profiler &profiler);
+  void add(Profiler &profiler, int core);
 };
 
 double currentRAM();

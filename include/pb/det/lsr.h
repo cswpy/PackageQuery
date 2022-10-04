@@ -7,6 +7,7 @@
 #include "pb/util/udebug.h"
 #include "pb/util/udeclare.h"
 #include "pb/util/upostgres.h"
+#include "pb/util/uconfig.h"
 #include "libpq-fe.h"
 
 using namespace pb;
@@ -24,6 +25,9 @@ public:
   map<long long, double> lp_sol;
   double ilp_score, exe_ilp, lp_score, exe_lp;
   int status;
+  #if DEBUG
+    Profiler pro;
+  #endif
 private:
   void init();
   void formulateDetProb(int core, const LsrProb &prob, DetProb &det_prob, string current_gtable, const vector<long long> &ids);

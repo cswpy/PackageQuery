@@ -1,6 +1,5 @@
 #include "lsr.h"
 
-#include "pb/util/uconfig.h"
 #include "pb/core/dual_reducer.h"
 
 const int kSleepPeriod = 25; // In ms
@@ -11,6 +10,7 @@ void LayeredSketchRefine::init(){
   assert(PQstatus(_conn) == CONNECTION_OK);
   _res = NULL;
   status = NotFound;
+  INIT_CLOCK(pro);
 }
 
 DLVPartition* LayeredSketchRefine::getDLVPartition(const LsrProb* prob){
@@ -49,6 +49,8 @@ void LayeredSketchRefine::formulateDetProb(int core, const LsrProb &prob, DetPro
   string col_names = join(prob.det_sql.att_cols, ",");
   #pragma omp parallel num_threads(core)
   {
+    CREATE_CLOCK(local_pro);
+
     string sql;
     PGconn* conn = PQconnectdb(pg->conninfo.c_str());
     assert(PQstatus(conn) == CONNECTION_OK);
@@ -61,7 +63,9 @@ void LayeredSketchRefine::formulateDetProb(int core, const LsrProb &prob, DetPro
     if (end_id >= start_id) string_ids += to_string(ids[end_id]);
     sql = fmt::format("SELECT {},{},{} FROM \"{}\" WHERE {} IN ({});",
       kId, prob.det_sql.obj_col, col_names, current_gtable, kId, string_ids);
+    START_CLOCK(local_pro, 0);
     res = PQexec(conn, sql.c_str());
+    END_CLOCK(local_pro, 0);
     for (int i = 0; i < PQntuples(res); i++){
       int index = i + start_id;
       det_prob.ids[index] = atoll(PQgetvalue(res, i, 0));
@@ -71,6 +75,7 @@ void LayeredSketchRefine::formulateDetProb(int core, const LsrProb &prob, DetPro
       }
       det_prob.A(m-1, index) = 1.0;
     }
+    ADD_CLOCK(local_pro, core);
     PQclear(res);
     PQfinish(conn);
   }
@@ -224,6 +229,7 @@ LayeredSketchRefine::LayeredSketchRefine(int core, const LsrProb &prob){
       }
       #pragma omp barrier
       if (loc_ids.size()) memcpy(&(ids[start_index]), &(loc_ids[0]), loc_ids.size()*sizeof(long long));
+      ADD_CLOCK(loc_partition->pro, core);
       delete loc_partition;
     }
 

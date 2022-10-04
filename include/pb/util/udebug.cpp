@@ -4,7 +4,7 @@
 #include <cmath>
 
 #include "udebug.h"
-#include "pb/util/uconfig.h"
+#include "pb/util/unumeric.h"
 #include "fmt/core.h"
 
 using std::min;
@@ -100,14 +100,24 @@ string showClassification(double x) {
   }
 }
 
+void Profiler::init(int n){
+  time.resize(n); time.fill(0);
+  count.resize(n); count.fill(0);
+  eps.clear(); eps.resize(n);
+}
+
 Profiler::Profiler(){
+}
+
+Profiler::Profiler(int n): n(n){
+  names.resize(n);
+  for (int i = 0; i < n; i ++) names[i] = to_string(i);
+  init(n);
 }
 
 Profiler::Profiler(vector<string> names): names(names){
   n = (int) names.size();
-  time.resize(n); time.fill(0);
-  count.resize(n); count.fill(0);
-  eps.resize(n);
+  init(n);
 }
 
 void Profiler::clock(int i, bool is_parallel){
@@ -150,10 +160,12 @@ void Profiler::print(){
   }
 }
 
-void Profiler::addProfiler(Profiler &profiler){
+void Profiler::add(Profiler &profiler, int core){
   assert(n == profiler.n);
-  time += profiler.time;
-  count += profiler.count;
+  for (int i = 0; i < n; i ++){
+    time(i) += profiler.time(i) / core;
+    count(i) += ceilDiv(profiler.count(i), core);
+  }
 }
 
 #ifdef _WIN32

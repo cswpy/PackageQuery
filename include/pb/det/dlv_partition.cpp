@@ -1,7 +1,5 @@
 #include "dlv_partition.h"
 
-#include "pb/util/uconfig.h"
-
 const double kIntervalEps = 1e-6;
 
 DLVPartition::~DLVPartition(){
@@ -15,6 +13,7 @@ DLVPartition::~DLVPartition(){
 DLVPartition::DLVPartition(const LsrProb *prob, vector<string> cols, double group_ratio, long long lp_size, int layer_count)
   : prob(prob), cols(cols), group_ratio(group_ratio), lp_size(lp_size), layer_count(layer_count){
   pg = new PgManager();
+  INIT_CLOCK(pro);
   _conn = PQconnectdb(pg->conninfo.c_str());
   assert(PQstatus(_conn) == CONNECTION_OK);
   _res = NULL;
@@ -91,7 +90,9 @@ long long DLVPartition::getGroupSize(int layer, long long group_id){
   string current_gtable = getGName(layer);
   char* vals[1];
   assign(vals, 0, group_id);
+  START_CLOCK(pro, 0);
   _res = PQexecPrepared(_conn, fmt::format("size_{}", current_gtable).c_str(), 1, vals, NULL, NULL, 0);
+  END_CLOCK(pro, 0);
   free(vals, 1);
   long long size = 0;
   if (PQntuples(_res)){
@@ -105,7 +106,9 @@ pair<long long, double> DLVPartition::getGroupWorthness(int layer, long long gro
   string current_gtable = getGName(layer);
   char* vals[1];
   assign(vals, 0, group_id);
+  START_CLOCK(pro, 0);
   _res = PQexecPrepared(_conn, fmt::format("worth_{}", current_gtable).c_str(), 1, vals, NULL, NULL, 0);
+  END_CLOCK(pro, 0); 
   free(vals, 1);
   long long size = 0;
   double worth = -1;
@@ -123,7 +126,9 @@ void DLVPartition::getGroupComp(vector<long long>& ids, int layer, long long gro
   string current_ptable = getPName(layer);
   char* vals[1];
   assign(vals, 0, group_id);
+  START_CLOCK(pro, 0);
   _res = PQexecPrepared(_conn, fmt::format("comp_{}", current_ptable).c_str(), 1, vals, NULL, NULL, 0);
+  END_CLOCK(pro, 0); 
   free(vals, 1);
   for (int i = 0; i < PQntuples(_res); i ++) ids.push_back(atoll(PQgetvalue(_res, i, 0)));
   PQclear(_res);
@@ -134,7 +139,9 @@ vector<pair<double, double>> DLVPartition::getGroupIntervals(int layer, long lon
   string current_initial_gtable = getInitialGName(layer);
   char* vals[1];
   assign(vals, 0, group_id);
+  START_CLOCK(pro, 0);
   _res = PQexecPrepared(_conn, fmt::format("interval_{}", current_initial_gtable).c_str(), 1, vals, NULL, NULL, 0);
+  END_CLOCK(pro, 0);
   free(vals, 1);
   for (int i = 0; i < PQnfields(_res); i ++){
     intervals.push_back(atop(PQgetvalue(_res, 0, i)));
@@ -150,7 +157,9 @@ long long DLVPartition::getGroupContaining(int layer, vector<double> values){
   for (int i = 0; i < m; i ++){
     assign(vals, i, values[i]);
   }
+  START_CLOCK(pro, 0);
   _res = PQexecPrepared(_conn, fmt::format("group_{}", current_initial_gtable).c_str(), m, vals, NULL, NULL, 0);
+  END_CLOCK(pro, 0);
   free(vals, m);
   long long group_id = -1;
   if (PQntuples(_res)) group_id = atoll(PQgetvalue(_res, 0, 0));

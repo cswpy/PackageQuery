@@ -4,6 +4,8 @@
 
 #include "pb/util/upostgres.h"
 #include "pb/util/udeclare.h"
+#include "pb/util/uconfig.h"
+#include "pb/util/udebug.h"
 #include "libpq-fe.h"
 
 using namespace pb;
@@ -21,6 +23,9 @@ public:
   long long lp_size;
   int layer_count;
   bool is_filtering;
+  #if DEBUG
+    Profiler pro;
+  #endif
 private:
   void getNeighboringGroupsRecurse(unordered_set<long long> &group_ids, vector<double> &values, int layer, int index, vector<pair<double, double>> &intervals);
 public:

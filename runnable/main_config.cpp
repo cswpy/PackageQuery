@@ -121,7 +121,7 @@ void main5p5(){
 void main6(){
   Profiler pro = Profiler({"DetProb"});
   for (int rep = 0; rep < 1; rep ++){
-    int order = 7;
+    int order = 9;
     string table_name = fmt::format("tpch_{}_1", order);
     string partition_name = "P0";
     string obj_col = "price";
@@ -136,6 +136,7 @@ void main6(){
     double hardness = 8;
     prob.generateBounds(E, alpha, hardness);
     LayeredSketchRefine lsr = LayeredSketchRefine(kPCore, prob);
+    lsr.pro.print();
     if (order <= 7){
       long long n = (long long) (2 * pow(10.0, order));
       pro.clock(0);

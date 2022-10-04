@@ -12,6 +12,11 @@ private:
   PgManager *pg;
   PGconn *_conn;
   PGresult *_res;
+public:
+  double exe;
+  #if DEBUG
+    Profiler pro;
+  #endif
 private:
   void init();
   long long doPartition(string table_name, string suffix, const vector<string> &cols);
