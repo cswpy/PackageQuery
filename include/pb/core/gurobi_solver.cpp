@@ -20,6 +20,7 @@ GurobiSolver::GurobiSolver(const DetProb &prob, bool with_objective): Checker(pr
   if (with_objective){
     for (int i = 0; i < n; i++) assert(!GRBaddvar(model, 0, NULL, NULL, prob.c(i), prob.l(i), prob.u(i), GRB_INTEGER, NULL));
   } else{
+    assert(!GRBsetintparam(env, GRB_INT_PAR_SOLUTIONLIMIT, 1));
     for (int i = 0; i < n; i++) assert(!GRBaddvar(model, 0, NULL, NULL, 0.0, prob.l(i), prob.u(i), GRB_INTEGER, NULL));
   }
 
@@ -51,7 +52,7 @@ void GurobiSolver::solveIlp(double mipGap, double time_limit){
   assert(!GRBsetdblparam(GRBgetenv(model), GRB_DBL_PAR_MIPGAP, mipGap));
   exe_ilp = exeTime([](GRBmodel *model){
     assert(!GRBoptimize(model));
-  }, model);
+  }, model) + exe_init;
   assert(!GRBgetintattr(model, GRB_INT_ATTR_STATUS, &ilp_status));
   if (ilp_status == GRB_OPTIMAL){
     ilp_status = Found;
@@ -73,7 +74,7 @@ void GurobiSolver::solveLp(){
   assert(!GRBsetintparam(local_env, GRB_INT_PAR_METHOD, 0));
   exe_lp = exeTime([](GRBmodel *relaxed) {
     assert(!GRBoptimize(relaxed));
-  }, relaxed);
+  }, relaxed) + exe_init;
   assert(!GRBgetintattr(relaxed, GRB_INT_ATTR_STATUS, &lp_status));
   if (lp_status == GRB_OPTIMAL){
     lp_status = Found;
@@ -85,14 +86,6 @@ void GurobiSolver::solveLp(){
     lp_score = getScore(lp_sol);
   } else if (lp_status == GRB_INFEASIBLE) lp_status = Infeasible;
   else if (lp_status == GRB_UNBOUNDED) lp_status = Unbounded;
-}
-
-double GurobiSolver::getLpTime(){
-  return exe_init + exe_lp;
-}
-
-double GurobiSolver::getIlpTime(){
-  return exe_init + exe_ilp;
 }
 
 double GurobiSolver::getScore(const VectorXd &sol){
@@ -124,8 +117,8 @@ int GurobiSolver::checkIlpFeasibility(const VectorXd &sol){
   return checkLpFeasibility(sol);
 }
 
-bool GurobiSolver::hasIlpSolution(){
+bool GurobiSolver::hasIlpSolution(double time_limit){
   GurobiSolver gs = GurobiSolver(prob, false);
-  gs.solveIlp();
+  gs.solveIlp(1e-4, time_limit);
   return gs.ilp_status == Found;
 }

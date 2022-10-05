@@ -89,6 +89,12 @@ pair<double, double> atop(char *s){
   return {left, right};
 }
 
+bool isPartitionName(string table_name){
+  regex expr ("^\\[([0-9]+).+\\](.+)");
+  smatch m;
+  regex_search(table_name, m, expr);
+  return m.size() > 0;
+}
 
 string nextName(string table_name, string symbol){
   regex expr ("^\\[([0-9]+).+\\](.+)");

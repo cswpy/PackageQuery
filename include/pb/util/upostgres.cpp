@@ -162,6 +162,12 @@ Stat* PgManager::readStats(string table_name){
   return stat;
 }
 
+void PgManager::deleteStats(string table_name){
+  _sql = fmt::format("DELETE FROM \"{}\" WHERE table_name='{}';", kStatTable, table_name);
+  _res = PQexec(_conn, _sql.c_str());
+  PQclear(_res);
+}
+
 bool PgManager::existTable(string table_name){
   _sql = fmt::format("SELECT * FROM pg_tables WHERE tablename='{}' AND schemaname='public'", table_name);
   _res = PQexec(_conn, _sql.c_str());
@@ -174,6 +180,7 @@ void PgManager::dropTable(string table_name){
   _sql = fmt::format("DROP TABLE IF EXISTS \"{}\";", table_name);
   _res = PQexec(_conn, _sql.c_str());
   PQclear(_res);
+  deleteStats(table_name);
 }
 
 vector<string> PgManager::listTables(string schema_name){

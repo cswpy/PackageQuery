@@ -23,6 +23,7 @@ private:
 public:
   ~DynamicLowVariance();
   DynamicLowVariance(int core, double group_ratio=0.01);
+  void dropAllPartitions();
   void dropTempTables();
   bool existPartition(string table_name, string partition_name);
   void dropPartition(string table_name, string partition_name);

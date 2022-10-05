@@ -5,6 +5,8 @@
 #include "pb/det/synthetic.h"
 #include "pb/det/dlv.h"
 
+using namespace pb;
+
 vector<double> DetExp::H3 = {1, 7, 13};
 vector<double> DetExp::H8 = {1, 3, 5, 7, 9, 11, 13, 15};
 vector<double> DetExp::E2 = {10, 1000};
@@ -52,10 +54,18 @@ vector<long long> DetExp::us = {
 };
 
 DetExp::~DetExp(){
+  out.close();
+  backup.open(backup_path, std::ios::out);
+  for (string s : lines) backup << s;
+  backup.close();
   delete pg;
 }
 
-DetExp::DetExp(){
+DetExp::DetExp(string out_file, bool verbose): verbose(verbose){
+  if (verbose) cout << "Start experiment " << out_file << endl;
+  string path = fmt::format("{}{}{}{}{}.csv", kProjectHome, separator(), kOutFolder, separator(), out_file);
+  backup_path = fmt::format("{}{}{}{}{}{}{}.csv", kProjectHome, separator(), kOutFolder, separator(), kBackupFolder, separator(), out_file);
+  out.open(path, std::ios::out);
   pg = new PgManager();
   reset();
 }
@@ -102,4 +112,17 @@ void DetExp::partition(){
   if (!dlv.existPartition(table_name, partition_name)){
     dlv.partition(table_name, partition_name);
   }
+}
+
+void DetExp::write(string id, double x, double y){
+  string s = fmt::format("{},{:.2Lf},{:.{}Lf}\n", id, x, y, kPrecision);
+  lines.push_back(s);
+  if (verbose) cout << s;
+  out << s;
+  out.flush();
+}
+
+void DetExp::setMemory(double M){
+  DetExp::M = M;
+  kMainMemorySize = M;
 }

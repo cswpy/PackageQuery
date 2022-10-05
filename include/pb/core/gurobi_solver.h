@@ -9,10 +9,10 @@ using namespace pb;
 
 class GurobiSolver: public Checker{
 private:
-  double exe_init, exe_lp, exe_ilp;
   GRBenv *env;
   GRBmodel *model;
 public:
+  double exe_init, exe_lp, exe_ilp;
   int lp_status, ilp_status;
   VectorXd lp_sol, ilp_sol;
   double lp_score, ilp_score;
@@ -22,11 +22,9 @@ public:
   GurobiSolver(const DetProb &prob, bool with_objective=true);
   void solveIlp(double mipGap=1e-4, double time_limit=-1.0);
   void solveLp();
-  double getLpTime();
-  double getIlpTime();
   double getScore(const VectorXd &sol);
   int checkLpFeasibility(const VectorXd &sol);
   int checkIlpFeasibility(const VectorXd &sol);
   void writeModel(string file_name);
-  bool hasIlpSolution();
+  bool hasIlpSolution(double time_limit=-1.0);
 };

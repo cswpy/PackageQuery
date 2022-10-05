@@ -32,6 +32,7 @@ string pgJoin(VectorXd vals, int precision);
 vector<string> pgStringSplit(char *s);
 VectorXd pgValueSplit(char *s);
 pair<double, double> atop(char *s);
+bool isPartitionName(string table_name);
 string nextGName(string table_name);
 string nextPName(string table_name);
 int getLayerIndex(string table_name);

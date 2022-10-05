@@ -1,11 +1,22 @@
 #pragma once
 
+#include <fstream>
+
 #include "pb/util/upostgres.h"
 #include "pb/det/det_sql.h"
 
+using std::fstream;
+
+static string kOutFolder = "plots";
+static string kBackupFolder = "backup";
+
 class DetExp{
 private:
+  fstream out, backup;
   PgManager *pg;
+  bool verbose;
+  vector<string> lines;
+  string backup_path;
 public:
   // Expected number of tuples in solution package
   double E;
@@ -48,10 +59,12 @@ public:
   
 public:
   ~DetExp();
-  DetExp();
+  DetExp(string out_file, bool verbose=true);
   void reset();
   string getTableName();
   vector<string> getCols();
   DetSql generate();
   void partition();
+  void write(string id, double x, double y);
+  void setMemory(double M);
 };

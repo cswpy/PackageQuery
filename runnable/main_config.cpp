@@ -239,17 +239,19 @@ void inspectRAM(){
 }
 
 void main10(){
-  std::thread ram (inspectRAM);
+  // std::thread ram (inspectRAM);
   double group_ratio = 0.01;
   string partition_name = "P1";
-  string table_name = "tpch_7_1";
+  string table_name = "tpch_9_1";
   DynamicLowVariance dlv = DynamicLowVariance(kPCore, group_ratio);
-  dlv.partition(table_name, partition_name);
-  dlv.pro.print();
-  cout << dlv.exe << endl;
-  is_finished = true;
-  ram.join();
-  cout << "RAM:" << max_RAM << endl;
+  // dlv.dropAllPartitions();
+  // dlv.dropTempTables();
+  // dlv.partition(table_name, partition_name);
+  // dlv.pro.print();
+  // cout << dlv.exe << endl;
+  // is_finished = true;
+  // ram.join();
+  // cout << "RAM:" << max_RAM << endl;
 }
 
 int main(){

@@ -48,6 +48,7 @@ public:
   void dropTable(string table_name);
   vector<string> getNumericCols(string table_name);
   Stat* readStats(string table_name);
+  void deleteStats(string table_name);
   void getSelectedTuples(RMatrixXd &out_tuples, vector<long long> &out_ids, string table_name, vector<long long> &ids, vector<string> cols, vector<string> filter_cols=vector<string>(), vector<pair<double, double>> filter_intervals=vector<pair<double, double>>());
   void getConsecutiveTuples(RMatrixXd &out_tuples, vector<long long> &out_ids, string table_name, long long start_id, long long end_id, vector<string> cols, vector<string> filter_cols=vector<string>(), vector<pair<double, double>> filter_intervals=vector<pair<double, double>>());
 };

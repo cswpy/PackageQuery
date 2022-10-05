@@ -1,6 +1,5 @@
 #define FMT_HEADER_ONLY
 
-#include "fmt/core.h"
 #include "dlv.h"
 #include "pb/util/uconfig.h"
 #include "pb/util/umisc.h"
@@ -74,6 +73,19 @@ void DynamicLowVariance::init(){
     ");", kPartitionTable);
   _res = PQexec(_conn, _sql.c_str());
   PQclear(_res);
+}
+
+void DynamicLowVariance::dropAllPartitions(){
+  vector<string> tables = pg->listTables();
+  for (string table : tables){
+    if (isPartitionName(table)){
+      int p1 = table.find("]");
+      int p2 = table.find_last_of("_");
+      string table_name = table.substr(p1+1, p2-1-p1);
+      string partition_name = table.substr(p2+1);
+      dropPartition(table_name, partition_name);
+    }
+  }
 }
 
 void DynamicLowVariance::dropTempTables(){

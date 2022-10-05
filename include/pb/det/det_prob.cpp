@@ -19,7 +19,8 @@ DetProb::DetProb(DetSql &det_sql, long long n, int seed): det_sql(&det_sql){
   PgManager pg = PgManager();
   long long size = pg.getSize(det_sql.table_name);
   long long chunk = ceilDiv(size, (long long) kPCore);
-  double probability = n / (double) size;
+  double probability = 1.0;
+  if (n >= 0) probability = n / (double) size;
   seed_seq seq{DetProb::seed};
   vector<unsigned int> local_seeds (kPCore);
   seq.generate(local_seeds.begin(), local_seeds.end());
