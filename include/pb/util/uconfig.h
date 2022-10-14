@@ -98,4 +98,4 @@ static int _ = readConfigs(configs);
   static const string kTempPrefix = "tmp";
 #endif
 
-long long getTupleCount(int tuple_size, int core_count=kPCore);
+long long getTupleCount(int tuple_size, int core_count=kPCore, double main_memory=kMainMemorySize);

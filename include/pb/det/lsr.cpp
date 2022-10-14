@@ -249,6 +249,7 @@ LayeredSketchRefine::LayeredSketchRefine(int core, const LsrProb &prob){
     status = dr.status;
     return;
   }
+  status = Found;
   ilp_score = lp_score = 0;
   for (int i = 0; i < (int) det_prob.c.size(); i ++){
     if (isGreater(dr.ilp_sol(i), 0)){

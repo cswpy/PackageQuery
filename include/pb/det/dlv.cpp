@@ -31,7 +31,7 @@ DynamicLowVariance::~DynamicLowVariance(){
   delete pg;
 }
 
-DynamicLowVariance::DynamicLowVariance(int core, double group_ratio): core(core), group_ratio(group_ratio){
+DynamicLowVariance::DynamicLowVariance(int core, double group_ratio, double main_memory): core(core), group_ratio(group_ratio), main_memory(main_memory){
   INIT_CLOCK(pro);
   init();
 }
@@ -141,7 +141,7 @@ void DynamicLowVariance::partition(string table_name, string partition_name, con
   _sql = fmt::format(""
     "INSERT INTO \"{}\"(table_name, partition_name, cols, group_ratio, lp_size, main_memory_used, core_used, layer_count) "
     "VALUES ('{}', '{}', {}, {}, {}, {}, {}, {});",
-    kPartitionTable, table_name, partition_name, pgJoin(cols), group_ratio, kLpSize, kMainMemorySize, core, layer_count);
+    kPartitionTable, table_name, partition_name, pgJoin(cols), group_ratio, kLpSize, main_memory, core, layer_count);
   _res = PQexec(_conn, _sql.c_str());
   PQclear(_res);
   exe = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start).count() / 1000000.0;
@@ -176,8 +176,8 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   // cout << "OK3" << endl;
 
   // In memory size for a local partition, meaning all 80 cores will share
-  double lower_in_memory_size_limit = kBucketCompensate * ceilDiv(core * size * kTempReserveSize * (m + 1) * 8, kMainMemorySize * 1e9);
-  long long in_memory_size = getTupleCount((m + 1) * 2, 2);
+  double lower_in_memory_size_limit = kBucketCompensate * ceilDiv(core * size * kTempReserveSize * (m + 1) * 8, main_memory * 1e9);
+  long long in_memory_size = getTupleCount((m + 1) * 2, 2, main_memory);
   assert(in_memory_size >= lower_in_memory_size_limit);
   long long bucket = (long long) (ceilDiv(size, in_memory_size) * kBucketCompensate); // Assuming bucket is within main memory otherwise above assert error will raise
   long long chunk = ceilDiv(size, (long long) core);
@@ -243,7 +243,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
     int seg = omp_get_thread_num();
     long long start_id = seg * chunk + 1;
     long long end_id = min((seg + 1) * chunk, size);
-    long long slide_size = getTupleCount(m+1);
+    long long slide_size = getTupleCount(m+1, core, main_memory);
     long long slide_count = ceilDiv(end_id - start_id + 1, slide_size);
     vector<int> sz (bucket, 0);
     vector<vector<pair<long long, VectorXd>>> cache (bucket, vector<pair<long long, VectorXd>>(kTempReserveSize));
@@ -391,7 +391,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
       assert(PQresultStatus(_res) == PGRES_COMMAND_OK);
       PQclear(_res);
 
-      long long slide_size = getTupleCount(m+1);
+      long long slide_size = getTupleCount(m+1, core, main_memory);
       long long slide_count = ceilDiv(recurse_size, slide_size);
       for (long long sl = 0; sl < slide_count; sl ++){
         long long offset = sl * slide_size;

@@ -66,5 +66,4 @@ public:
   DetSql generate();
   void partition();
   void write(string id, double x, double y);
-  void setMemory(double M);
 };

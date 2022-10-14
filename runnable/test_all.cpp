@@ -31,8 +31,8 @@ void inspectRAM(){
 /******************************************/
 
 void A1(){
-  DetExp exp = DetExp("A1");
-  exp.o = 7;
+  DetExp exp = DetExp("A1B");
+  exp.o = 8;
   DetSql det_sql = exp.generate();
   DetProb prob = DetProb(det_sql, -1, exp.seed);
   for (auto C : exp.C6){
@@ -116,9 +116,9 @@ void P1(){
   DetExp exp = DetExp("P1");
   exp.o = 8;
   for (double M : exp.M6){
-    exp.setMemory(M);
+    exp.M = M;
     std::thread ram (inspectRAM);
-    DynamicLowVariance dlv = DynamicLowVariance(exp.C, exp.g);
+    DynamicLowVariance dlv = DynamicLowVariance(exp.C, exp.g, exp.M);
     dlv.partition(exp.getTableName(), "M" + to_string(M));
     is_finished = true;
     ram.join();
@@ -129,10 +129,10 @@ void P1(){
 
 void P2(){
   DetExp exp = DetExp("P2");
-  exp.o = 8;
+  exp.o = 7;
   for (int C : exp.C6){
     exp.C = C;
-    DynamicLowVariance dlv = DynamicLowVariance(exp.C, exp.g);
+    DynamicLowVariance dlv = DynamicLowVariance(exp.C, exp.g, exp.M);
     dlv.partition(exp.getTableName(), "C" + to_string(exp.C));
     exp.write("DLV", exp.C, dlv.exe);
   }
@@ -142,7 +142,7 @@ void P3(){
   DetExp exp = DetExp("P3");
   for (int o : exp.o4){
     exp.o = o;
-    DynamicLowVariance dlv = DynamicLowVariance(exp.C, exp.g);
+    DynamicLowVariance dlv = DynamicLowVariance(exp.C, exp.g, exp.M);
     dlv.partition(exp.getTableName(), "P3");
     double X = pow(10.0, o);
     exp.write("DLV_read", X, dlv.pro.time(0));
@@ -272,7 +272,7 @@ void L4(){
 /******************************************/
 
 int main(){
-  // A1();
+  A1();
   // A2();
   // A3();
   // P1();

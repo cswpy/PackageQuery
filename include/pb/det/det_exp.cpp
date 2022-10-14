@@ -107,7 +107,7 @@ DetSql DetExp::generate(){
 }
 
 void DetExp::partition(){
-  DynamicLowVariance dlv = DynamicLowVariance(kPCore, g);
+  DynamicLowVariance dlv = DynamicLowVariance(kPCore, g, kMainMemorySize);
   string table_name = getTableName();
   if (!dlv.existPartition(table_name, partition_name)){
     dlv.partition(table_name, partition_name);
@@ -120,9 +120,4 @@ void DetExp::write(string id, double x, double y){
   if (verbose) cout << s;
   out << s;
   out.flush();
-}
-
-void DetExp::setMemory(double M){
-  DetExp::M = M;
-  kMainMemorySize = M;
 }
