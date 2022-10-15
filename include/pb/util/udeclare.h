@@ -43,6 +43,7 @@ namespace pb{
   using std::pair;
   using std::tuple;
   using std::tie;
+  using std::shared_ptr;
   
   using std::to_string;
   using std::iota;
@@ -50,6 +51,9 @@ namespace pb{
   using std::min;
   using std::max;
   using std::map;
+  using std::nth_element;
+  using std::distance;
+  using std::make_shared;
 
   using Eigen::VectorXd;
   using Eigen::VectorXi;
