@@ -49,7 +49,6 @@ namespace pb{
   using std::sort;
   using std::min;
   using std::max;
-  using std::map;
 
   using Eigen::VectorXd;
   using Eigen::VectorXi;

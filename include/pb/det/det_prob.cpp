@@ -38,19 +38,17 @@ DetProb::DetProb(DetSql &det_sql, long long n, int seed): det_sql(&det_sql){
     long long start_id = seg * chunk + 1;
     long long end_id = (seg + 1) * chunk;
     RMatrixXd local_A; vector<long long> local_ids;
+    PgManager *_pg = new PgManager();
     if (probability >= 1){
-      PgManager *_pg = new PgManager();
       _pg->getConsecutiveTuples(local_A, local_ids, det_sql.table_name, start_id, end_id, cols, det_sql.filter_cols, det_sql.filter_intervals);
-      delete _pg;
     } else{
       vector<long long> selected_ids; selected_ids.reserve((int)(chunk * probability));
       for (long long id = start_id; id <= end_id; id ++){
         if (dist(gen) <= probability) selected_ids.push_back(id);
       }
-      PgManager *_pg = new PgManager();
       _pg->getSelectedTuples(local_A, local_ids, det_sql.table_name, selected_ids, cols, det_sql.filter_cols, det_sql.filter_intervals);
-      delete _pg;
     }
+    delete _pg;
     MeanVar local_mv = MeanVar(att_count);
     int local_size = (int) local_ids.size();
     long long local_start = -1;

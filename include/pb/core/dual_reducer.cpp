@@ -14,7 +14,7 @@ enum StayStatus {NotStay, LikelyStay, Stay};
 DualReducer::~DualReducer(){
 }
 
-DualReducer::DualReducer(int core, const DetProb &prob){
+DualReducer::DualReducer(int core, const DetProb &prob, bool is_safe){
   std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
   int n = (int) prob.c.size();
   int m = (int) prob.bl.size();
@@ -212,13 +212,20 @@ DualReducer::DualReducer(int core, const DetProb &prob){
         reduced_prob.u(i) = prob.u(reduced_index(i));
       }
       GurobiSolver gs = GurobiSolver(reduced_prob);
-      gs.solveIlp(kMipGap, kTimeLimit);
+      if (is_safe) gs.solveIlp();
+      else gs.solveIlp(kMipGap, kTimeLimit);
       status = gs.ilp_status;
       if (gs.ilp_status == Found){
         for (int i = 0; i < gs.ilp_sol.size(); i ++){
           ilp_sol(reduced_index(i)) = gs.ilp_sol(i);
           ilp_score += gs.ilp_sol(i) * reduced_prob.c(i);
         }
+      } else if (is_safe){
+        GurobiSolver _gs = GurobiSolver(prob);
+        _gs.solveIlp();
+        status = gs.ilp_status;
+        ilp_sol = _gs.ilp_sol;
+        ilp_score = _gs.ilp_score;
       }
     } else{
       status = dual.status;
