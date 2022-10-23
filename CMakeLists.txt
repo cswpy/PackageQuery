@@ -57,9 +57,10 @@ link_directories( ${PYTHON_LIBRARIES})
 
 # MAIN
 # set(MAIN_NAME "main_config")
+set(MAIN_NAME "main_sketchrefine")
 
 # TEST
-set(MAIN_NAME "test_all")
+# set(MAIN_NAME "test_all")
 #set(MAIN_NAME "test_det_bound")
 
 message("PROJECT NAME: " ${PROJECT_NAME})

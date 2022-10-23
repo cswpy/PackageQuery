@@ -32,9 +32,9 @@ class KDTree {
         ~KDTree();
         KDTree();
         KDTree(int dimension, int size_req, double diameter_req);
-        void partitionTable(string data_table_name, string repr_table_name, vector<string>& cols, int size_req, double diameter_req);
+        void partitionTable(string data_table_name, string partition_name, vector<string>& cols, int size_req, double diameter_req);
         void insert(VectorXd tuple);
         //void storePartitions(string repr_table_name, vector<Tuple>& centroids, map<long long, vector<long long>>& mappings);
-        void getGroupCentroidAndPartition(vector<Tuple>& centroids, map<long long, vector<long long>>& mappings);
+        void getGroupCentroidAndPartition(vector<Tuple>& centroids, map<long long, vector<long long>>& mappings, map<long long, double>& diameters);
         bool buildTree(const vector<Tuple>::iterator &begin, const vector<Tuple>::iterator &end, const size_t &length);
 };
