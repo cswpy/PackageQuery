@@ -62,6 +62,8 @@ MeanVar::MeanVar(){
 MeanVar::MeanVar(int attr_count){
   mean.resize(attr_count); mean.fill(0);
   M2.resize(attr_count); M2.fill(0);
+  max.resize(attr_count); max.fill(0);
+  min.resize(attr_count); min.fill(0);
   this->attr_count = attr_count;
   sample_count = 0;
 }
@@ -71,11 +73,18 @@ void MeanVar::add(const VectorXd& x){
   VectorXd delta = x - mean;
   mean += delta / sample_count;
   M2 += delta.cwiseProduct(x - mean);
+  if(sample_count == 1) {
+    max = x;
+    min = x;
+  }else {
+    max = max.cwiseMax(x);
+    min = min.cwiseMin(x);
+  }
 }
 
 void MeanVar::add(double *start, int cycle){
   sample_count ++;
-  for (int i = 0; i < attr_count; i ++){
+  for (int i = 0; i < attr_count; i++){
     double x = start[i*cycle];
     double delta = x - mean(i);
     mean(i) += delta / sample_count;
@@ -91,10 +100,14 @@ void MeanVar::add(MeanVar &mv){
       mean = (sample_count * mean + mv.sample_count * mv.mean) / total_sample_count;
       M2 += mv.M2 + delta.cwiseProduct(delta)*sample_count*mv.sample_count/total_sample_count;
       sample_count = total_sample_count;
+      max = max.cwiseMax(mv.max);
+      min = min.cwiseMin(mv.min);
     } else{
       sample_count = mv.sample_count;
       mean = mv.mean;
       M2 = mv.M2;
+      max = mv.max;
+      min = mv.min;
     }
   }
 }
@@ -103,6 +116,8 @@ void MeanVar::reset(){
   mean.fill(0);
   M2.fill(0);
   sample_count = 0;
+  max.fill(0);
+  min.fill(0);
 }
 
 VectorXd MeanVar::getMean(){
@@ -119,16 +134,24 @@ VectorXd MeanVar::getM2(){
   return M2;
 }
 
+VectorXd MeanVar::getRange(){
+  return max-min;
+}
+
 ScalarMeanVar::ScalarMeanVar(){
   mean = 0;
   M2 = 0;
   sample_count = 0;
+  min = DBL_MAX;
+  max = DBL_MIN;
 }
 
 void ScalarMeanVar::reset(){
   mean = 0;
   M2 = 0;
   sample_count = 0;
+  max = DBL_MIN;
+  min = DBL_MAX;
 }
 
 void ScalarMeanVar::add(double x){
@@ -136,6 +159,8 @@ void ScalarMeanVar::add(double x){
   double delta = x - mean;
   mean += delta / sample_count;
   M2 += delta * (x - mean);
+  if (x<min) min = x;
+  if (x>max) max = x;
 }
 
 void ScalarMeanVar::add(ScalarMeanVar &smv){
@@ -165,4 +190,8 @@ double ScalarMeanVar::getVar(){
 
 double ScalarMeanVar::getM2(){
   return M2;
+}
+
+double ScalarMeanVar::getRange(){
+  return max-min;
 }

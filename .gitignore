@@ -8,3 +8,4 @@ plots/*
 !resource/*.ipynb
 !resource/*.py
 !resource/*.sh
+.vscode/

@@ -30,6 +30,7 @@ double nonNegativeSign(T value) {
   return 1.0;
 }
 
+#include "float.h"
 #include "Eigen/Dense"
 
 using Eigen::VectorXd;
@@ -37,7 +38,7 @@ using Eigen::VectorXd;
 // C++ implementation of Welford's running mean-var algorithm
 class MeanVar{
 private:
-  VectorXd mean, M2;
+  VectorXd mean, M2, max, min;
   int attr_count;
 public:
   long long sample_count;
@@ -51,11 +52,12 @@ public:
   VectorXd getMean();
   VectorXd getVar();
   VectorXd getM2();
+  VectorXd getRange();
 };
 
 class ScalarMeanVar{
 private:
-  double mean, M2;
+  double mean, M2, min, max;
 public:
   long long sample_count;
 public:
@@ -66,4 +68,5 @@ public:
   double getMean();
   double getVar();
   double getM2();
+  double getRange();
 };

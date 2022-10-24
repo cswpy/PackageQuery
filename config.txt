@@ -1,8 +1,8 @@
 # Parameters for Postgres
 hostname = 127.0.0.1
 port = 5433
-username = alm818
-database = postgres
+username = pw1287
+database = sketchrefine
 password = 
 schema = public
 
