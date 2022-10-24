@@ -74,6 +74,7 @@ string DLVPartition::getPName(int layer){
 string DLVPartition::getGName(int layer){
   if (!is_filtering) return fmt::format("[{}G]{}_{}", layer, prob->det_sql.table_name, prob->partition_name);
   else return fmt::format("{}_[{}G]{}_{}", kTempPrefix, layer, prob->det_sql.table_name, prob->partition_name);
+  // For example, temporary table such as tmp_[1G]ssds_P0 needs to contain columns: id, tmass_prox, j, h, k, size
 }
 
 string DLVPartition::getInitialGName(int layer){
