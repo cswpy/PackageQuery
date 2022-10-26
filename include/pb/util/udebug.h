@@ -15,9 +15,11 @@
 
 #include "Eigen/Dense"
 
+#define NUM_CLOCK 10
+
 #if DEBUG
-  #define INIT_CLOCK(pro) pro = Profiler(3)
-  #define CREATE_CLOCK(pro) Profiler pro = Profiler(3)
+  #define INIT_CLOCK(pro) pro = Profiler(NUM_CLOCK)
+  #define CREATE_CLOCK(pro) Profiler pro = Profiler(NUM_CLOCK)
   #define START_CLOCK(pro, i) pro.clock(i)
   #define END_CLOCK(pro, i) pro.stop(i)
   #define ADD_CLOCK(local_pro, core)\

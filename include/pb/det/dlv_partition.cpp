@@ -92,7 +92,9 @@ long long DLVPartition::getGroupSize(int layer, long long group_id){
   char* vals[1];
   assign(vals, 0, group_id);
   START_CLOCK(pro, 0);
+  START_CLOCK(pro, 9);
   _res = PQexecPrepared(_conn, fmt::format("size_{}", current_gtable).c_str(), 1, vals, NULL, NULL, 0);
+  END_CLOCK(pro, 9);
   END_CLOCK(pro, 0);
   free(vals, 1);
   long long size = 0;
@@ -108,7 +110,9 @@ pair<long long, double> DLVPartition::getGroupWorthness(int layer, long long gro
   char* vals[1];
   assign(vals, 0, group_id);
   START_CLOCK(pro, 0);
+  START_CLOCK(pro, 8);
   _res = PQexecPrepared(_conn, fmt::format("worth_{}", current_gtable).c_str(), 1, vals, NULL, NULL, 0);
+  END_CLOCK(pro, 8); 
   END_CLOCK(pro, 0); 
   free(vals, 1);
   long long size = 0;
@@ -128,7 +132,9 @@ void DLVPartition::getGroupComp(vector<long long>& ids, int layer, long long gro
   char* vals[1];
   assign(vals, 0, group_id);
   START_CLOCK(pro, 0);
+  START_CLOCK(pro, 7);
   _res = PQexecPrepared(_conn, fmt::format("comp_{}", current_ptable).c_str(), 1, vals, NULL, NULL, 0);
+  END_CLOCK(pro, 7);   
   END_CLOCK(pro, 0); 
   free(vals, 1);
   for (int i = 0; i < PQntuples(_res); i ++) ids.push_back(atoll(PQgetvalue(_res, i, 0)));
@@ -141,7 +147,9 @@ vector<pair<double, double>> DLVPartition::getGroupIntervals(int layer, long lon
   char* vals[1];
   assign(vals, 0, group_id);
   START_CLOCK(pro, 0);
+  START_CLOCK(pro, 6);
   _res = PQexecPrepared(_conn, fmt::format("interval_{}", current_initial_gtable).c_str(), 1, vals, NULL, NULL, 0);
+  END_CLOCK(pro, 6);  
   END_CLOCK(pro, 0);
   free(vals, 1);
   for (int i = 0; i < PQnfields(_res); i ++){
@@ -159,8 +167,10 @@ long long DLVPartition::getGroupContaining(int layer, vector<double> values){
     assign(vals, i, values[i]);
   }
   START_CLOCK(pro, 0);
+  START_CLOCK(pro, 5);
   _res = PQexecPrepared(_conn, fmt::format("group_{}", current_initial_gtable).c_str(), m, vals, NULL, NULL, 0);
   END_CLOCK(pro, 0);
+  END_CLOCK(pro, 5);
   free(vals, m);
   long long group_id = -1;
   if (PQntuples(_res)) group_id = atoll(PQgetvalue(_res, 0, 0));

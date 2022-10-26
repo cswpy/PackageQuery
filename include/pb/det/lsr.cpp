@@ -50,7 +50,6 @@ void LayeredSketchRefine::formulateDetProb(int core, const LsrProb &prob, DetPro
   #pragma omp parallel num_threads(core)
   {
     CREATE_CLOCK(local_pro);
-
     string sql;
     PGconn* conn = PQconnectdb(pg->conninfo.c_str());
     assert(PQstatus(conn) == CONNECTION_OK);
@@ -60,22 +59,24 @@ void LayeredSketchRefine::formulateDetProb(int core, const LsrProb &prob, DetPro
     int end_id = min((seg + 1) * chunk - 1, n - 1);
     string string_ids = "";
     for (int i = start_id; i < end_id; i ++) string_ids += to_string(ids[i]) + ",";
-    if (end_id >= start_id) string_ids += to_string(ids[end_id]);
-    sql = fmt::format("SELECT {},{},{} FROM \"{}\" WHERE {} IN ({});",
-      kId, prob.det_sql.obj_col, col_names, current_gtable, kId, string_ids);
-    START_CLOCK(local_pro, 0);
-    res = PQexec(conn, sql.c_str());
-    END_CLOCK(local_pro, 0);
-    for (int i = 0; i < PQntuples(res); i++){
-      int index = i + start_id;
-      det_prob.ids[index] = atoll(PQgetvalue(res, i, 0));
-      det_prob.c(index) = atof(PQgetvalue(res, i, 1));
-      for (int j = 0; j < m-1; j ++){
-        det_prob.A(j, index) = atof(PQgetvalue(res, i, 2+j)); 
+    if (end_id >= start_id) {
+      string_ids += to_string(ids[end_id]);
+      sql = fmt::format("SELECT {},{},{} FROM \"{}\" WHERE {} IN ({});",
+        kId, prob.det_sql.obj_col, col_names, current_gtable, kId, string_ids);
+      START_CLOCK(local_pro, 0);
+      res = PQexec(conn, sql.c_str());
+      END_CLOCK(local_pro, 0);
+      for (int i = 0; i < PQntuples(res); i++){
+        int index = i + start_id;
+        det_prob.ids[index] = atoll(PQgetvalue(res, i, 0));
+        det_prob.c(index) = atof(PQgetvalue(res, i, 1));
+        for (int j = 0; j < m-1; j ++){
+          det_prob.A(j, index) = atof(PQgetvalue(res, i, 2+j)); 
+        }
+        det_prob.A(m-1, index) = 1.0;
       }
-      det_prob.A(m-1, index) = 1.0;
+      ADD_CLOCK(local_pro, core);
     }
-    ADD_CLOCK(local_pro, core);
     PQclear(res);
     PQfinish(conn);
   }

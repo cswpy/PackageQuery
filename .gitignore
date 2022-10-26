@@ -9,3 +9,4 @@ plots/*
 !resource/*.py
 !resource/*.sh
 .vscode/
+config.txt

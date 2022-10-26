@@ -262,6 +262,7 @@ void L4(){
         LsrChecker ch = LsrChecker(lsr_prob);
         assert(ch.checkLpFeasibility(lsr.lp_sol) == Feasibility);
         assert(ch.checkIlpFeasibility(lsr.ilp_sol) == Feasibility);
+        lsr.pro.print();
         exp.write("LSR_read", X, lsr.pro.time(0));
         exp.write("LSR_aux", X, lsr.exe_ilp);
       }
@@ -272,7 +273,7 @@ void L4(){
 /******************************************/
 
 int main(){
-  A1();
+  // A1();
   // A2();
   // A3();
   // P1();
