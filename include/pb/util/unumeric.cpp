@@ -42,13 +42,13 @@ int ceilDiv(int x, int q){
 }
 
 
-double normalQuantile(double u, double v, double p){
-  return u + sqrt(2*v) * erf_inv(2*p - 1);
-}
+// double normalQuantile(double u, double v, double p){
+//   return u + sqrt(2*v) * erf_inv(2*p - 1);
+// }
 
-double normalCdf(double u, double v, double x){
-  return 0.5 + 0.5 * erf((x-u) / (sqrt(2*v)));
-}
+// double normalCdf(double u, double v, double x){
+//   return 0.5 + 0.5 * erf((x-u) / (sqrt(2*v)));
+// }
 
 double pctError(double x, double ground){
   // Assume ground > x

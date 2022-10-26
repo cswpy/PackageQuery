@@ -28,10 +28,22 @@
 
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> RMatrixXd;
 
-enum ConsSense { LowerBounded, UpperBounded, Bounded};
+enum DetSense { LowerBounded, UpperBounded, Bounded};
 enum SolStatus { NotFound, Found, Feasible, Infeasible, Unbounded, DualUnbounded, Timeout, NoPartitionFound, IncompatiblePartition};
 enum FeasStatus { Unsolved, Feasibility, Infeasibility, LbConstraint, UbConstraint, LbVariable, UbVariable, Integrality, BadFilter};
 enum GroupStatus { Unitialized, Unlocked, Locked};
+
+enum StoSense { VaR1, VaR2, VaR3, VaR4, CVaR1, CVaR2, CVaR3, CVaR4};
+/*
+VaR1: Pr(G >= v) >= p
+VaR2: Pr(G <= v) >= p
+VaR3: Pr(G >= v) <= p
+VaR4: Pr(G <= v) <= p
+CVaR1: E[G | G <= Q_G(p)] >= v
+CVaR2: E[G | G >= Q_G(p)] <= v
+CVaR3: E[G | G <= Q_G(p)] <= v
+CVaR4: E[G | G >= Q_G(p)] >= v
+*/
 
 namespace pb{
   using std::map;
@@ -63,6 +75,7 @@ namespace pb{
   using std::default_random_engine;
   using std::uniform_real_distribution;
   using std::normal_distribution;
+  using std::lognormal_distribution;
   using std::seed_seq;
 
   using std::fstream;

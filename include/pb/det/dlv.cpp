@@ -5,7 +5,7 @@
 #include "pb/util/umisc.h"
 #include "pb/util/unumeric.h"
 #include "pb/util/udeclare.h"
-#include "pb/core/map_sort.h"
+#include "pb/lib/map_sort.h"
 
 using namespace pb;
 

@@ -56,8 +56,8 @@ INCLUDE_DIRECTORIES( ${PYTHON_INCLUDE_DIRS} )
 link_directories( ${PYTHON_LIBRARIES})
 
 # MAIN
-# set(MAIN_NAME "main_config")
-set(MAIN_NAME "main_sketchrefine")
+set(MAIN_NAME "main_config")
+# set(MAIN_NAME "main_sketchrefine")
 
 # TEST
 # set(MAIN_NAME "test_all")
@@ -84,6 +84,9 @@ file(GLOB all_SRCS
   "${PROJECT_SOURCE_DIR}/include/pb/det/*.cpp"
   "${PROJECT_SOURCE_DIR}/include/pb/sto/*.h"
   "${PROJECT_SOURCE_DIR}/include/pb/sto/*.cpp"
+  "${PROJECT_SOURCE_DIR}/include/pb/lib/*.h"
+  "${PROJECT_SOURCE_DIR}/include/pb/lib/*.hpp"
+  "${PROJECT_SOURCE_DIR}/include/pb/lib/*.cpp"
 )
 
 #OpenMP for Windows

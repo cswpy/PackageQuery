@@ -2,3 +2,7 @@ wget
 matplotlib
 numpy
 psycopg
+yahoo_fin
+pandas
+pandas-datareader
+stocksymbol

@@ -12,8 +12,9 @@ bool isInteger(double x, double eps=kNumericEps);
 long long ceilDiv(long long x, long long q);
 int ceilDiv(int x, int q);
 
-double normalQuantile(double u, double v, double p);
-double normalCdf(double u, double v, double x);
+// Deprecated since normal.hpp is much more optimized
+// double normalQuantile(double u, double v, double p);
+// double normalCdf(double u, double v, double x);
 
 double pctError(double x, double ground);
 

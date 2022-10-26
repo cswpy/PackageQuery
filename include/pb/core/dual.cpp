@@ -1,5 +1,5 @@
 #include "pb/core/dual.h"
-#include "pb/core/map_sort.h"
+#include "pb/lib/map_sort.h"
 #include "pb/util/unumeric.h"
 #include "pb/util/udebug.h"
 

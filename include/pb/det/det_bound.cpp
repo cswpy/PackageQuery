@@ -1,5 +1,7 @@
 #include "det_bound.h"
 
+#include "pb/lib/normal.hpp"
+
 void DetBound::computeRotationMatrix(){
   M.resize(m, m);
   double a = 1 / (m + sqrt(m));
@@ -26,15 +28,17 @@ double DetBound::computeLowerBound(double E, double rho){
       double ov = fabs(E) * vars[i];
       double u = c * means[i];
       double v = fabs(c) * vars[i];
+      double sigma = sqrt(v);
+      double osigma = sqrt(ov);
       switch (att_senses[i]){
         case LowerBounded:
-          min_prob = min(min_prob, 1 - normalCdf(ou, ov, normalQuantile(u, v, 1-rho)));
+          min_prob = min(min_prob, 1 - normal_ms_cdf(normal_ms_cdf_inv(1-rho, u, sigma), ou, osigma));
           break;
         case UpperBounded:
-          min_prob = min(min_prob, normalCdf(ou, ov, normalQuantile(u, v, rho)));
+          min_prob = min(min_prob, normal_ms_cdf(normal_ms_cdf_inv(rho, u, sigma), ou, osigma));
           break;
         case Bounded:
-          min_prob = min(min_prob, normalCdf(ou, ov, normalQuantile(u, v, 0.5 + rho/2)) - normalCdf(ou, ov, normalQuantile(u, v, 0.5 - rho/2)));
+          min_prob = min(min_prob, normal_ms_cdf(normal_ms_cdf_inv(0.5 + rho/2, u, sigma), ou, osigma) - normal_ms_cdf(normal_ms_cdf_inv(0.5 - rho/2, u, sigma), ou, osigma));
           break;
         default:
           throw invalid_argument("Invalid constraint sense");
@@ -70,9 +74,10 @@ double DetBound::measureHardness(double E, const VectorXd& bl, const VectorXd& b
   for (int i = 0; i < m; i ++){
     double ou = E * means[i];
     double ov = fabs(E) * vars[i];
-    if (bl(i) != -DBL_MAX && bu(i) != DBL_MAX) hardness -= log10(max(normalCdf(ou, ov, bu(i)) - normalCdf(ou, ov, bl(i)), eps));
-    else if (bl(i) != -DBL_MAX) hardness -= log10(max(1 - normalCdf(ou, ov, bl(i)), eps));
-    else if (bu(i) != DBL_MAX) hardness -= log10(max(normalCdf(ou, ov, bu(i)), eps));
+    double osigma = sqrt(ov);
+    if (bl(i) != -DBL_MAX && bu(i) != DBL_MAX) hardness -= log10(max(normal_ms_cdf(bu(i), ou, osigma) - normal_ms_cdf(bl(i), ou, osigma), eps));
+    else if (bl(i) != -DBL_MAX) hardness -= log10(max(1 - normal_ms_cdf(bl(i), ou, osigma), eps));
+    else if (bu(i) != DBL_MAX) hardness -= log10(max(normal_ms_cdf(bu(i), ou, osigma), eps));
   }
   return hardness;
 }
@@ -119,18 +124,19 @@ void DetBound::assignBound(double rho, const VectorXd& center, VectorXd& bl, Vec
   for (int i = 0; i < m; i ++){
     double u = center(i) * means[i];
     double v = fabs(center(i)) * vars[i];
+    double sigma = sqrt(v);
     switch (att_senses[i]){
       case LowerBounded:
-        bl(i) = normalQuantile(u, v, 1-rho);
+        bl(i) = normal_ms_cdf_inv(1-rho, u, sigma);
         bu(i) = DBL_MAX;
         break;
       case UpperBounded:
         bl(i) = -DBL_MAX;
-        bu(i) = normalQuantile(u, v, rho);
+        bu(i) = normal_ms_cdf_inv(rho, u, sigma);
         break;
       case Bounded:
-        bl(i) = normalQuantile(u, v, 0.5 - rho/2);
-        bu(i) = normalQuantile(u, v, 0.5 + rho/2);
+        bl(i) = normal_ms_cdf_inv(0.5 - rho/2, u, sigma);
+        bu(i) = normal_ms_cdf_inv(0.5 + rho/2, u, sigma);
         break;
       default:
         throw invalid_argument("Invalid constraint sense");

@@ -11,6 +11,13 @@
 #include "pb/util/upostgres.h"
 #include "pb/det/lsr.h"
 #include "pb/det/det_sql.h"
+#include "pb/core/dist.h"
+
+#include "pb/lib/praxis.hpp"
+#include "pb/lib/normal.hpp"
+#include "pb/lib/log_normal_truncated_ab.hpp"
+#include "pb/lib/log_normal.hpp"
+#include "pb/lib/truncated_normal.hpp"
 
 using namespace pb;
 
@@ -254,6 +261,42 @@ void main10(){
   // cout << "RAM:" << max_RAM << endl;
 }
 
+// void main11(){
+//   double mu = 10;
+//   double variance = 100;
+//   Profiler pro = Profiler({"1", "2"});
+//   Dist* normal = new Normal(mu, variance);
+//   int N = 1000000;
+//   pro.clock(0);
+//   for (int i = 0; i < N-1; i ++){
+//     normal->quantile(1.0/N*(i+1));
+//     normal->cdf(i-N/2);
+//   }
+//   pro.stop(0);
+//   pro.clock(1);
+//   for (int i = 0; i < N-1; i ++){
+//     normalQuantile(mu, variance, 1.0/N*(i+1));
+//     normalCdf(mu, variance, i-N/2);
+//   }
+//   pro.stop(1);
+//   // VectorXd x;
+//   // normal->sample(x, 10, -1);
+//   // print(x);
+//   pro.print();
+// }
+
+void main12(){
+  double mu = 0;
+  double sigma = 1;
+  Dist* dist = new LogNormal(mu, sigma);
+  VectorXd x;
+  dist->sample(x, 10, -1);
+  print(x);
+  cout << dist->left_cvar(1.0) << " " << dist->right_cvar(1.0) << endl;
+  cout << dist->left_cvar(0.1) << " " << dist->right_cvar(0.1) << endl; 
+  cout << dist->mean() << " " << dist->variance() << endl;
+}
+
 int main(){
   // main4();
   //main5();
@@ -262,5 +305,7 @@ int main(){
   //main7();
   // main8();
   // main9();
-  main10();
+  // main10();
+  // main11();
+  main12();
 }
