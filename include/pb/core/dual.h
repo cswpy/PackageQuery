@@ -6,6 +6,7 @@
 
 using namespace pb;
 
+// All the time is in ms
 class Dual{
 public:
   int n, m, iteration_count, mini_iteration_count, status;

@@ -7,6 +7,7 @@
 
 using namespace pb;
 
+// All the time is in ms
 class GurobiSolver: public Checker{
 private:
   GRBenv *env;

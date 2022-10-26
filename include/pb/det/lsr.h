@@ -12,6 +12,7 @@
 
 using namespace pb;
 
+// All the time is in ms
 class LayeredSketchRefine{
 private:
   // We need to keep pg as pointer to PgManager since we want to implement customized destructor of LSR and DLV
@@ -34,5 +35,5 @@ private:
   DLVPartition* getDLVPartition(const LsrProb *prob);
 public:
   ~LayeredSketchRefine();
-  LayeredSketchRefine(int core, const LsrProb &prob);
+  LayeredSketchRefine(int core, const LsrProb &prob, bool is_safe=false);
 };

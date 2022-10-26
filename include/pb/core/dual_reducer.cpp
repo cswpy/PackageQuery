@@ -14,6 +14,67 @@ enum StayStatus {NotStay, LikelyStay, Stay};
 DualReducer::~DualReducer(){
 }
 
+DetProb* DualReducer::filtering(VectorXi &reduced_index, int core, const DetProb &prob, VectorXd &dual_sol, int stay_count, int stay_mode, vector<int> &stay){
+  int n = (int) prob.c.size();
+  int m = (int) prob.bl.size();  
+  reduced_index.resize(stay_count);
+  DetProb *reduced_prob = new DetProb(m, stay_count);
+  reduced_prob->bl = prob.bl;
+  reduced_prob->bu = prob.bu;
+  int start_stay_count = 0;
+  #pragma omp parallel num_threads(core)
+  {
+    int local_start_index = -1;
+    int local_stay_count = 0;
+    VectorXi local_stay_index (stay_count);
+    VectorXd local_change_b (m); local_change_b.fill(0);
+    #pragma omp for nowait
+    for (int i = 0; i < n; i ++){
+      if (stay[i] == Stay || stay[i] == stay_mode){
+        local_stay_index(local_stay_count) = i;
+        local_stay_count ++;
+      } else{
+        ilp_sol(i) = dual_sol(i);
+        #pragma omp atomic
+        ilp_score += dual_sol(i) * prob.c(i);
+        for (int j = 0; j < m; j ++){
+          local_change_b(j) += prob.A(j, i) * dual_sol(i);
+        }
+      }
+    }
+    #pragma omp critical (c3)
+    {
+      local_start_index = start_stay_count;
+      start_stay_count += local_stay_count;
+    }
+    if (local_stay_count) memcpy(&(reduced_index(local_start_index)), &(local_stay_index(0)), local_stay_count*sizeof(int));
+    // for (int i = local_start_index; i < local_start_index + local_stay_count; i ++){
+    //   reduced_index(i) = local_stay_index(i-local_start_index);
+    //   assert(reduced_index(i) == local_stay_index(i-local_start_index));
+    // }
+    #pragma omp barrier
+    for (int i = 0; i < m; i ++){
+      if (prob.bl(i) != -DBL_MAX){
+        #pragma omp atomic
+        reduced_prob->bl(i) -= local_change_b(i);
+      }
+      if (prob.bu(i) != DBL_MAX){
+        #pragma omp atomic
+        reduced_prob->bu(i) -= local_change_b(i);
+      }
+    }
+  }
+  for (int i = 0; i < start_stay_count; i ++){
+    for (int j = 0; j < m; j ++){
+      reduced_prob->A(j, i) = prob.A(j, reduced_index(i));
+    }
+    reduced_prob->c(i) = prob.c(reduced_index(i));
+    reduced_prob->l(i) = prob.l(reduced_index(i));
+    reduced_prob->u(i) = prob.u(reduced_index(i));
+  }
+  return reduced_prob;
+}
+
 DualReducer::DualReducer(int core, const DetProb &prob, bool is_safe){
   std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
   int n = (int) prob.c.size();
@@ -157,75 +218,47 @@ DualReducer::DualReducer(int core, const DetProb &prob, bool is_safe){
       }
       // Filtering
       VectorXi reduced_index (stay_count);
-      DetProb reduced_prob = DetProb(m, stay_count);
-      reduced_prob.bl = prob.bl;
-      reduced_prob.bu = prob.bu;
-      int start_stay_count = 0;
-      #pragma omp parallel num_threads(core)
-      {
-        int local_start_index = -1;
-        int local_stay_count = 0;
-        VectorXi local_stay_index (stay_count);
-        VectorXd local_change_b (m); local_change_b.fill(0);
-        #pragma omp for nowait
-        for (int i = 0; i < n; i ++){
-          if (stay[i] == Stay || stay[i] == stay_mode){
-            local_stay_index(local_stay_count) = i;
-            local_stay_count ++;
-          } else{
-            ilp_sol(i) = dual.sol(i);
-            #pragma omp atomic
-            ilp_score += dual.sol(i) * prob.c(i);
-            for (int j = 0; j < m; j ++){
-              local_change_b(j) += prob.A(j, i) * dual.sol(i);
-            }
-          }
-        }
-        #pragma omp critical (c3)
-        {
-          local_start_index = start_stay_count;
-          start_stay_count += local_stay_count;
-        }
-        if (local_stay_count) memcpy(&(reduced_index(local_start_index)), &(local_stay_index(0)), local_stay_count*sizeof(int));
-        // for (int i = local_start_index; i < local_start_index + local_stay_count; i ++){
-        //   reduced_index(i) = local_stay_index(i-local_start_index);
-        //   assert(reduced_index(i) == local_stay_index(i-local_start_index));
-        // }
-        #pragma omp barrier
-        for (int i = 0; i < m; i ++){
-          if (prob.bl(i) != -DBL_MAX){
-            #pragma omp atomic
-            reduced_prob.bl(i) -= local_change_b(i);
-          }
-          if (prob.bu(i) != DBL_MAX){
-            #pragma omp atomic
-            reduced_prob.bu(i) -= local_change_b(i);
-          }
-        }
-      }
-      for (int i = 0; i < start_stay_count; i ++){
-        for (int j = 0; j < m; j ++){
-          reduced_prob.A(j, i) = prob.A(j, reduced_index(i));
-        }
-        reduced_prob.c(i) = prob.c(reduced_index(i));
-        reduced_prob.l(i) = prob.l(reduced_index(i));
-        reduced_prob.u(i) = prob.u(reduced_index(i));
-      }
-      GurobiSolver gs = GurobiSolver(reduced_prob);
+      DetProb *reduced_prob = filtering(reduced_index, core, prob, dual.sol, stay_count, stay_mode, stay);
+      GurobiSolver gs = GurobiSolver(*reduced_prob);
       if (is_safe) gs.solveIlp();
       else gs.solveIlp(kMipGap, kTimeLimit);
       status = gs.ilp_status;
       if (gs.ilp_status == Found){
         for (int i = 0; i < gs.ilp_sol.size(); i ++){
           ilp_sol(reduced_index(i)) = gs.ilp_sol(i);
-          ilp_score += gs.ilp_sol(i) * reduced_prob.c(i);
+          ilp_score += gs.ilp_sol(i) * reduced_prob->c(i);
         }
+        delete reduced_prob;
       } else if (is_safe){
-        GurobiSolver _gs = GurobiSolver(prob);
-        _gs.solveIlp();
-        status = gs.ilp_status;
-        ilp_sol = _gs.ilp_sol;
-        ilp_score = _gs.ilp_score;
+        int current_size = kIlpSize;
+        while (true){
+          delete reduced_prob;
+          current_size = min(current_size*2, n);
+          // cout << "AT " << current_size << endl;
+          while (stay_count < current_size){
+            int index = deficit_pq.peak().second;
+            if (stay[index] != Stay){
+              stay[index] = Stay;
+              stay_count ++;
+            }
+            deficit_pq.pop();
+          }
+          reduced_prob = filtering(reduced_index, core, prob, dual.sol, stay_count, stay_mode, stay);
+          GurobiSolver _gs = GurobiSolver(*reduced_prob);
+          _gs.solveIlp();
+          status = _gs.ilp_status;
+          if (_gs.ilp_status == Found){
+            for (int i = 0; i < _gs.ilp_sol.size(); i ++){
+              ilp_sol(reduced_index(i)) = _gs.ilp_sol(i);
+              ilp_score += _gs.ilp_sol(i) * reduced_prob->c(i);
+            }
+            delete reduced_prob;
+            break;
+          } else if (current_size == n){
+            delete reduced_prob;
+            break;
+          }
+        }
       }
     } else{
       status = dual.status;
@@ -387,8 +420,8 @@ DualReducer::DualReducer(int core, const DetProb &prob, bool is_safe){
 //       // Filtering
 //       VectorXi reduced_index (stay_count);
 //       DetProb reduced_prob = DetProb(m, stay_count);
-//       reduced_prob.bl = prob.bl;
-//       reduced_prob.bu = prob.bu;
+//       reduced_prob->bl = prob.bl;
+//       reduced_prob->bu = prob.bu;
 //       int start_stay_count = 0;
 //       #pragma omp parallel num_threads(core)
 //       {
@@ -422,21 +455,21 @@ DualReducer::DualReducer(int core, const DetProb &prob, bool is_safe){
 //         for (int i = 0; i < m; i ++){
 //           if (prob.bl(i) != -DBL_MAX){
 //             #pragma omp atomic
-//             reduced_prob.bl(i) -= local_change_b(i);
+//             reduced_prob->bl(i) -= local_change_b(i);
 //           }
 //           if (prob.bu(i) != DBL_MAX){
 //             #pragma omp atomic
-//             reduced_prob.bu(i) -= local_change_b(i);
+//             reduced_prob->bu(i) -= local_change_b(i);
 //           }
 //         }
 //       }
 //       for (int i = 0; i < start_stay_count; i ++){
 //         for (int j = 0; j < m; j ++){
-//           reduced_prob.A(j, i) = prob.A(j, reduced_index(i));
+//           reduced_prob->A(j, i) = prob.A(j, reduced_index(i));
 //         }
-//         reduced_prob.c(i) = prob.c(reduced_index(i));
-//         reduced_prob.l(i) = prob.l(reduced_index(i));
-//         reduced_prob.u(i) = prob.u(reduced_index(i));
+//         reduced_prob->c(i) = prob.c(reduced_index(i));
+//         reduced_prob->l(i) = prob.l(reduced_index(i));
+//         reduced_prob->u(i) = prob.u(reduced_index(i));
 //       }
 //       GurobiSolver gs = GurobiSolver(reduced_prob);
 //       gs.solveIlp(kMipGap, kTimeLimit);
@@ -444,7 +477,7 @@ DualReducer::DualReducer(int core, const DetProb &prob, bool is_safe){
 //       if (gs.ilp_status == Found){
 //         for (int i = 0; i < gs.ilp_sol.size(); i ++){
 //           ilp_sol(reduced_index(i)) = gs.ilp_sol(i);
-//           ilp_score += gs.ilp_sol(i) * reduced_prob.c(i);
+//           ilp_score += gs.ilp_sol(i) * reduced_prob->c(i);
 //         }
 //       }
 //     } else{

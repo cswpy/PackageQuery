@@ -83,7 +83,7 @@ void LayeredSketchRefine::formulateDetProb(int core, const LsrProb &prob, DetPro
   det_prob.truncate();
 }
 
-LayeredSketchRefine::LayeredSketchRefine(int core, const LsrProb &prob){
+LayeredSketchRefine::LayeredSketchRefine(int core, const LsrProb &prob, bool is_safe){
   init();
   std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
   partition = getDLVPartition(&prob);
@@ -111,7 +111,7 @@ LayeredSketchRefine::LayeredSketchRefine(int core, const LsrProb &prob){
   for (int layer = partition->layer_count; layer >= 1; layer --){
     int n = (int) det_prob.c.size();
     // Phase-2a: Sketch
-    DualReducer dr = DualReducer(core, det_prob);
+    DualReducer dr = DualReducer(core, det_prob, is_safe);
     if (dr.status != Found){
       status = dr.status;
       return;
@@ -245,7 +245,7 @@ LayeredSketchRefine::LayeredSketchRefine(int core, const LsrProb &prob){
   }
 
   // Phase-3: Final solution
-  DualReducer dr = DualReducer(core, det_prob);
+  DualReducer dr = DualReducer(core, det_prob, is_safe);
   if (dr.status != Found){
     status = dr.status;
     return;
