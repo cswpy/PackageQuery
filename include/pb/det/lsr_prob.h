@@ -8,6 +8,8 @@
 using namespace pb;
 
 class LsrProb{
+private:
+  tuple<double, double, double> last_eah;
 public:
   DetSql &det_sql;
   string partition_name;
@@ -20,4 +22,5 @@ public:
   LsrProb(DetSql &det_sql, string partition_name, int seed=-1);
   double generateBounds(double E, double alpha, double hardness);
   void setSeed(int seed);
+  void rebound(VectorXd means, VectorXd vars);
 };

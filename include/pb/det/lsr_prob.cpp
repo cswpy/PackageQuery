@@ -13,9 +13,11 @@ LsrProb::LsrProb(DetSql &det_sql, string partition_name, int seed): det_sql(det_
   bu.resize(m); bu.fill(DBL_MAX);
   cl = -DBL_MAX;
   cu = DBL_MAX;
+  last_eah = {-1, -1, -1};
   PgManager pg = PgManager();
   // If there is filtering, our means, vars are wrong
   // This leads to infeasible query if the filter ratio is high
+  // Hence rebound is needed to correct means and vars for filtering
   Stat* stat = pg.readStats(det_sql.table_name);
   vector<double> means (m);
   vector<double> vars (m);
@@ -29,6 +31,7 @@ LsrProb::LsrProb(DetSql &det_sql, string partition_name, int seed): det_sql(det_
 }
 
 double LsrProb::generateBounds(double E, double alpha, double hardness){
+  last_eah = {E, alpha, hardness};
   if (det_sql.has_count_constraint){
     cl = E*kLowerCountFactor;
     cu = E*kUpperCountFactor;
@@ -48,4 +51,10 @@ void LsrProb::setSeed(int seed){
     LsrProb::seed = rd();
   }
   det_bound.setSeed(seed);
+}
+
+void LsrProb::rebound(VectorXd means, VectorXd vars){
+  det_bound = DetBound(det_sql.att_senses, means, vars, seed);
+  auto [E, alpha, hardness] = last_eah;
+  if (alpha >= 0) generateBounds(E, alpha, hardness);
 }

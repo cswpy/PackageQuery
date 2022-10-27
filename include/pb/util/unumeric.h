@@ -1,5 +1,13 @@
 #pragma once
 
+#include <utility>
+#include <float.h>
+
+#include "Eigen/Dense"
+
+using Eigen::VectorXd;
+using std::pair;
+
 constexpr double kNumericEps = 1e-12;
 
 bool isEqual(double x, double y, double eps=kNumericEps);
@@ -11,6 +19,8 @@ bool isInteger(double x, double eps=kNumericEps);
 
 long long ceilDiv(long long x, long long q);
 int ceilDiv(int x, int q);
+
+bool doesIntersect(pair<double, double> a, pair<double, double> b);
 
 // Deprecated since normal.hpp is much more optimized
 // double normalQuantile(double u, double v, double p);
@@ -30,11 +40,6 @@ double nonNegativeSign(T value) {
   if (value < 0) return -1.0;
   return 1.0;
 }
-
-#include "float.h"
-#include "Eigen/Dense"
-
-using Eigen::VectorXd;
 
 // C++ implementation of Welford's running mean-var algorithm
 class MeanVar{

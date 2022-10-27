@@ -9,7 +9,7 @@ schema = public
 # Parameters for PackageQuery
 physical_core = 80
 logical_core = 160
-max_multicolumn_indexes = 2
+max_multicolumn_indexes = 32
 # Main memory in GB
 main_memory_size = 300
 # lp_size >= core^2

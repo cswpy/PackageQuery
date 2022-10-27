@@ -155,20 +155,15 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   if (size <= kLpSize) return 0;
 
   // cout << "OK1" << endl;
-
-  int stat_max_var_index = -1;
-  int max_var_index = -1;
-  double max_var = -1;
   int m = (int) cols.size();
+  vector<tuple<double, int, int>> col_vars (m);
   for (int i = 0; i < m; i ++){
     int index = stat->getIndex(cols[i]);
     double var = stat->getVar(index);
-    if (max_var < var){
-      max_var = var;
-      max_var_index = i;
-      stat_max_var_index = index;
-    }
+    col_vars[i] = {-var, i, index};
   }
+  sort(col_vars.begin(), col_vars.end());
+  auto [_, max_var_index, stat_max_var_index] = col_vars[0];
   // cout << "OK2" << endl;
 
   double min_att = stat->amin(stat_max_var_index);
@@ -549,7 +544,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   // cout << "Begin 2b" << endl;
   long long max_size = -1;
   long long agg_count = (long long) agg_bucket_stat.size();
-  max_var = -1;
+  double max_var = -1;
   for (long long p = 0; p < agg_count; p ++){
     if (agg_bucket_stat[p].sample_count){
       max_size = max(max_size, agg_bucket_stat[p].sample_count);
@@ -805,7 +800,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
             long long g_index = g_start_index + i;
             long long group_sz = delims[i+1] - delims[i];
             vector<long long>* gptr = new vector<long long>(group_sz);
-            memcpy(&(*gptr)[0], &g[delims[i]], group_sz*sizeof(long long));
+            if (group_sz) memcpy(&(*gptr)[0], &g[delims[i]], group_sz*sizeof(long long));
 
             groups[g_index] = gptr;
             for (int j = 0; j < m; j ++){
@@ -948,7 +943,10 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   PGconn *conn;
   conn = PQconnectdb(pg->conninfo.c_str());
   vector<string> interval_names;
-  for (int i = 0; i < min(m, kMaxMultiColumnIndexes); i ++) interval_names.push_back("interval_" + cols[i]);
+  for (int i = 0; i < min(m, kMaxMultiColumnIndexes); i ++){
+    auto [_1, index, _2] = col_vars[i];
+    interval_names.push_back("interval_" + cols[index]);
+  }
   _sql = fmt::format("CREATE INDEX \"{}_group_interval\" ON \"{}\" USING gist ({});", g_name, g_name, join(interval_names, ","));
   assert(PQsendQuery(conn, _sql.c_str()));
   wait_conns.push_back(conn);

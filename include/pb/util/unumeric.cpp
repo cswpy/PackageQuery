@@ -41,6 +41,10 @@ int ceilDiv(int x, int q){
   return d.quot + (d.rem != 0);
 }
 
+bool doesIntersect(pair<double, double> a, pair<double, double> b){
+  return !(a.first >= b.second || b.first >= a.second);
+}
+
 
 // double normalQuantile(double u, double v, double p){
 //   return u + sqrt(2*v) * erf_inv(2*p - 1);

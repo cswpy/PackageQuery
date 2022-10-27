@@ -8,6 +8,7 @@
 #include "pb/util/udeclare.h"
 #include "pb/util/upostgres.h"
 #include "pb/util/uconfig.h"
+#include "pb/util/unumeric.h"
 #include "libpq-fe.h"
 
 using namespace pb;
@@ -31,9 +32,9 @@ public:
   #endif
 private:
   void init();
-  void formulateDetProb(int core, const LsrProb &prob, DetProb &det_prob, string current_gtable, const vector<long long> &ids);
-  DLVPartition* getDLVPartition(const LsrProb *prob);
+  void formulateDetProb(int core, LsrProb &prob, DetProb &det_prob, string current_gtable, const vector<long long> &ids);
+  DLVPartition* getDLVPartition(LsrProb *prob);
 public:
   ~LayeredSketchRefine();
-  LayeredSketchRefine(int core, const LsrProb &prob, bool is_safe=false);
+  LayeredSketchRefine(int core, LsrProb &prob, bool is_safe=false);
 };

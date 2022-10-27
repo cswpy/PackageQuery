@@ -13,7 +13,7 @@ void LayeredSketchRefine::init(){
   INIT_CLOCK(pro);
 }
 
-DLVPartition* LayeredSketchRefine::getDLVPartition(const LsrProb* prob){
+DLVPartition* LayeredSketchRefine::getDLVPartition(LsrProb* prob){
   _sql = fmt::format("SELECT cols, group_ratio, lp_size, layer_count FROM {} WHERE table_name='{}' AND partition_name='{}';", kPartitionTable, prob->det_sql.table_name, prob->partition_name);
   _res = PQexec(_conn, _sql.c_str());
   if (PQntuples(_res)){
@@ -31,7 +31,7 @@ LayeredSketchRefine::~LayeredSketchRefine(){
   delete pg;
 }
 
-void LayeredSketchRefine::formulateDetProb(int core, const LsrProb &prob, DetProb &det_prob, string current_gtable, const vector<long long> &ids){
+void LayeredSketchRefine::formulateDetProb(int core, LsrProb &prob, DetProb &det_prob, string current_gtable, const vector<long long> &ids){
   int m = prob.det_sql.att_cols.size() + 1;
   int n = (int) ids.size();
   det_prob.resize(m, n);
@@ -83,7 +83,7 @@ void LayeredSketchRefine::formulateDetProb(int core, const LsrProb &prob, DetPro
   det_prob.truncate();
 }
 
-LayeredSketchRefine::LayeredSketchRefine(int core, const LsrProb &prob, bool is_safe){
+LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, bool is_safe){
   init();
   std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
   partition = getDLVPartition(&prob);
@@ -98,10 +98,147 @@ LayeredSketchRefine::LayeredSketchRefine(int core, const LsrProb &prob, bool is_
   // Phase-0: Filtering
   string current_gtable = partition->getGName(partition->layer_count);
   int n = pg->getSize(current_gtable);
-  vector<long long> last_layer_ids (n);
+  vector<long long> last_layer_ids;
   if (partition->is_filtering){
     // Filtering
+    vector<string> att_names;
+    for (int i = 0; i < (int) partition->query_cols.size(); i ++){
+      att_names[i] = fmt::format("{} DOUBLE PRECISION", partition->query_cols[i]);
+    }
+    #if DEBUG
+      MeanVar global_mv = MeanVar(partition->query_cols.size());
+    #endif
+    string gname;
+    long long group_count, chunk;
+    int start_index = 0;
+    #pragma omp parallel num_threads(core)
+    {
+      string sql;
+      PGconn *conn = PQconnectdb(pg->conninfo.c_str());
+      assert(PQstatus(conn) == CONNECTION_OK);
+      PGresult *res = NULL;
+      DLVPartition *loc_partition = new DLVPartition(&prob, partition->cols, partition->group_ratio, partition->lp_size, partition->layer_count);
+      
+      int local_start_index = 0;
+      vector<long long> local_ids;
+      local_ids.reserve(n);
+
+      for (int layer = 1; layer <= partition->layer_count; layer ++){
+        #pragma omp master
+        {
+          gname = partition->getGName(layer);
+          pg->dropTable(gname);
+          _sql = fmt::format(""
+            "CREATE TABLE IF NOT EXISTS \"{}\"("
+            "	{} BIGINT,"
+            " {}"
+            ");", gname, kId, join(att_names, ","));
+          _res = PQexec(_conn, _sql.c_str());
+          PQclear(_res);
+
+          group_count = pg->getSize(partition->getInitialGName(layer));
+          chunk = ceilDiv(group_count, (long long) core);
+        }
+        #pragma omp barrier
+        int seg = omp_get_thread_num();
+        long long start_id = seg * chunk + 1;
+        long long end_id = min((seg + 1) * chunk, group_count);
+        if (end_id >= start_id){
+          sql = fmt::format("COPY \"{}\" FROM STDIN with(delimiter ',');", gname);
+          res = PQexec(conn, sql.c_str());
+          assert(PQresultStatus(res) == PGRES_COPY_IN);
+          PQclear(res);
+          if (layer == 1){
+            // Fast filtering if the intervals lie outside the filtering conditions
+            unordered_map<string, int> cols_map;
+            for (int i = 0; i < (int) partition->cols.size(); i ++){
+              cols_map[partition->cols[i]] = i;
+            }
+            for (long long group_id = start_id; group_id <= end_id; group_id ++){
+              vector<pair<double, double>> intervals = loc_partition->getGroupIntervals(layer, group_id);
+              bool is_filtered = false;
+              for (int j = 0; j < (int) prob.det_sql.filter_cols.size(); j++){
+                int col_index = cols_map[prob.det_sql.filter_cols[j]];
+                if (!doesIntersect(intervals[col_index], prob.det_sql.filter_intervals[j])){
+                  is_filtered = true;
+                  break;
+                }
+              }
+              if (!is_filtered){
+                // Go through group and check individual original tuples
+                MeanVar mv = MeanVar(loc_partition->query_cols.size());
+                loc_partition->getGroupFilteredStat(mv, layer, group_id);
+                if (mv.sample_count){
+                  string data = fmt::format("{},{}\n", group_id, join(mv.getVar(), kPrecision));
+                  assert(PQputCopyData(_conn, data.c_str(), (int) data.length()) == 1);
+                }
+                #if DEBUG
+                #pragma omp critical (c6)
+                {
+                  global_mv.add(mv);
+                }
+                #endif
+                if (layer == partition->layer_count){
+                  local_ids.push_back(group_id);
+                }
+              }
+            }
+          } else{
+            // Normal filtering since the intervals are no longer correct for original tuples
+            for (long long group_id = start_id; group_id <= end_id; group_id ++){
+              MeanVar mv = MeanVar(loc_partition->query_cols.size());
+              loc_partition->getGroupFilteredStat(mv, layer, group_id);
+              if (mv.sample_count){
+                string data = fmt::format("{},{}\n", group_id, join(mv.getVar(), kPrecision));
+                assert(PQputCopyData(_conn, data.c_str(), (int) data.length()) == 1);
+              }
+              if (layer == partition->layer_count){
+                local_ids.push_back(group_id);
+              }
+            }
+          }
+          assert(PQputCopyEnd(_conn, NULL) == 1);
+          _res = PQgetResult(_conn);
+          assert(PQresultStatus(_res) == PGRES_COMMAND_OK);
+          PQclear(_res);
+        }
+        #pragma omp barrier
+        #pragma omp master
+        {
+          _sql = fmt::format("CREATE INDEX \"{}_id\" ON \"{}\" USING btree ({});", gname, gname, kId);
+          _res = PQexec(_conn, _sql.c_str());
+          PQclear(_res);
+        }
+        #pragma omp barrier
+        if (layer < partition->layer_count) loc_partition->prepareGroupFilteredStatSql(layer+1);
+        #pragma omp barrier
+      }
+      PQfinish(conn);
+      delete loc_partition;
+      #pragma omp critical (c7)
+      {
+        local_start_index = start_index;
+        start_index += local_ids.size();
+      }
+      #pragma omp barrier
+      #pragma omp master
+      {
+        last_layer_ids.resize(start_index);
+      }
+      #pragma omp barrier
+      if (local_ids.size()){
+        memcpy(&(last_layer_ids[local_start_index]), &(local_ids[0]), local_ids.size()*sizeof(long long));
+      }
+    }
+    #if DEBUG
+      VectorXd means = global_mv.getMean();
+      means.conservativeResize(prob.det_sql.att_cols.size());
+      VectorXd vars = global_mv.getVar();
+      vars.conservativeResize(prob.det_sql.att_cols.size());
+      prob.rebound(means, vars);
+    #endif
   } else{
+    last_layer_ids.resize(n);
     iota(last_layer_ids.begin(), last_layer_ids.end(), 1);
   }
   DetProb det_prob;
@@ -218,7 +355,7 @@ LayeredSketchRefine::LayeredSketchRefine(int core, const LsrProb &prob, bool is_
 
       // Phase-2c: Refine
       long long start_index = 0;
-      #pragma omp critical
+      #pragma omp critical (c5)
       {
         start_index = global_start_index;
         global_start_index += loc_ids.size();
@@ -243,7 +380,12 @@ LayeredSketchRefine::LayeredSketchRefine(int core, const LsrProb &prob, bool is_
     // cout << endl;
     // cout << ids.size() << endl;
   }
-
+  if (partition->is_filtering){
+    for (int layer = 1; layer <= partition->layer_count; layer ++){
+      string gname = partition->getGName(layer);
+      pg->dropTable(gname);
+    }
+  }
   // Phase-3: Final solution
   DualReducer dr = DualReducer(core, det_prob, is_safe);
   if (dr.status != Found){

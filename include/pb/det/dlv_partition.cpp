@@ -20,6 +20,9 @@ DLVPartition::DLVPartition(const LsrProb *prob, vector<string> cols, double grou
 
   is_filtering = prob->det_sql.filter_cols.size() > 0;
 
+  query_cols = prob->det_sql.att_cols;
+  if (!isIn(query_cols, prob->det_sql.obj_col)) query_cols.push_back(prob->det_sql.obj_col);
+
   vector<string> intervals (cols.size());
   for (int i = 0; i < (int) cols.size(); i ++) intervals[i] = "interval_" + cols[i];
   string interval_names = join(intervals, ",");
@@ -58,10 +61,32 @@ DLVPartition::DLVPartition(const LsrProb *prob, vector<string> cols, double grou
         string filter_conds = getFilterConds(prob->det_sql.filter_cols, prob->det_sql.filter_intervals, kPrecision);
         _sql = fmt::format("SELECT p.tid FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid=$1::bigint{};", current_ptable, prob->det_sql.table_name, filter_conds);
       } else{
-        _sql = fmt::format("SELECT p.tid FROM \"{}\" p WHERE p.gid=$1::bigint AND p.tid IN (SELECT id FROM \"{}\");", current_ptable, getGName(layer-1));
+        _sql = fmt::format("SELECT p.tid FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid=$1::bigint;", current_ptable, getGName(layer-1));
       }
     }
     _res = PQprepare(_conn, fmt::format("comp_{}", current_ptable).c_str(), _sql.c_str(), 1, NULL);
+    assert(PQresultStatus(_res) == PGRES_COMMAND_OK);
+    PQclear(_res);
+  }
+  prepareGroupFilteredStatSql(1);
+}
+
+void DLVPartition::prepareGroupFilteredStatSql(int layer){
+  if (is_filtering){
+    string current_ptable = getPName(layer);
+    vector<string> g_cols (query_cols.size());
+    for (int i = 0; i < (int) query_cols.size(); i ++){
+      g_cols[i] = "g." + query_cols[i];
+    }
+    string g_cols_name = join(g_cols, ",");
+    if (layer == 1){
+      // Special filtering for original layer
+      string filter_conds = getFilterConds(prob->det_sql.filter_cols, prob->det_sql.filter_intervals, kPrecision);
+      _sql = fmt::format("SELECT {} FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid=$1::bigint{};", g_cols_name, current_ptable, prob->det_sql.table_name, filter_conds);
+    } else{
+      _sql = fmt::format("SELECT {} FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid=$1::bigint;", g_cols_name, current_ptable, getGName(layer-1));
+    }
+    _res = PQprepare(_conn, fmt::format("stat_{}", current_ptable).c_str(), _sql.c_str(), 1, NULL);
     assert(PQresultStatus(_res) == PGRES_COMMAND_OK);
     PQclear(_res);
   }
@@ -138,6 +163,26 @@ void DLVPartition::getGroupComp(vector<long long>& ids, int layer, long long gro
   END_CLOCK(pro, 0); 
   free(vals, 1);
   for (int i = 0; i < PQntuples(_res); i ++) ids.push_back(atoll(PQgetvalue(_res, i, 0)));
+  PQclear(_res);
+}
+
+void DLVPartition::getGroupFilteredStat(MeanVar &mv, int layer, long long group_id){
+  string current_ptable = getPName(layer);
+  char* vals[1];
+  assign(vals, 0, group_id);
+  START_CLOCK(pro, 0);
+  START_CLOCK(pro, 4);
+  _res = PQexecPrepared(_conn, fmt::format("stat_{}", current_ptable).c_str(), 1, vals, NULL, NULL, 0);
+  END_CLOCK(pro, 4);   
+  END_CLOCK(pro, 0);
+  free(vals, 1);
+  VectorXd x (query_cols.size());
+  for (int i = 0; i < PQntuples(_res); i ++){
+    for (int j = 0; j < (int) query_cols.size(); j ++){
+      x(j) = atof(PQgetvalue(_res, i, j));
+    }
+    mv.add(x);
+  }
   PQclear(_res);
 }
 

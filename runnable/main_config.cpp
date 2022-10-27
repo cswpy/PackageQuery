@@ -12,6 +12,7 @@
 #include "pb/det/lsr.h"
 #include "pb/det/det_sql.h"
 #include "pb/core/dist.h"
+#include "pb/det/det_exp.h"
 
 #include "pb/lib/praxis.hpp"
 #include "pb/lib/normal.hpp"
@@ -285,16 +286,27 @@ void main10(){
 //   pro.print();
 // }
 
-void main12(){
-  double mu = 0;
-  double sigma = 1;
-  Dist* dist = new LogNormal(mu, sigma);
-  VectorXd x;
-  dist->sample(x, 10, -1);
-  print(x);
-  cout << dist->left_cvar(1.0) << " " << dist->right_cvar(1.0) << endl;
-  cout << dist->left_cvar(0.1) << " " << dist->right_cvar(0.1) << endl; 
-  cout << dist->mean() << " " << dist->variance() << endl;
+// void main12(){
+//   double mu = 0;
+//   double sigma = 1;
+//   Dist* dist = new LogNormal(mu, sigma);
+//   VectorXd x;
+//   dist->sample(x, 10, -1);
+//   print(x);
+//   cout << dist->left_cvar(1.0) << " " << dist->right_cvar(1.0) << endl;
+//   cout << dist->left_cvar(0.1) << " " << dist->right_cvar(0.1) << endl; 
+//   cout << dist->mean() << " " << dist->variance() << endl;
+// }
+
+void main13(){
+  DetExp exp = DetExp("L2");
+  exp.o = 7;
+  exp.partition_name = "P3";
+  DetSql det_sql = exp.generate();
+  LsrProb lsr_prob = LsrProb(det_sql, exp.partition_name, exp.seed);
+  lsr_prob.generateBounds(exp.E, exp.a, exp.H);
+  LayeredSketchRefine lsr = LayeredSketchRefine(exp.C, lsr_prob);
+  cout << solMessage(lsr.status) << " " << lsr.exe_ilp << endl;
 }
 
 int main(){
@@ -307,5 +319,6 @@ int main(){
   // main9();
   // main10();
   // main11();
-  main12();
+  // main12();
+  main13();
 }
