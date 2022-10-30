@@ -45,6 +45,20 @@ bool doesIntersect(pair<double, double> a, pair<double, double> b){
   return !(a.first >= b.second || b.first >= a.second);
 }
 
+vector<double> linearCombination(vector<double> &v){
+  double sum = 0;
+  vector<double> res (v.size());
+  for (auto x : v){
+    assert(x >= 0);
+    sum += x;
+  }
+  assert(sum > 0);
+  for (int i = 0; i < (int) v.size(); i ++){
+    res[i] = v[i] / sum;
+  }
+  return res;
+}
+
 
 // double normalQuantile(double u, double v, double p){
 //   return u + sqrt(2*v) * erf_inv(2*p - 1);

@@ -5,6 +5,8 @@
 
 using namespace pb;
 
+double wassersteinDistance(VG &vg1, VG &vg2, int n, int seed=-1);
+
 class Normal : public Dist{
 private:
   double sigma;

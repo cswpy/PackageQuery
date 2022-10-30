@@ -5,6 +5,19 @@
 #include "pb/lib/log_normal.hpp"
 #include "pb/lib/log_normal_truncated_ab.hpp"
 
+#include "pb/util/udebug.h"
+
+double wassersteinDistance(VG &vg1, VG &vg2, int n, int seed){
+  VectorXd v1, v2;
+  vg1.sample(v1, n, seed);
+  vg2.sample(v2, n, seed);
+  sort(v1.begin(), v1.end());
+  sort(v2.begin(), v2.end());
+  // VectorXd v = v1-v2;
+  // print(v);
+  return (v1-v2).cwiseAbs().mean();
+}
+
 Normal::Normal(double mean, double variance){
   assert(variance > 0);
   u = mean;
@@ -95,6 +108,8 @@ double Uniform::left_cvar(double p){
   double tmp = quantile(p);
   return (a + tmp) * (tmp - a) / (2 * p * (b-a));
 }
+
+/////////////////////////////////////
 
 LogNormal::LogNormal(double mu, double sigma){
   assert(sigma > 0);

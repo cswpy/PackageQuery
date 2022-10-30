@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #include <utility>
 #include <float.h>
 
@@ -7,6 +8,7 @@
 
 using Eigen::VectorXd;
 using std::pair;
+using std::vector;
 
 constexpr double kNumericEps = 1e-12;
 
@@ -21,6 +23,8 @@ long long ceilDiv(long long x, long long q);
 int ceilDiv(int x, int q);
 
 bool doesIntersect(pair<double, double> a, pair<double, double> b);
+
+vector<double> linearCombination(vector<double> &v);
 
 // Deprecated since normal.hpp is much more optimized
 // double normalQuantile(double u, double v, double p);

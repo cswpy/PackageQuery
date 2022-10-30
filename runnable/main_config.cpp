@@ -19,6 +19,10 @@
 #include "pb/lib/log_normal_truncated_ab.hpp"
 #include "pb/lib/log_normal.hpp"
 #include "pb/lib/truncated_normal.hpp"
+#include "pb/core/vg.h"
+
+#include "pb/lib/random_quantile.h"
+#include "pb/lib/common.h"
 
 using namespace pb;
 
@@ -309,6 +313,180 @@ void main13(){
   cout << solMessage(lsr.status) << " " << lsr.exe_ilp << endl;
 }
 
+vector<int> getBuckets(int from, int to, int bucket){
+  assert(to > from);
+  vector<int> res;
+  int dif = to - from;
+  if (dif <= bucket){
+    res.resize(dif + 1);
+    iota(res.begin(), res.end(), from);
+    return res;
+  }
+  res.resize(bucket + 1);
+  res[0] = from;
+  div_t q = div(dif, bucket);
+  for (int i = 0; i < q.rem; i ++) res[i+1] = res[i] + q.quot + 1;
+  for (int i = q.rem; i <= bucket; i ++) res[i+1] = res[i] + q.quot;
+  return res;
+}
+
+double my_quantile(map<int, double> &qtree, int N, double p){
+  double bucket_width = 1/(N+1.0);
+  double left_most = bucket_width;
+  if (p <= left_most) return qtree[0]-(qtree[1] - qtree[0])*(left_most-p)/bucket_width;
+  double right_most = N*bucket_width;
+  if (p >= right_most) return qtree[N-1]+(qtree[N-1] - qtree[N-2])*(p-right_most)/bucket_width;
+  int low = (int) floor(p / bucket_width);
+  auto ptr = qtree.upper_bound(low);
+  // cout << p << " " << bucket_width << " " << low << " " << ptr->first << endl;
+  double sv = ptr->second;
+  double s = (ptr->first+1)*bucket_width;
+  double f = (prev(ptr)->first+1)*bucket_width;
+  double fv = prev(ptr)->second;
+  return fv + (sv-fv)*(p-f)/(s-f);
+}
+
+void main14(){
+  double eps = 0.01;
+  RandomQuantile rq (eps);
+  LogNormal dist = LogNormal(0, 3);
+  VectorXd samples;
+  int N = 1000000;
+  dist.sample(samples, N);
+  for (auto v : samples) rq.feed(v);
+  rq.finalize();
+  double left = 0.01;
+  double right = 0.01;
+  double deps = 0.000001;
+  double left_error = 0;
+  double right_error = 0;
+  int cnt = 0;
+  double veps = 1e-4;
+  for (double p = veps; p <= left; p += deps){
+    left_error += abs(dist.quantile(p)-rq.query_for_value(p));
+    cnt ++;
+  }
+  left_error /= cnt;
+  cnt = 0;
+  for(double p = 1-right; p <= 1-veps; p += deps){
+    right_error += abs(dist.quantile(p)-rq.query_for_value(p));
+    // cout << right_error << endl;
+    cnt ++;
+  }
+  right_error /= cnt;
+  cout << left_error << " " << right_error << endl;
+
+  int estimated = (int) ceil(1/eps*pow(log2(1/eps), 1.5));
+  sort(samples.begin(), samples.end());
+  int bucket = 10;
+  int limit = estimated;
+  cout << estimated << endl;
+  vector<int> buckets = getBuckets(0, N-1, bucket);
+  vector<tuple<double, int, int>> pq (limit + bucket);
+  for (int i = 0; i < bucket; i ++){
+    double v = samples[buckets[i+1]] - samples[buckets[i]];
+    pq[i] = {v, buckets[i], buckets[i+1]};
+  }
+  int heap_size = bucket;
+  make_heap(pq.begin(), pq.begin()+heap_size);
+  while (heap_size < limit){
+    auto [v, from, to] = pq[0];
+    pop_heap(pq.begin(), pq.begin()+heap_size);
+    heap_size --;
+    if (to - from <= 1) continue;
+    buckets = getBuckets(from, to, bucket);
+    for (int i = 0; i < bucket; i ++){
+      double v = samples[buckets[i+1]] - samples[buckets[i]];
+      pq[heap_size] = {v, buckets[i], buckets[i+1]};
+      heap_size ++;
+      push_heap(pq.begin(), pq.begin()+heap_size);
+    }
+  }
+  map<int, double> qtree;
+  for (int i = 0; i < heap_size; i ++){
+    auto [v, from, to] = pq[i];
+    qtree[from] = samples[from];
+    qtree[to] = samples[to];
+  }
+  qtree[1] = samples[1];
+  qtree[N-2] = samples[N-2];
+
+  left_error = 0;
+  right_error = 0;
+  
+  cnt = 0;
+  for (double p = veps; p <= left; p += deps){
+    left_error += abs(dist.quantile(p)-my_quantile(qtree, N, p));
+    cnt ++;
+  }
+  left_error /= cnt;
+  cnt = 0;
+  for(double p = 1-right; p <= 1-veps; p += deps){
+    // cout << p << " " << dist.quantile(p) << " " << my_quantile(qtree, N, p) << " " << rq.query_for_value(p) << endl;
+    right_error += abs(dist.quantile(p)-my_quantile(qtree, N, p));
+    // cout << right_error << endl;
+    cnt ++;
+  }
+  right_error /= cnt;
+  cout << left_error << " " << right_error << endl;  
+  cout << cnt << " " << qtree[0] << " " << qtree[1] << " " << qtree[N-2] << " " << qtree[N-1] << endl;
+}
+
+void main15(){
+  int n = 50;
+  int seed = -1;
+  if (seed < 0){
+    random_device rd;
+    seed = rd();
+  }
+  vector<VG*> dists (n);
+  vector<double> ms (n);
+  default_random_engine gen (seed);
+  double my_mean = 0;
+  double my_variance = 0;
+  for (int i = 0; i < n; i ++){
+    ms[i] = r8_uniform_ab(0, 1, seed);
+    int choice = i4_uniform_ab(0, 0, seed);
+    if (choice == 0){
+      uniform_real_distribution dist1 (0.0, 10.0);
+      uniform_real_distribution dist2 (50.0, 100.0);
+      dists[i] = new Uniform(dist1(gen), dist2(gen));
+    } else if (choice == 1){
+      uniform_real_distribution dist1 (-10.0, 10.0);
+      uniform_real_distribution dist2 (100.0, 10000.0);
+      dists[i] = new Normal(dist1(gen), dist2(gen));
+    } else{
+      uniform_real_distribution dist1 (0.0, 0.25);
+      uniform_real_distribution dist2 (0.0, 2.0);
+      dists[i] = new LogNormal(dist1(gen), dist2(gen));
+    }
+  }
+  vector<double> norm_ms = linearCombination(ms);
+  for (int i = 0; i < n; i ++){
+    Dist* o = (Dist*) dists[i];
+    my_mean += norm_ms[i]*o->mean();
+    my_variance += norm_ms[i]*norm_ms[i]*o->variance();
+  }
+
+  LinearVG lvg = LinearVG(dists, ms);
+  MixtureVG mvg = MixtureVG(dists, ms);
+
+  int R = 1000000;
+  // print(lvg.ms);
+  // print(mvg.ms);
+  cout << my_mean << " " << my_variance << endl;
+  cout << lvg.mean(R) << " " << lvg.variance(R) << endl;
+  cout << mvg.mean(R) << " " << mvg.variance(R) << endl;
+  // double d1 = wassersteinDistance(lvg, mvg, R, seed);
+  // cout << d1 << endl;
+  // Normal en = Normal(my_mean, my_variance);
+  // double d2 = wassersteinDistance(lvg, en, R, seed);
+  // cout << d2 << endl;
+  for (int i = 0; i < n; i ++){
+    delete dists[i];
+  }
+}
+
 int main(){
   // main4();
   //main5();
@@ -320,5 +498,7 @@ int main(){
   // main10();
   // main11();
   // main12();
-  main13();
+  // main13();
+  main14();
+  // main15();
 }

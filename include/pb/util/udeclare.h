@@ -65,7 +65,12 @@ namespace pb{
   using std::map;
   using std::nth_element;
   using std::distance;
+
+  using std::make_heap;
+  using std::push_heap;
+  using std::pop_heap;
   using std::make_shared;
+  using std::shuffle;
 
   using Eigen::VectorXd;
   using Eigen::VectorXi;

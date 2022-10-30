@@ -58,9 +58,19 @@ string solCombination(VectorXd sol);
 string showClassification(double x);
 
 template <typename T>
+string print(vector<T> v) {
+  string s = "[";
+  for (int i = 0; i < (int) (v.size() - 1); i++)  s += infAlias((double) v[i], -1) + " ";
+  if (v.size() > 0) s += infAlias((double) v[v.size() - 1], -1);
+  s += "]\n";
+  cout << s;
+  return s;
+}
+
+template <typename T>
 string print(Matrix<T, Dynamic, 1> v) {
   string s = "[";
-  for (int i = 0; i < v.size() - 1; i++)  s += infAlias((double) v(i), -1) + " ";
+  for (int i = 0; i < (int) (v.size() - 1); i++)  s += infAlias((double) v(i), -1) + " ";
   if (v.size() > 0) s += infAlias((double) v(v.size() - 1), -1);
   s += "]\n";
   cout << s;
