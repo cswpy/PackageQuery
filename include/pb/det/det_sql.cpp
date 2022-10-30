@@ -1,8 +1,13 @@
 #include "det_sql.h"
 
 #include "pb/util/uconfig.h"
+#include "pb/util/unumeric.h"
 #include "pb/util/umisc.h"
-#include "pb/util/udebug.h"
+#include "pb/lib/random_quantile.h"
+
+#include "libpq-fe.h"
+
+const double kMaxLog2OfInt = 31.0;
 
 DetSql::~DetSql(){
   delete pg;
@@ -24,10 +29,55 @@ void DetSql::addFilter(string col, double l, double u){
 }
 
 void DetSql::addFilterWithRatio(string col, double F, int sense){
-  // TODO
-  UNUSED(col);
-  UNUSED(F);
-  UNUSED(sense);
+  long long size = pg->getSize(table_name);
+  int core = kPCore;
+  double main_memory = kMainMemorySize;
+  long long chunk = ceilDiv(size, (long long) core);
+  long long slide_size = getTupleCount(1, core+1, main_memory);
+  double eps = kMaxLog2OfInt/slide_size;
+  RandomQuantile rq (eps);
+  #pragma omp parallel num_threads(core)
+  {
+    string sql;
+    PGconn *conn = PQconnectdb(pg->conninfo.c_str());
+    assert(PQstatus(conn) == CONNECTION_OK);
+    PGresult *res = NULL;
+
+    int seg = omp_get_thread_num();
+    long long start_id = seg * chunk + 1;
+    long long end_id = min((seg + 1) * chunk, size);
+    long long slide_count = ceilDiv(end_id - start_id + 1, slide_size);
+    for (long long sl = 0; sl < slide_count; sl ++){
+      long long slide_start_id = start_id + sl * slide_size;
+      long long slide_end_id = min(start_id + (sl + 1) * slide_size - 1, end_id);
+      sql = fmt::format("SELECT {} FROM \"{}\" WHERE {} BETWEEN {} AND {};", col, table_name, kId, slide_start_id, slide_end_id);
+      res = PQexec(conn, sql.c_str());
+      vector<double> vals (PQntuples(res));
+      for (long long i = 0; i < PQntuples(res); i++){
+        vals[i] = atof(PQgetvalue(res, i, 0));
+      }
+      PQclear(res);
+      #pragma omp critical (c0)
+      {
+        for (auto &v : vals) rq.feed(v);
+      }
+    }
+    PQfinish(conn);
+  }
+  rq.finalize();
+  switch(sense) {
+    case LowerBounded:
+      addFilter(col, rq.query_for_value(1-F), DBL_MAX);
+      break;
+    case UpperBounded:
+      addFilter(col, -DBL_MAX, rq.query_for_value(F));
+      break;
+    case Bounded:
+      addFilter(col, rq.query_for_value(F/2), rq.query_for_value(1-F/2));
+      break;
+    default:
+      throw invalid_argument("Invalid DetSense type: " + to_string(sense));
+  }
 }
   
 bool DetSql::isFiltering(){
