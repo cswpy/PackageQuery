@@ -99,8 +99,8 @@ MeanVar::MeanVar(){
 MeanVar::MeanVar(int attr_count){
   mean.resize(attr_count); mean.fill(0);
   M2.resize(attr_count); M2.fill(0);
-  max.resize(attr_count); max.fill(0);
-  min.resize(attr_count); min.fill(0);
+  max.resize(attr_count); max.fill(DBL_MIN);
+  min.resize(attr_count); min.fill(DBL_MAX);
   this->attr_count = attr_count;
   sample_count = 0;
 }
@@ -110,15 +110,10 @@ void MeanVar::add(const VectorXd& x){
   VectorXd delta = x - mean;
   mean += delta / sample_count;
   M2 += delta.cwiseProduct(x - mean);
-  if(sample_count == 1) {
-    max = x;
-    min = x;
-  }else {
-    max = max.cwiseMax(x);
-    min = min.cwiseMin(x);
-  }
+  max = max.cwiseMax(x);
+  min = min.cwiseMin(x);
 }
-
+// max min are not implemented on this method
 void MeanVar::add(double *start, int cycle){
   sample_count ++;
   for (int i = 0; i < attr_count; i++){
