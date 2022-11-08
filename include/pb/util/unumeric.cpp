@@ -99,7 +99,7 @@ MeanVar::MeanVar(){
 MeanVar::MeanVar(int attr_count){
   mean.resize(attr_count); mean.fill(0);
   M2.resize(attr_count); M2.fill(0);
-  max.resize(attr_count); max.fill(DBL_MIN);
+  max.resize(attr_count); max.fill(-DBL_MAX);
   min.resize(attr_count); min.fill(DBL_MAX);
   this->attr_count = attr_count;
   sample_count = 0;
@@ -183,7 +183,7 @@ ScalarMeanVar::ScalarMeanVar(){
   M2 = 0;
   sample_count = 0;
   min = DBL_MAX;
-  max = DBL_MIN;
+  max = -DBL_MAX;
 }
 
 ScalarMeanVar::ScalarMeanVar(const ScalarMeanVar &smv){
@@ -198,7 +198,7 @@ void ScalarMeanVar::reset(){
   mean = 0;
   M2 = 0;
   sample_count = 0;
-  max = DBL_MIN;
+  max = -DBL_MAX;
   min = DBL_MAX;
 }
 
