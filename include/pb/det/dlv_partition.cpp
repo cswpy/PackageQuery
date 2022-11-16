@@ -37,7 +37,7 @@ DLVPartition::DLVPartition(const LsrProb *prob, vector<string> cols, double grou
     _res = PQprepare(_conn, fmt::format("size_{}", current_gtable).c_str(), _sql.c_str(), 1, NULL);
     assert(PQresultStatus(_res) == PGRES_COMMAND_OK);
     PQclear(_res);
-    _sql = fmt::format("SELECT size,{} FROM \"{}\" WHERE id=$1::bigint;", prob->det_sql.obj_col, current_gtable);
+    _sql = fmt::format("SELECT {} FROM \"{}\" WHERE id=$1::bigint;", prob->det_sql.obj_col, current_gtable);
     _res = PQprepare(_conn, fmt::format("worth_{}", current_gtable).c_str(), _sql.c_str(), 1, NULL);
     assert(PQresultStatus(_res) == PGRES_COMMAND_OK);
     PQclear(_res);
@@ -130,7 +130,7 @@ long long DLVPartition::getGroupSize(int layer, long long group_id){
   return size;
 }
 
-pair<long long, double> DLVPartition::getGroupWorthness(int layer, long long group_id){
+double DLVPartition::getGroupWorthness(int layer, long long group_id){
   string current_gtable = getGName(layer);
   char* vals[1];
   assign(vals, 0, group_id);
@@ -140,19 +140,17 @@ pair<long long, double> DLVPartition::getGroupWorthness(int layer, long long gro
   END_CLOCK(pro, 8); 
   END_CLOCK(pro, 0); 
   free(vals, 1);
-  long long size = 0;
   double worth = -1;
   if (PQntuples(_res)){
-    size = atoll(PQgetvalue(_res, 0, 0));
-    worth = atof(PQgetvalue(_res, 0, 1));
+    worth = atof(PQgetvalue(_res, 0, 0));
     if (!prob->det_sql.is_maximize) worth = -worth;
   }
   PQclear(_res);
-  return {size, worth};
+  return worth;
 }
 
 
-void DLVPartition::getGroupComp(vector<long long>& ids, int layer, long long group_id){
+long long DLVPartition::getGroupComp(vector<long long>& ids, int layer, long long group_id, double limit){
   string current_ptable = getPName(layer);
   char* vals[1];
   assign(vals, 0, group_id);
@@ -162,8 +160,21 @@ void DLVPartition::getGroupComp(vector<long long>& ids, int layer, long long gro
   END_CLOCK(pro, 7);   
   END_CLOCK(pro, 0); 
   free(vals, 1);
-  for (int i = 0; i < PQntuples(_res); i ++) ids.push_back(atoll(PQgetvalue(_res, i, 0)));
-  PQclear(_res);
+  long long size = (long long) PQntuples(_res);
+  long long limit_size = (long long) floor(min(limit, (double) size));
+  if (limit_size < size){
+    vector<int> indices (size);
+    iota(indices.begin(), indices.end(), 0);
+    shuffle(indices.begin(), indices.end(), default_random_engine(kGlobalSeed));
+    sort(indices.begin(), indices.begin() + limit_size);
+    for (int i = 0; i < (int) limit_size; i ++) ids.push_back(atoll(PQgetvalue(_res, indices[i], 0)));
+    PQclear(_res);
+    return limit_size;
+  } else{
+    for (int i = 0; i < size; i ++) ids.push_back(atoll(PQgetvalue(_res, i, 0)));
+    PQclear(_res);
+    return size;
+  }
 }
 
 void DLVPartition::getGroupFilteredStat(MeanVar &mv, int layer, long long group_id){

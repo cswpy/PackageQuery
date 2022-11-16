@@ -40,8 +40,8 @@ public:
   vector<pair<double, double>> getGroupIntervals(int layer, long long group_id);
   long long getGroupContaining(int layer, vector<double> values);
   long long getGroupSize(int layer, long long group_id);
-  pair<long long, double> getGroupWorthness(int layer, long long group_id);
-  void getGroupComp(vector<long long> &ids, int layer, long long group_id);
+  double getGroupWorthness(int layer, long long group_id);
+  long long getGroupComp(vector<long long> &ids, int layer, long long group_id, double limit=DBL_MAX);
   void getGroupFilteredStat(MeanVar &mv, int layer, long long group_id);
   void getNeighboringGroups(unordered_set<long long> &group_ids, int layer, long long group_id);
 };

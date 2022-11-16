@@ -95,6 +95,14 @@ LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, bool is_safe){
     status = IncompatiblePartition;
     return;
   }
+
+  double limit_size_per_group = DBL_MAX;
+  if (isLess(kOutlierPercentage, 1.0)){
+    limit_size_per_group = 
+      (1 - kOutlierPercentage*partition->group_ratio)
+      /(partition->group_ratio*(1-kOutlierPercentage));
+  }
+
   // Phase-0: Filtering
   string current_gtable = partition->getGName(partition->layer_count);
   int n = pg->getSize(current_gtable);
@@ -262,7 +270,7 @@ LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, bool is_safe){
     #pragma omp parallel num_threads(core)
     {
       DLVPartition *loc_partition = new DLVPartition(&prob, partition->cols, partition->group_ratio, partition->lp_size, partition->layer_count);
-      vector<long long> loc_ids;
+      vector<long long> loc_ids; loc_ids.reserve(loc_partition->lp_size);
       #pragma omp for
       for (int i = 0; i < n; i ++){
         // Condition for sketch
@@ -322,10 +330,10 @@ LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, bool is_safe){
                 }
               }
               if (is_adding){
-                auto[size, worth] = loc_partition->getGroupWorthness(layer, gid);
-                loc_partition->getGroupComp(loc_ids, layer, gid);
+                double worth = loc_partition->getGroupWorthness(layer, gid);
+                long long actual_size = loc_partition->getGroupComp(loc_ids, layer, gid, limit_size_per_group);
                 #pragma omp atomic
-                total_size += size;
+                total_size += actual_size;
                 #pragma omp critical (c3)
                 {
                   pq.emplace(worth, gid);

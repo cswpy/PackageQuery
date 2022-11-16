@@ -58,6 +58,7 @@ static int _ = readConfigs(configs);
   static int kPrecision = stoi(configs["precision"]);
   static int kGlobalSeed = stoi(configs["global_seed"]);
   static long long kLpSize = stoll(configs["lp_size"]);
+  static double kOutlierPercentage = stod(configs["outlier_percentage"]);
   static double kMainMemorySize = stod(configs["main_memory_size"]);
 
   static string kPgDatabase = configs["database"];
@@ -82,6 +83,7 @@ static int _ = readConfigs(configs);
   static const int kPrecision = stoi(configs["precision"]);
   static const int kGlobalSeed = stoi(configs["global_seed"]);
   static const long long kLpSize = stoll(configs["lp_size"]);
+  static const double kOutlierPercentage = stod(configs["outlier_percentage"]);
   static const double kMainMemorySize = stod(configs["main_memory_size"]);
 
   static const string kPgDatabase = configs["database"];
