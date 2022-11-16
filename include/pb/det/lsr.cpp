@@ -276,14 +276,10 @@ LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, bool is_safe){
         // Condition for sketch
         if (dr.lp_sol(i) > 0 || dr.ilp_sol(i) > 0){
           long long group_id = det_prob.ids[i];
-          long long size = loc_partition->getGroupSize(layer, group_id);
-          #pragma omp critical (c1)
-          {
-            if (total_size <= partition->lp_size) total_size += size;
-            else size = 0;
-          }
-          if (size){
-            loc_partition->getGroupComp(loc_ids, layer, group_id);
+          if (total_size <= partition->lp_size){
+            long long size = loc_partition->getGroupComp(loc_ids, layer, group_id, limit_size_per_group);
+            #pragma omp atomic
+            total_size += size;
             #pragma omp critical (c2)
             {
               pq.emplace(det_prob.c(i), group_id);
