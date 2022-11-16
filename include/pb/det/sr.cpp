@@ -2,6 +2,7 @@
 
 #include "pb/core/gurobi_solver.h"
 #include "pb/det/det_prob.h"
+#include "partialpackage.h"
 
 #include "pb/util/uconfig.h"
 #include "pb/util/upostgres.h"
@@ -21,31 +22,34 @@ void SketchRefine::init()
     _res = NULL;
 }
 
-SketchRefine::SketchRefine(LsrProb &prob)
+SketchRefine::SketchRefine(LsrProb &lsr_prob): prob(lsr_prob)
 {
     init();
+}
+
+void SketchRefine::refine(map<long long, long long> &sol) {
     group_table_name = fmt::format("[1G]_{}_{}", prob.det_sql.table_name, prob.partition_name);
     partition_table_name = fmt::format("[1P]_{}_{}", prob.det_sql.table_name, prob.partition_name);
+    assert(pg->existTable(group_table_name));
+    assert(pg->existTable(partition_table_name));
 
     // Filtering groups based on base predicates
     if (prob.det_sql.isFiltering())
     {
         long long num_group = pg->getSize(group_table_name);
         vector<string> g_cols(prob.det_sql.att_cols.size());
-        for (int i = 0; i < (int)prob.det_sql.att_cols.size(); i++)
-        {
+        for (size_t i = 0; i < prob.det_sql.att_cols.size(); i++){
             g_cols[i] = "g." + prob.det_sql.att_cols[i];
         }
         string g_cols_name = join(g_cols, ",");
         string filter_conds = getFilterConds(prob.det_sql.filter_cols, prob.det_sql.filter_intervals, kPrecision);
-
         // Construct lower & upper bound for filtering
         // assert(g_cols.size() == prob.det_sql.filter_cols.size());
         VectorXd bl(g_cols.size());
-        bl.fill(DBL_MIN);
+        bl.fill(-DBL_MAX);
         VectorXd bu(g_cols.size());
         bu.fill(DBL_MAX);
-        for (int i = 0; i < prob.det_sql.filter_cols.size(); i++)
+        for (size_t i = 0; i < prob.det_sql.filter_cols.size(); i++)
         {
             auto itr = find(prob.det_sql.att_cols.begin(), prob.det_sql.att_cols.end(), prob.det_sql.filter_cols[i]);
             assert(itr != prob.det_sql.att_cols.end());
@@ -53,7 +57,6 @@ SketchRefine::SketchRefine(LsrProb &prob)
             bl(ind) = prob.det_sql.filter_intervals[i].first;
             bu(ind) = prob.det_sql.filter_intervals[i].second;
         }
-
         // Updating group averages according to filtered tuples
         vector<vector<double>> group_averages;
         group_averages.reserve(num_group);
@@ -64,11 +67,11 @@ SketchRefine::SketchRefine(LsrProb &prob)
             string sql = fmt::format("SELECT {} FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid={}{};", g_cols_name, partition_table_name, prob.det_sql.table_name, i, filter_conds);
             _res = PQexec(_conn, sql.c_str());
             assert(PQresultStatus(_res) == PGRES_TUPLES_OK);
-            MeanVar group_mv;
+            MeanVar group_mv (g_cols.size());
             VectorXd tuple(g_cols.size());
             for (int j = 0; j < PQntuples(_res); j++)
             {
-                for (int k = 0; k < g_cols.size(); k++)
+                for (size_t k = 0; k < g_cols.size(); k++) 
                 {
                     tuple(k) = atof(PQgetvalue(_res, j, k));
                 }
@@ -92,10 +95,10 @@ SketchRefine::SketchRefine(LsrProb &prob)
 
         det_prob.resize(m, n);
         for(int i=0; i<n; i++) {
-            for (int j=0; j<m; j++) {
+            for (int j=0; j<m-1; j++) {
                 det_prob.A(j, i) = group_averages[i][j];
             }
-            det_prob.A(m-1, i) = 1.0 // for cl & cu
+            det_prob.A(m-1, i) = 1.0; // for cl & cu
         }
         for(int i=0; i<n; i++) {
             det_prob.ids[i] = group_ids[i];
@@ -124,6 +127,7 @@ SketchRefine::SketchRefine(LsrProb &prob)
         }
         PQclear(_res);
     }
+
     // Assign other common variables
     det_prob.u.fill((double)prob.det_sql.u); // Each tuple's occurrence is bounded between 0 and u
     det_prob.copyBounds(prob.bl, prob.bu, prob.cl, prob.cu);
@@ -132,23 +136,43 @@ SketchRefine::SketchRefine(LsrProb &prob)
     // Sketching initial package from representative tuples
     GurobiSolver gs = GurobiSolver(det_prob, true);
     gs.solveIlp();
-    cout << "Status: " << gs.ilp_status << endl;
-    assert(gs.ilp_status == Found);
 
     // Replacing representative tuples with actual tuples
+    map<long long, long long> sketch_sol;
+    vector<int> sketch_gids; // Different from tid, the indices within a group
+    vector<long long> temp_ids;
 
+    //group_indices.reserve((int)prob.cu); 
     for (int i = 0; i < gs.ilp_sol.size(); i++)
     {
         if (gs.ilp_sol(i) != 0)
         {
-            cout << det_prob.ids[i] << " ";
+            sketch_sol.insert(pair<long long, long long>(det_prob.ids[i], gs.ilp_sol(i)));
+            //group_indices.push_back(i);
+            sketch_gids.insert(sketch_gids.end(), (int)gs.ilp_sol(i), i);
+            temp_ids.insert(temp_ids.end(), (int)gs.ilp_sol(i), det_prob.ids[i]);
         }
     }
-    cout << endl;
+    RMatrixXd effective_A = det_prob.A(Eigen::all, sketch_gids);
+    VectorXd effective_c = det_prob.c(sketch_gids);
+    Checker ch = Checker(det_prob);
+    fmt::print("Sketch solution status: {}\n",feasMessage(ch.checkIlpFeasibility(sketch_sol)) );
+
+    // Effectively, only changes variables whose dimension includes n
+    int m = effective_A.rows();
+    int n = effective_A.cols();
+    det_prob.resize(m, n);
+    det_prob.A = effective_A;
+    det_prob.ids = temp_ids;
+    det_prob.c = effective_c;
+
+    PartialPackage pp = PartialPackage(prob);
+    pp.init(_conn, det_prob, sketch_sol, sketch_gids);
+    pp.refine(sol);
 }
 
 bool SketchRefine::checkTupleFiltered(VectorXd &tuple, VectorXd &bl, VectorXd &bu)
-{
+{   
     return (tuple.array() > bl.array()).all() && (tuple.array() < bu.array()).all();
 }
 
