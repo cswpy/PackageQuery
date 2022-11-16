@@ -7,12 +7,12 @@
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
-#include <map>
 #include <utility>
 #include <string>
 #include <numeric>
 #include <algorithm>
 #include <map>
+#include <set>
 #include <random>
 #include <float.h>
 #include <queue>
@@ -20,8 +20,10 @@
 #include <chrono>
 #include <thread>
 #include <ctime>
+#include <cmath>
 #include <cfloat>
 #include <stdexcept>
+#include <functional>
 
 #include "Eigen/Dense"
 #include "fmt/core.h"
@@ -47,6 +49,7 @@ CVaR4: E[G | G >= Q_G(p)] >= v
 
 namespace pb{
   using std::map;
+  using std::set;
   using std::unordered_map;
   using std::unordered_set;
   using std::priority_queue;
@@ -62,9 +65,10 @@ namespace pb{
   using std::sort;
   using std::min;
   using std::max;
-  using std::map;
   using std::nth_element;
   using std::distance;
+  using std::hash;
+  using std::isnan;
 
   using std::make_heap;
   using std::push_heap;

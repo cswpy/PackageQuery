@@ -225,6 +225,7 @@ void DetProb::copyBounds(VectorXd &bl, VectorXd &bu, double cl, double cu){
   assert(DetProb::bl.size() > bl.size());
   assert(DetProb::bu.size() > bu.size());
   int att_count = (int) bl.size();
+  if (att_count == 0) return;
   memcpy(&(DetProb::bl(0)), &bl(0), att_count*sizeof(double));
   memcpy(&(DetProb::bu(0)), &bu(0), att_count*sizeof(double));
   DetProb::bl(att_count) = cl;

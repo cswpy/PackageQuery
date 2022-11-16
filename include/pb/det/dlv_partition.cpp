@@ -59,7 +59,7 @@ DLVPartition::DLVPartition(const LsrProb *prob, vector<string> cols, double grou
       if (layer == 1){
         // Special filtering for original layer
         string filter_conds = getFilterConds(prob->det_sql.filter_cols, prob->det_sql.filter_intervals, kPrecision);
-        _sql = fmt::format("SELECT p.tid FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid=$1::bigint{};", current_ptable, prob->det_sql.table_name, filter_conds);
+        _sql = fmt::format("SELECT p.tid FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid=$1::bigint AND {};", current_ptable, prob->det_sql.table_name, filter_conds);
       } else{
         _sql = fmt::format("SELECT p.tid FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid=$1::bigint;", current_ptable, getGName(layer-1));
       }
@@ -82,7 +82,7 @@ void DLVPartition::prepareGroupFilteredStatSql(int layer){
     if (layer == 1){
       // Special filtering for original layer
       string filter_conds = getFilterConds(prob->det_sql.filter_cols, prob->det_sql.filter_intervals, kPrecision);
-      _sql = fmt::format("SELECT {} FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid=$1::bigint{};", g_cols_name, current_ptable, prob->det_sql.table_name, filter_conds);
+      _sql = fmt::format("SELECT {} FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid=$1::bigint AND {};", g_cols_name, current_ptable, prob->det_sql.table_name, filter_conds);
     } else{
       _sql = fmt::format("SELECT {} FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid=$1::bigint;", g_cols_name, current_ptable, getGName(layer-1));
     }

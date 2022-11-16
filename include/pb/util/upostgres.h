@@ -13,6 +13,7 @@ using std::vector;
 using Eigen::VectorXd;
 
 void showError(PGconn *conn);
+string getFilterConds(vector<string> filter_cols, vector<pair<double, double>> filter_intervals, int precision);
 
 class Stat{
 public:

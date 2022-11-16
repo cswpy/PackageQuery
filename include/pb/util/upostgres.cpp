@@ -22,6 +22,20 @@ void showError(PGconn *conn){
   else cout << "No errors" << endl;
 }
 
+string getFilterConds(vector<string> filter_cols, vector<pair<double, double>> filter_intervals, int precision){
+  if (filter_cols.size() == 0) return "1=1";
+  string filter_conds = "";
+  for (int i = 0; i < (int) filter_cols.size(); i ++){
+    filter_conds += fmt::format(" AND g.{} ", filter_cols[i]);
+    auto [left, right] = filter_intervals[i];
+    if (left != -DBL_MAX && right != DBL_MAX) filter_conds += fmt::format("BETWEEN {:.{}Lf} AND {:.{}Lf}", left, precision, right, precision);
+    else if (left != -DBL_MAX) filter_conds += fmt::format(">= {:.{}Lf}", left, precision);
+    else filter_conds += fmt::format("<= {:.{}Lf}", right, precision);
+  }
+  // 5 to remove the first " AND "
+  return filter_conds.substr(5);
+}
+
 PgManager::~PgManager(){
   PQfinish(_conn);
 }
@@ -229,7 +243,7 @@ void PgManager::getSelectedTuples(RMatrixXd &out_tuples, vector<long long> &out_
 void PgManager::getConsecutiveTuples(RMatrixXd &out_tuples, vector<long long> &out_ids, string table_name, long long start_id, long long end_id, vector<string> cols, vector<string> filter_cols, vector<pair<double, double>> filter_intervals){
   string col_names = join(cols, ",");
   string filter_conds = getFilterConds(filter_cols, filter_intervals, kPrecision);
-  _sql = fmt::format("SELECT {},{} FROM \"{}\" WHERE {} BETWEEN {} AND {}{};", kId, col_names, table_name, kId, start_id, end_id, filter_conds);
+  _sql = fmt::format("SELECT {},{} FROM \"{}\" WHERE {} BETWEEN {} AND {} AND {};", kId, col_names, table_name, kId, start_id, end_id, filter_conds);
   _res = PQexec(_conn, _sql.c_str());
   int n = PQntuples(_res);
   int m = (int) cols.size();

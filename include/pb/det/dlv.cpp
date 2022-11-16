@@ -10,7 +10,7 @@
 using namespace pb;
 
 const double kSizeBias = 0.5;
-const double kVarScale = 2.5;
+const double kVarScale = 13.5;
 const double kBucketCompensate = 2.0;
 const int kTempReserveSize = 1000;
 
@@ -769,6 +769,22 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
               delim_count ++;
               smv.reset();
               smv.add(A[at(mi, g[i])]);
+            }
+          }
+          if (delim_count == 0){
+            // This is when the data has too many close or duplicated values
+            // And we cannot further partition based on reduced_var
+            // By default, we will do 1/group_ratio partition uniformly on the delim
+            int default_partition_count = (int) ceil(1.0 / group_ratio);
+            for (int i = 0; i < default_partition_count - 1; i ++){
+              int delim_value = (int) ceil((i+1.0)*g.size()/default_partition_count);
+              if (delim_count < delim_sz) delims[delim_count] = delim_value;
+              else{
+                delim_sz += soft_partition_lim;
+                delims.resize(delim_sz);
+                delims[delim_count] = delim_value;
+              }
+              delim_count ++;
             }
           }
           if (delim_count < delim_sz) delims[delim_count] = (long long) g.size();

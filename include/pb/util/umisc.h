@@ -40,7 +40,6 @@ int getLayerIndex(string table_name);
 bool startsWith(string full, string sub);
 bool endsWith(string full, string sub);
 bool isIn(vector<string> arr, string s);
-string getFilterConds(vector<string> filter_cols, vector<pair<double, double>> filter_intervals, int precision);
 
 void allocate(char **vals, int index, const char *s);
 void free(char** vals, int length);

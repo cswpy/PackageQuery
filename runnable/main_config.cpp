@@ -487,6 +487,115 @@ void main15(){
   }
 }
 
+void main16(){
+  double g = 0.01;
+  int partition_count = (int) ceil(1/g);
+  double mu = 0;
+  double var = 10000;
+  double sigma = sqrt(var);
+  Normal dist = Normal(mu, var);
+  int N = 10000000;
+  VectorXd samples; dist.sample(samples, N);
+  sort(samples.begin(), samples.end());
+  double left = 0;
+  double right = var;
+  while (abs(left-right) > 1e-8){
+    double mid = (left+right)/2;
+    int cnt = 0;
+    ScalarMeanVar smv = ScalarMeanVar();
+    for (int i = 0; i < N; i ++){
+      smv.add(samples[i]);
+      if (smv.getVar() > mid){
+        smv.reset();
+        smv.add(samples[i]);
+        cnt ++;
+      }
+    }
+    if (cnt <= partition_count) right = mid;
+    else left = mid;
+  }
+
+  // double left = 0;
+  // double right = var;
+  // vector<double> delims;
+  // while (abs(left-right) > 1e-8){
+  //   delims.clear();
+  //   double mid = (left+right)/2;
+  //   int count = 1;
+  //   double l = 0;
+  //   double r = 1;
+  //   while (abs(l-r) > 1e-8){
+  //     double m = (l+r)/2;
+  //     double v = truncated_normal_b_variance(mu, sigma, m);
+  //     cout << mid << " " << m << " " << v << endl;
+  //     if (v >= mid) r = m;
+  //     else l = m;
+  //   }
+  //   double a = (l+r)/2;
+  //   delims.push_back(a);
+  //   while (abs(a-1) > 1e-8){
+  //     double ll = a;
+  //     double rr = 1;
+  //     while (abs(ll-rr) > 1e-8){
+  //       double mm = (ll+rr)/2;
+  //       double v = truncated_normal_ab_variance(mu, sigma, a, mm);
+  //       if (v >= mid) rr = mm;
+  //       else ll = mm;
+  //     }
+  //     count ++;
+  //     a = (ll+rr)/2;
+  //     delims.push_back(a);
+  //   }
+  //   if (count <= partition_count) right = mid;
+  //   else left = mid;
+  // }
+  double my_var = (left+right)/2;
+  cout << my_var << endl;
+  // print(delims);
+
+}
+
+void main17(){
+  vector<double> a = {1,2,3};
+  VectorXd b (3);
+  memcpy(&b(0), &a[0], 3*sizeof(double));
+  print(b);
+}
+
+
+void main18(){
+  int r = 3;
+  int c = 4;
+  RMatrixXd A (r, c);
+  for (int i = 0; i < r; i ++){
+    for (int j = 0; j < c; j ++){
+      A(i, j) = 0;
+    }
+  }
+  vector<double> a (r*c);
+  a[0] = 1;
+  a[4] = 2;
+  a[8] = 3;
+
+  a[1] = 4;
+  a[5] = 5;
+  a[9] = 6;
+
+  a[2] = 7;
+  a[6] = 8;
+  a[10] = 9;
+
+  a[3] = 10;
+  a[7] = 11;
+  a[11] = 12;
+  A(0, 0);
+  A(1, 0);
+  A(2, 0);
+  memcpy(&A(0,0), &a[0], sizeof(double)*r*c);
+  cout << A << endl;
+}
+
+
 int main(){
   // main4();
   //main5();
@@ -499,6 +608,8 @@ int main(){
   // main11();
   // main12();
   // main13();
-  main14();
+  // main14();
   // main15();
+  // main16();
+  main18();
 }

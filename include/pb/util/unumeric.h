@@ -22,6 +22,10 @@ bool isInteger(double x, double eps=kNumericEps);
 long long ceilDiv(long long x, long long q);
 int ceilDiv(int x, int q);
 
+double floorLf(double v, int precision=-1);
+double roundLf(double v, int precision=-1);
+double ceilLf(double v, int precision=-1);
+
 bool doesIntersect(pair<double, double> a, pair<double, double> b);
 
 vector<double> linearCombination(vector<double> &v);
@@ -63,6 +67,8 @@ public:
   VectorXd getVar();
   VectorXd getM2();
   VectorXd getRange();
+  VectorXd getMin();
+  VectorXd getMax();
 };
 
 class ScalarMeanVar{
@@ -72,6 +78,7 @@ public:
   long long sample_count;
 public:
   ScalarMeanVar();
+  ScalarMeanVar(const ScalarMeanVar &smv);
   void add(double x);
   void add(ScalarMeanVar &smv);
   void reset();
@@ -79,4 +86,7 @@ public:
   double getVar();
   double getM2();
   double getRange();
+  double getMin();
+  double getMax();
+  double getBiasedVar();
 };

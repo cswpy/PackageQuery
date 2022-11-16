@@ -33,3 +33,6 @@ double r8vec_norm ( int n, double a[] );
 void svsort ( int n, double d[], double v[] ) ;
 
 double r8_uniform_ab ( double a, double b, int &seed );
+double r8_epsilon ( );
+double r8_sign ( double x );
+double r8_max ( double x, double y );

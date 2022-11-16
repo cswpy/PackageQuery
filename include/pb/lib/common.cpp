@@ -1715,3 +1715,125 @@ double r8_uniform_ab ( double a, double b, int &seed )
   return value;
 }
 //****************************************************************************80
+
+double r8_epsilon ( )
+
+//****************************************************************************80
+//
+//  Purpose:
+//
+//    R8_EPSILON returns the R8 roundoff unit.
+//
+//  Discussion:
+//
+//    The roundoff unit is a number R which is a power of 2 with the
+//    property that, to the precision of the computer's arithmetic,
+//      1 < 1 + R
+//    but
+//      1 = ( 1 + R / 2 )
+//
+//  Licensing:
+//
+//    This code is distributed under the GNU LGPL license.
+//
+//  Modified:
+//
+//    01 September 2012
+//
+//  Author:
+//
+//    John Burkardt
+//
+//  Parameters:
+//
+//    Output, double R8_EPSILON, the R8 round-off unit.
+//
+{
+  const double value = 2.220446049250313E-016;
+
+  return value;
+}
+
+//****************************************************************************80
+
+double r8_sign ( double x )
+
+//****************************************************************************80
+//
+//  Purpose:
+//
+//    R8_SIGN returns the sign of an R8.
+//
+//  Licensing:
+//
+//    This code is distributed under the GNU LGPL license.
+//
+//  Modified:
+//
+//    18 October 2004
+//
+//  Author:
+//
+//    John Burkardt
+//
+//  Parameters:
+//
+//    Input, double X, the number whose sign is desired.
+//
+//    Output, double R8_SIGN, the sign of X.
+//
+{
+  double value;
+
+  if ( x < 0.0 )
+  {
+    value = -1.0;
+  }
+  else
+  {
+    value = 1.0;
+  }
+  return value;
+}
+//****************************************************************************80
+
+double r8_max ( double x, double y )
+
+//****************************************************************************80
+//
+//  Purpose:
+//
+//    R8_MAX returns the maximum of two R8's.
+//
+//  Licensing:
+//
+//    This code is distributed under the GNU LGPL license.
+//
+//  Modified:
+//
+//    18 August 2004
+//
+//  Author:
+//
+//    John Burkardt
+//
+//  Parameters:
+//
+//    Input, double X, Y, the quantities to compare.
+//
+//    Output, double R8_MAX, the maximum of X and Y.
+//
+{
+  double value;
+
+  if ( y < x )
+  {
+    value = x;
+  }
+  else
+  {
+    value = y;
+  }
+  return value;
+}
+//****************************************************************************80

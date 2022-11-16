@@ -2,6 +2,7 @@
 #include <boost/math/special_functions/erf.hpp>
 
 #include "unumeric.h"
+#include "fmt/core.h"
 
 using boost::math::erf_inv;
 
@@ -39,6 +40,24 @@ long long ceilDiv(long long x, long long q){
 int ceilDiv(int x, int q){
   div_t d = div(x, q);
   return d.quot + (d.rem != 0);
+}
+
+double floorLf(double v, int precision){
+  if (precision < 0) return v;
+  double scale = pow(10.0, (double) precision);
+  return floor(v*scale) / scale;
+}
+
+double roundLf(double v, int precision){
+  if (precision < 0) return v;
+  double scale = pow(10.0, (double) precision);
+  return round(v*scale) / scale;
+}
+
+double ceilLf(double v, int precision){
+  if (precision < 0) return v;
+  double scale = pow(10.0, (double) precision);
+  return ceil(v*scale) / scale;
 }
 
 bool doesIntersect(pair<double, double> a, pair<double, double> b){
@@ -156,12 +175,28 @@ VectorXd MeanVar::getRange(){
   return max-min;
 }
 
+VectorXd MeanVar::getMin(){
+  return min;
+}
+
+VectorXd MeanVar::getMax(){
+  return max;
+}
+
 ScalarMeanVar::ScalarMeanVar(){
   mean = 0;
   M2 = 0;
   sample_count = 0;
   min = DBL_MAX;
   max = DBL_MIN;
+}
+
+ScalarMeanVar::ScalarMeanVar(const ScalarMeanVar &smv){
+  mean = smv.mean;
+  M2 = smv.M2;
+  sample_count = smv.sample_count;
+  min = smv.min;
+  max = smv.max;
 }
 
 void ScalarMeanVar::reset(){
@@ -212,4 +247,17 @@ double ScalarMeanVar::getM2(){
 
 double ScalarMeanVar::getRange(){
   return max-min;
+}
+
+double ScalarMeanVar::getBiasedVar(){
+  if (sample_count <= 1) return 0;
+  return M2 / sample_count;
+}
+
+double ScalarMeanVar::getMin(){
+  return min;
+}
+
+double ScalarMeanVar::getMax(){
+  return max;
 }

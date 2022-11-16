@@ -73,7 +73,8 @@ void DetSql::addFilterWithRatio(string col, double F, int sense){
       addFilter(col, -DBL_MAX, rq.query_for_value(F));
       break;
     case Bounded:
-      addFilter(col, rq.query_for_value(F/2), rq.query_for_value(1-F/2));
+    ///// (1-F)/2 //// l //////F////// u ///// (1-F)/2 //////
+      addFilter(col, rq.query_for_value((1-F)/2), rq.query_for_value(1-(1-F)/2));
       break;
     default:
       throw invalid_argument("Invalid DetSense type: " + to_string(sense));
