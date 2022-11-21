@@ -236,7 +236,7 @@ void main9(){
   // Dest is RMatrixXd m x n 
   // WE ARE GOOD HERE.
   print(C);
-  // cout << B << endl;
+   cout << B << endl;
 }
 
 bool is_finished = false;
@@ -603,7 +603,7 @@ int main(){
   // main6();
   //main7();
   // main8();
-  // main9();
+  main9();
   // main10();
   // main11();
   // main12();
