@@ -10,4 +10,5 @@ cmake/*
 !resource/*.py
 !resource/*.sh
 .vscode/
+.ipynb_checkpoints/
 config.txt
