@@ -87,7 +87,7 @@ void KDTree::getGroupCentroidAndPartition(vector<Tuple>& centroids, map<long lon
     if(right_child) right_child.get()->getGroupCentroidAndPartition(centroids, mappings, diameters);
 }
 
-void KDTree::partitionTable(string data_table_name, string partition_name, vector<string>& cols, int size_req, double diameter_req) {
+void KDTree::partitionTable(string data_table_name, string partition_name, vector<string> cols, int size_req, double diameter_req) {
     PgManager pg = PgManager();
     //long long n_tuples = pg.getSize(table_name);
     int k = cols.size();

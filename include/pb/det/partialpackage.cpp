@@ -76,7 +76,7 @@ void PartialPackage::refine(map<long long, long long> &sol) {
         refine_det_prob.bu = sketch_det_prob.bu - sum;
 
         // TODO: check sql syntax
-        string sql = fmt::format("SELECT {}, {}, {} FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid={}{};", kId, lsr_prob.det_sql.obj_col, g_cols_name, partition_table_name, lsr_prob.det_sql.table_name, refine_gid, filter_conds);
+        string sql = fmt::format("SELECT {}, {}, {} FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid={} AND {};", kId, lsr_prob.det_sql.obj_col, g_cols_name, partition_table_name, lsr_prob.det_sql.table_name, refine_gid, filter_conds);
         _res = PQexec(_conn, sql.c_str());
         assert(PQresultStatus(_res) == PGRES_TUPLES_OK);
 

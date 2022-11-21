@@ -64,7 +64,7 @@ void SketchRefine::refine(map<long long, long long> &sol) {
         //group_average_flattened.reserve(num_group * g_cols.size());
         for (long long i = 1; i <= num_group; i++)
         {
-            string sql = fmt::format("SELECT {} FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid={}{};", g_cols_name, partition_table_name, prob.det_sql.table_name, i, filter_conds);
+            string sql = fmt::format("SELECT {} FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid={} AND {};", g_cols_name, partition_table_name, prob.det_sql.table_name, i, filter_conds);
             _res = PQexec(_conn, sql.c_str());
             assert(PQresultStatus(_res) == PGRES_TUPLES_OK);
             MeanVar group_mv (g_cols.size());

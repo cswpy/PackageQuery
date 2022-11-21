@@ -4,6 +4,8 @@
 #include "pb/det/lsr_prob.h"
 #include "pb/det/dlv.h"
 #include "pb/det/lsr.h"
+#include "pb/det/sr.h"
+#include "pb/det/kd_tree.h"
 
 #include "pb/core/checker.h"
 #include "pb/core/dual.h"
@@ -272,6 +274,51 @@ void L4(){
 
 /******************************************/
 
+void tmp(){
+  DetExp exp = DetExp("tmp");
+  exp.o = 7;
+  exp.q = 0;
+  DetSql det_sql = exp.generate();
+  exp.seed = 1;
+  exp.E = 50;
+  exp.H = 3;
+  exp.partition_name = "L3x" + to_string(exp.seed);
+  LsrProb lsr_prob = LsrProb(det_sql, exp.partition_name, exp.seed);
+  lsr_prob.generateBounds(exp.E, exp.a, exp.H);
+  KDTree kt;
+  int tau = 5000;
+  // kt.partitionTable(exp.getTableName(), fmt::format("s{}_d0", tau), exp.getCols(), tau, DBL_MAX);
+
+  LayeredSketchRefine lsr = LayeredSketchRefine(exp.C, lsr_prob);
+  lsr_prob.partition_name = fmt::format("s{}_d0", tau);
+  SketchRefine sr = SketchRefine(lsr_prob);
+  map<long long, long long> sol;
+  sr.refine(sol);  
+
+  LsrChecker ch = LsrChecker(lsr_prob);
+  double SR_score, LSR_score, LP_score;
+  SR_score = ch.getScore(sol);
+  LSR_score = ch.getScore(lsr.ilp_sol);
+  LP_score = ch.getScore(lsr.lp_sol);
+  fmt::print("LP score: {}\n\n", LP_score);
+  fmt::print("SketchRefine feasibility: {}\n", feasMessage(ch.checkIlpFeasibility(sol)));
+  fmt::print("SketchRefine ILP score: {}\n", SR_score);
+  fmt::print("SketchRefine pctError: {}\n", pctError(SR_score, LP_score));
+  // GurobiSolver gs = GurobiSolver(det_prob, t       rue);
+  // fmt::print("Query feasibility: {}\n",feasMessage() gs.hasIlpSolution());
+  
+  
+  fmt::print("LayerSketchRefine feasibility: {}\n", feasMessage(ch.checkIlpFeasibility(lsr.ilp_sol)));
+  fmt::print("LayerSketchRefine ILP score: {}\n", LSR_score);
+  fmt::print("LayerSketchRefine pctError: {}\n", pctError(LSR_score, LP_score));
+
+  // double ground = lsr.lp_score;
+  // cout << "LSR: " << solMessage(lsr.status) << endl;
+  // exp.write(fmt::format("LSR_{}_{}", exp.q, exp.E), exp.H, pctError(lsr.ilp_score, ground));
+}
+
+/******************************************/
+
 int main(){
   // A1();
   // A2();
@@ -282,5 +329,6 @@ int main(){
   // L1();
   // L2();
   // L3();
-  L4();
+  // L4();
+  tmp();
 }

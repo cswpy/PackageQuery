@@ -225,7 +225,7 @@ void PgManager::getSelectedTuples(RMatrixXd &out_tuples, vector<long long> &out_
   for (int i = 0; i < (int) ids.size(); i ++) str_ids[i] = to_string(ids[i]);
   string id_names = join(str_ids, ",");
   string filter_conds = getFilterConds(filter_cols, filter_intervals, kPrecision);
-  _sql = fmt::format("SELECT {},{} FROM \"{}\" WHERE {} IN ({}){};", kId, col_names, table_name, kId, id_names, filter_conds);
+  _sql = fmt::format("SELECT {},{} FROM \"{}\" WHERE {} IN ({}) AND {};", kId, col_names, table_name, kId, id_names, filter_conds);
   _res = PQexec(_conn, _sql.c_str());
   int n = PQntuples(_res);
   int m = (int) cols.size();
