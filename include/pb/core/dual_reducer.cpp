@@ -161,13 +161,15 @@ DualReducer::DualReducer(int core, const DetProb &prob, bool is_safe){
           if (isLess(dual.sol(i), prob.u(i), kEpsilon)){
             score(i) = 0;
             for (int j = 0; j < m; j ++){
-              if (prob.A(j, i) > 0 && right_space(j) > 0){
-                score(i) += prob.A(j, i) / right_space(j);
-              } else if (prob.A(j, i) < 0 && left_space(j) > 0){
-                score(i) -= prob.A(j, i) / left_space(j);
+              if (prob.A(j, i) > 0){
+                if (isGreater(right_space(j), 0, kEpsilon)) score(i) += prob.A(j, i) / right_space(j);
+                else if (isLess(right_space(j), 0, kEpsilon)) score(i) += (right_space(j) - prob.A(j, i)) / right_space(j);
+              } else if (prob.A(j, i) < 0){
+                if (isGreater(left_space(j), 0, kEpsilon)) score(i) -= prob.A(j, i) / left_space(j);
+                else if (isLess(left_space(j), 0, kEpsilon)) score(i) += (left_space(j) + prob.A(j, i)) / left_space(j);
               }
             }
-            score(i) /= m;
+            // if (m > 0) score(i) /= m;
             if (max_abs_c > 0) score(i) -= prob.c(i) / max_abs_c;
           }
           (*deficit)[i] = {-score(i), i};
