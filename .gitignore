@@ -1,6 +1,7 @@
 resource/*
 build/*
 plots/*
+cmake/*
 !build/conanfile.txt
 !resource/sql_script
 !resource/backup
