@@ -28,6 +28,7 @@ SketchRefine::SketchRefine(LsrProb &lsr_prob): prob(lsr_prob)
 }
 
 void SketchRefine::refine(map<long long, long long> &sol) {
+    auto t0 = std::chrono::high_resolution_clock::now();
     group_table_name = fmt::format("[1G]_{}_{}", prob.det_sql.table_name, prob.partition_name);
     partition_table_name = fmt::format("[1P]_{}_{}", prob.det_sql.table_name, prob.partition_name);
     assert(pg->existTable(group_table_name));
@@ -139,7 +140,8 @@ void SketchRefine::refine(map<long long, long long> &sol) {
 
     // Replacing representative tuples with actual tuples
     map<long long, long long> sketch_sol;
-    vector<int> sketch_gids; // Different from tid, the indices within a group
+    unordered_set<long long> sketch_gids; // Unique group ids
+    vector<long long> sol_index_seq;
     vector<long long> temp_ids;
 
     //group_indices.reserve((int)prob.cu); 
@@ -149,12 +151,13 @@ void SketchRefine::refine(map<long long, long long> &sol) {
         {
             sketch_sol.insert(pair<long long, long long>(det_prob.ids[i], gs.ilp_sol(i)));
             //group_indices.push_back(i);
-            sketch_gids.insert(sketch_gids.end(), (int)gs.ilp_sol(i), i);
+            sketch_gids.insert(det_prob.ids[i]);
+            sol_index_seq.insert(sol_index_seq.end(), (int)gs.ilp_sol(i), i);
             temp_ids.insert(temp_ids.end(), (int)gs.ilp_sol(i), det_prob.ids[i]);
         }
     }
-    RMatrixXd effective_A = det_prob.A(Eigen::all, sketch_gids);
-    VectorXd effective_c = det_prob.c(sketch_gids);
+    RMatrixXd effective_A = det_prob.A(Eigen::all, sol_index_seq);
+    VectorXd effective_c = det_prob.c(sol_index_seq);
     Checker ch = Checker(det_prob);
     fmt::print("Sketch solution status: {}\n",feasMessage(ch.checkIlpFeasibility(sketch_sol)) );
 
@@ -166,9 +169,15 @@ void SketchRefine::refine(map<long long, long long> &sol) {
     det_prob.ids = temp_ids;
     det_prob.c = effective_c;
 
+    auto t1 = std::chrono::high_resolution_clock::now();
+    auto sketch_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count() / 1000000.0;
+    fmt::print("Finished sketching solutions: {:.5Lf}ms\n", sketch_elapsed);
     PartialPackage pp = PartialPackage(prob);
     pp.init(_conn, det_prob, sketch_sol, sketch_gids);
     pp.refine(sol);
+    auto t2 = std::chrono::high_resolution_clock::now();
+    auto refine_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() / 1000000.0;
+    fmt::print("Finished refining groups: {:.5Lf}ms\n", refine_elapsed);
 }
 
 bool SketchRefine::checkTupleFiltered(VectorXd &tuple, VectorXd &bl, VectorXd &bu)

@@ -16,14 +16,13 @@
 using namespace pb;
 
 int main() {
-    KDTree kt;
+    //KDTree kt;
 
     //vector<string> cols = {"tmass_prox", "j", "h", "k"};
     //kt.partitionTable("ssds_6_1", "s5000_d2", cols, 5000, 2);
     //vector<string> att_cols = {"j", "h", "k"};
-    
     // vector<string> cols = {"price", "quantity", "discount", "tax"};
-    // kt.partitionTable("tpch_6_1", "s5000_d100", cols, 5000, 100);
+    // kt.partitionTable("tpch_7_1", "s20000_d300", cols, 20000, 300);
     vector<string> att_cols = {"quantity", "discount", "tax"};
     
     vector<int> att_senses = {0, 1, 2};
@@ -31,7 +30,7 @@ int main() {
     //det_sql.addFilterWithRatio("j", 0.9, 0);
     //det_sql.addFilterWithRatio("k", 0.9, 2);
     double E = 150;
-    double h = 5;
+    double h = 13;
     LsrProb lsr_prob = LsrProb(det_sql, "s5000_d100", 1);
     lsr_prob.generateBounds(E, 0, h);
     fmt::print("E: {}\tHardness: {}\tis_maximizing: {}\n", E, h, lsr_prob.det_sql.is_maximize);
