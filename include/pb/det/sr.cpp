@@ -27,14 +27,19 @@ SketchRefine::SketchRefine(LsrProb &lsr_prob): prob(lsr_prob)
     init();
 }
 
-void SketchRefine::refine(map<long long, long long> &sol) {
+bool SketchRefine::sketchAndRefine(map<long long, long long> &sol) {
+
     auto t0 = std::chrono::high_resolution_clock::now();
     group_table_name = fmt::format("[1G]_{}_{}", prob.det_sql.table_name, prob.partition_name);
     partition_table_name = fmt::format("[1P]_{}_{}", prob.det_sql.table_name, prob.partition_name);
     assert(pg->existTable(group_table_name));
     assert(pg->existTable(partition_table_name));
+    
+    VectorXd group_sizes;
+    int m, n;
 
     // Filtering groups based on base predicates
+    // #TODO: handle group_sizes when filtering
     if (prob.det_sql.isFiltering())
     {
         long long num_group = pg->getSize(group_table_name);
@@ -91,8 +96,8 @@ void SketchRefine::refine(map<long long, long long> &sol) {
                 group_averages.push_back(group_average);
             }
         }
-        int m = g_cols.size() + 1; // Account for cl & cu
-        int n = group_ids.size();
+        m = g_cols.size() + 1; // Account for cl & cu
+        n = group_ids.size();
 
         det_prob.resize(m, n);
         for(int i=0; i<n; i++) {
@@ -109,20 +114,24 @@ void SketchRefine::refine(map<long long, long long> &sol) {
     else
     {
         string col_names = join(prob.det_sql.att_cols, ",");
-        string sql = fmt::format("SELECT {},{},{} FROM \"{}\";",
+        string sql = fmt::format("SELECT {},size,{},{} FROM \"{}\";",
                                  kId, prob.det_sql.obj_col, col_names, group_table_name);
         _res = PQexec(_conn, sql.c_str());
         assert(PQresultStatus(_res) == PGRES_TUPLES_OK);
-        int m = prob.det_sql.att_cols.size() + 1;
-        int n = PQntuples(_res);
+        m = prob.det_sql.att_cols.size() + 1;
+        n = PQntuples(_res);
         det_prob.resize(m, n);
+        det_prob.u.fill(prob.det_sql.u);
+        group_sizes.resize(n);
+        
         for (int i = 0; i < PQntuples(_res); i++)
         {
             det_prob.ids[i] = atoll(PQgetvalue(_res, i, 0));
-            det_prob.c(i) = atof(PQgetvalue(_res, i, 1));
+            group_sizes(i) = atof(PQgetvalue(_res, i, 1));
+            det_prob.c(i) = atof(PQgetvalue(_res, i, 2));
             for (int j = 0; j < m - 1; j++)
             {
-                det_prob.A(j, i) = atof(PQgetvalue(_res, i, 2 + j));
+                det_prob.A(j, i) = atof(PQgetvalue(_res, i, 3 + j));
             }
             det_prob.A(m - 1, i) = 1.0; // for cl & cu
         }
@@ -130,7 +139,11 @@ void SketchRefine::refine(map<long long, long long> &sol) {
     }
 
     // Assign other common variables
-    det_prob.u.fill((double)prob.det_sql.u); // Each tuple's occurrence is bounded between 0 and u
+
+    // Computing u (upper bound) for each group
+    VectorXd cu(n);
+    cu.fill(prob.cu);
+    det_prob.u = cu.cwiseMin(group_sizes*prob.det_sql.u); // Each group's repr tuple can occur at most its size, or cu (the package size), whichever is smaller
     det_prob.copyBounds(prob.bl, prob.bu, prob.cl, prob.cu);
     det_prob.truncate();
 
@@ -159,25 +172,32 @@ void SketchRefine::refine(map<long long, long long> &sol) {
     RMatrixXd effective_A = det_prob.A(Eigen::all, sol_index_seq);
     VectorXd effective_c = det_prob.c(sol_index_seq);
     Checker ch = Checker(det_prob);
-    fmt::print("Sketch solution status: {}\n",feasMessage(ch.checkIlpFeasibility(sketch_sol)) );
-
+    int feasStatus = ch.checkIlpFeasibility(sketch_sol);
+    fmt::print("Sketch solution status: {}\n",feasMessage(feasStatus) );
+    if (feasStatus != 1) return false;
     // Effectively, only changes variables whose dimension includes n
-    int m = effective_A.rows();
-    int n = effective_A.cols();
-    det_prob.resize(m, n);
-    det_prob.A = effective_A;
-    det_prob.ids = temp_ids;
-    det_prob.c = effective_c;
+    m = effective_A.rows();
+    n = effective_A.cols();
+    DetProb det_prob_trimmed;
+    det_prob_trimmed.resize(m, n);
+    det_prob_trimmed.u.fill((double)prob.det_sql.u);
+    det_prob_trimmed.copyBounds(prob.bl, prob.bu, prob.cl, prob.cu);
+    det_prob_trimmed.A = effective_A;
+    det_prob_trimmed.ids = temp_ids;
+    det_prob_trimmed.c = effective_c;
+    det_prob_trimmed.truncate();
 
     auto t1 = std::chrono::high_resolution_clock::now();
     auto sketch_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count() / 1000000.0;
     fmt::print("Finished sketching solutions: {:.5Lf}ms\n", sketch_elapsed);
     PartialPackage pp = PartialPackage(prob);
-    pp.init(_conn, det_prob, sketch_sol, sketch_gids);
-    pp.refine(sol);
+    pp.init(_conn, det_prob_trimmed, sketch_sol, sketch_gids);
+    bool status = pp.refine(sol);
     auto t2 = std::chrono::high_resolution_clock::now();
     auto refine_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() / 1000000.0;
-    fmt::print("Finished refining groups: {:.5Lf}ms\n", refine_elapsed);
+    fmt::print("Finished refining groups: {:.5Lf}ms\n\n", refine_elapsed);
+    exec_sr = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t0).count() / 1000000.0;
+    return status;
 }
 
 bool SketchRefine::checkTupleFiltered(VectorXd &tuple, VectorXd &bl, VectorXd &bu)

@@ -119,10 +119,12 @@ void KDTree::partitionTable(string data_table_name, string partition_name, vecto
     auto t2 = std::chrono::high_resolution_clock::now();
     auto query_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() / 1000000.0;
     fmt::print("Query time elapsed: {:.5Lf}ms\n", query_elapsed);
+    exec_query = query_elapsed;
     buildTree(tuples.begin(), tuples.end(), (size_t)tuples.size());
     auto t3 = std::chrono::high_resolution_clock::now();
     auto build_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(t3 - t2).count() / 1000000.0;
     fmt::print("Finished building KDTree: {:.5Lf}ms\n", build_elapsed);
+    exec_tree_building = build_elapsed;
     
     vector<Tuple> repr_tuples;
     map<long long, vector<long long>> mappings;
@@ -221,6 +223,7 @@ void KDTree::partitionTable(string data_table_name, string partition_name, vecto
     auto t4 = std::chrono::high_resolution_clock::now();
     auto update_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(t4 - t3).count() / 1000000.0;
     fmt::print("Finished storing partitions: {:.5Lf}ms\n", update_elapsed);
+    exec_storage = update_elapsed;
 
     // Verifying the correctness of partitions
     // vector<string> agg_clause, agg_cond;
@@ -243,4 +246,5 @@ void KDTree::partitionTable(string data_table_name, string partition_name, vecto
     // fmt::print("Verified paritions satisfy size and diameter requirements\n");
     // PQclear(res);
     PQfinish(conn);
+    exec_kd = std::chrono::duration_cast<std::chrono::nanoseconds>(t4 - t1).count() / 1000000.0;
 }

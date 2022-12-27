@@ -35,7 +35,6 @@ class PartialPackage {
     public:
         ~PartialPackage();
         PartialPackage(LsrProb &lsr_rob);
-        void init(PGconn *conn, DetProb sketch_det_prob, map<long long, long long> &sketch_sol, unordered_set<long long> &sketch_gids);
-        void refine(map<long long, long long> &sol);
-        bool checkComplete();
+        void init(PGconn *conn, DetProb &sketch_det_prob, map<long long, long long> &sketch_sol, unordered_set<long long> &sketch_gids);
+        bool refine(map<long long, long long> &sol);
 };

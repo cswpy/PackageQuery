@@ -18,15 +18,14 @@ class SketchRefine {
         PGconn *_conn;
         PGresult *_res;
         string _sql, group_table_name, partition_table_name;
+        bool checkTupleFiltered(VectorXd &tuple, VectorXd &bl, VectorXd &bu);
+    public:
         DetProb det_prob;
         LsrProb prob;
-    public:
+        double exec_sr;
         ~SketchRefine();
         SketchRefine(LsrProb &lsr_prob);
         void init();
-        void Sketch(LsrProb &prob);
-        void refine(map<long long, long long> &sol);
+        bool sketchAndRefine(map<long long, long long> &sol);
         void formulateDetProb(LsrProb &prob, string sql);
-    private:
-        bool checkTupleFiltered(VectorXd &tuple, VectorXd &bl, VectorXd &bu);
 };
