@@ -290,6 +290,7 @@ void tmp(){
   // kt.partitionTable(exp.getTableName(), fmt::format("s{}_d0", tau), exp.getCols(), tau, DBL_MAX);
 
   LayeredSketchRefine lsr = LayeredSketchRefine(exp.C, lsr_prob);
+  // Remember to change partition name of LSR to fit SketchRefine.
   lsr_prob.partition_name = fmt::format("s{}_d0", tau);
   SketchRefine sr = SketchRefine(lsr_prob);
   map<long long, long long> sol;
