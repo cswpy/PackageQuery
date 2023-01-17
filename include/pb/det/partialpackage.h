@@ -21,19 +21,20 @@ class PartialPackage {
         PGresult *_res;
         VectorXd sum;
         map<long long, long long> sketch_sol; // mapping gid to its corresponding occurrences
+        vector<long long> initial_ids; // the initial ids of sketch_det_prob, indicates the index to gid mapping
+        RMatrixXd temp_A;
         VectorXd refine_sol;
         LsrProb lsr_prob;
         DetProb sketch_det_prob, refine_det_prob;
         long long num_total_group;
         //vector<int> group_indices;
         vector<string> g_cols; // att_cols aliased as g
-        vector<int> sketch_gids; // used for indexing the RMatrix
+        unordered_set<long long> sketch_gids; // used for indexing the RMatrix
         string filter_conds;
 
     public:
         ~PartialPackage();
         PartialPackage(LsrProb &lsr_rob);
-        void init(PGconn *conn, DetProb sketch_det_prob, map<long long, long long> &sketch_sol, vector<int> &group_indices);
-        void refine(map<long long, long long> &sol);
-        bool checkComplete();
+        void init(PGconn *conn, DetProb &sketch_det_prob, map<long long, long long> &sketch_sol, unordered_set<long long> &sketch_gids);
+        bool refine(map<long long, long long> &sol);
 };
