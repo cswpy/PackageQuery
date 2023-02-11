@@ -31,7 +31,7 @@ DynamicLowVariance::~DynamicLowVariance(){
   delete pg;
 }
 
-DynamicLowVariance::DynamicLowVariance(int core, double group_ratio, double main_memory): core(core), group_ratio(group_ratio), main_memory(main_memory){
+DynamicLowVariance::DynamicLowVariance(int core, double group_ratio, double main_memory, long long tps): core(core), group_ratio(group_ratio), main_memory(main_memory), tps(tps){
   INIT_CLOCK(pro);
   init();
 }
@@ -73,6 +73,8 @@ void DynamicLowVariance::init(){
     ");", kPartitionTable);
   _res = PQexec(_conn, _sql.c_str());
   PQclear(_res);
+
+  exe = 0;
 }
 
 void DynamicLowVariance::dropAllPartitions(){
@@ -141,7 +143,7 @@ void DynamicLowVariance::partition(string table_name, string partition_name, con
   _sql = fmt::format(""
     "INSERT INTO \"{}\"(table_name, partition_name, cols, group_ratio, lp_size, main_memory_used, core_used, layer_count) "
     "VALUES ('{}', '{}', {}, {}, {}, {}, {}, {});",
-    kPartitionTable, table_name, partition_name, pgJoin(cols), group_ratio, kLpSize, main_memory, core, layer_count);
+    kPartitionTable, table_name, partition_name, pgJoin(cols), group_ratio, tps, main_memory, core, layer_count);
   _res = PQexec(_conn, _sql.c_str());
   PQclear(_res);
   exe = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start).count() / 1000000.0;
@@ -152,7 +154,7 @@ long long DynamicLowVariance::doPartition(string table_name, string suffix, cons
   Stat *stat = pg->readStats(table_name);
   // cout << "OKb" << endl;
   long long size = stat->size;
-  if (size <= kLpSize) return 0;
+  if (size <= tps) return 0;
 
   // cout << "OK1" << endl;
   int m = (int) cols.size();

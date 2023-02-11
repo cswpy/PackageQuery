@@ -18,7 +18,8 @@ static vector<string> sol_messages = {
   "DUAL UNBOUNDED",
   "TIMEOUT",
   "NO PARTITION FOUND",
-  "INCOMPATIBLE PARTITION"
+  "INCOMPATIBLE PARTITION",
+  "NUMERICAL UNSTABILITY"
 };
 
 static vector<string> feas_messages = {

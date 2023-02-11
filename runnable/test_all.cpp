@@ -281,20 +281,25 @@ void tmp(){
   DetSql det_sql = exp.generate();
   exp.seed = 1;
   exp.E = 50;
-  exp.H = 3;
+  exp.H = 1.25;
   exp.partition_name = "L3x" + to_string(exp.seed);
   LsrProb lsr_prob = LsrProb(det_sql, exp.partition_name, exp.seed);
   lsr_prob.generateBounds(exp.E, exp.a, exp.H);
   KDTree kt;
-  int tau = 5000;
-  // kt.partitionTable(exp.getTableName(), fmt::format("s{}_d0", tau), exp.getCols(), tau, DBL_MAX);
+  int tau = 1000000;
+  double dia = 1000000;
+  string table_name = fmt::format("s{}_d{}", tau, dia);
+  PgManager pg = PgManager();
+  // pg.dropTable("[1P]_tpch_7_1_s500_d50");
+  // pg.dropTable("[1G]_tpch_7_1_s500_d50");
+  // kt.partitionTable(exp.getTableName(), table_name, exp.getCols(), tau, dia);
 
   LayeredSketchRefine lsr = LayeredSketchRefine(exp.C, lsr_prob);
   // Remember to change partition name of LSR to fit SketchRefine.
-  lsr_prob.partition_name = fmt::format("s{}_d0", tau);
+  lsr_prob.partition_name = table_name;
   SketchRefine sr = SketchRefine(lsr_prob);
   map<long long, long long> sol;
-  sr.refine(sol);  
+  sr.sketchAndRefine(sol);  
 
   LsrChecker ch = LsrChecker(lsr_prob);
   double SR_score, LSR_score, LP_score;
@@ -312,6 +317,7 @@ void tmp(){
   fmt::print("LayerSketchRefine feasibility: {}\n", feasMessage(ch.checkIlpFeasibility(lsr.ilp_sol)));
   fmt::print("LayerSketchRefine ILP score: {}\n", LSR_score);
   fmt::print("LayerSketchRefine pctError: {}\n", pctError(LSR_score, LP_score));
+  fmt::print("Time {}ms\n", lsr.exe_ilp);
 
   // double ground = lsr.lp_score;
   // cout << "LSR: " << solMessage(lsr.status) << endl;
@@ -319,6 +325,157 @@ void tmp(){
 }
 
 /******************************************/
+
+// SketchRefine optimal tau
+void S1(){
+  DetExp exp = DetExp("S1");
+  exp.o = 6;
+  exp.q = 0;
+  DetSql det_sql = exp.generate();
+  exp.seed = 1;
+  exp.E = 50;
+  int cur_right = (int) pow(10, exp.o);
+  PgManager pg = PgManager();
+  for (auto H : exp.H8){
+    // if (H < 13) continue;
+    fmt::print("Start with H={}\n", H);
+    exp.H = H;
+    int left = 2;
+    int right = cur_right;
+    double exec_kd, group_ratio, exec_refine, exec_sketch;
+    map<long long, long long> kd_sol;
+    int kd_tau = -1;
+    LsrProb lsr_prob = LsrProb(det_sql, "", exp.seed);
+    lsr_prob.generateBounds(exp.E, exp.a, exp.H);
+    while (abs(left - right) > 2 || kd_tau==-1){
+      int mid = (left + right) / 2;
+      cout << left << " " << mid << " " << right << endl;
+      int tau = mid;
+      double dia = DBL_MAX;
+      string partition_name = fmt::format("s{}_dinf", tau);
+      lsr_prob.partition_name = partition_name;
+      pg.dropTable("[1P]_" + exp.getTableName() + "_" + partition_name); 
+      pg.dropTable("[1G]_" + exp.getTableName() + "_" + partition_name); 
+      KDTree kt;
+      kt.partitionTable(exp.getTableName(), partition_name, exp.getCols(), tau, dia);
+      // Remember to change partition name of LSR to fit SketchRefine.
+      SketchRefine sr = SketchRefine(lsr_prob);
+      map<long long, long long> sol;
+      bool is_success = sr.sketchAndRefine(sol);
+      if (is_success){
+        kd_sol = sol;
+        left = mid;
+        exec_kd = kt.exec_kd;
+        group_ratio = kt.group_ratio;
+        kd_tau = tau;
+        exec_refine = sr.exec_refine;
+        exec_sketch = sr.exec_sketch;
+        break;
+      } else {
+        right = mid - 1;
+        // fmt::print("SR fails in {:.4Lf}ms\n", sr.exec_sr);
+      }
+      pg.dropTable("[1P]_" + exp.getTableName() + "_" + partition_name); 
+      pg.dropTable("[1G]_" + exp.getTableName() + "_" + partition_name); 
+    }
+    cur_right = right;
+    fmt::print("KD Tree in {:.4Lf}ms with group_ratio: {:.8Lf}% with tau: {}\n", exec_kd, group_ratio*100, kd_tau);
+    fmt::print("SR sketches in {:.4Lf}ms and refines in {:.4Lf}ms\n", exec_sketch, exec_refine);
+    DetProb detProb = DetProb(det_sql, -1, exp.seed);
+    detProb.copyBounds(lsr_prob.bl, lsr_prob.bu, lsr_prob.cl, lsr_prob.cu);
+    DualReducer dr = DualReducer(exp.C, detProb);
+    if (dr.status == Found){
+      Checker ch = Checker(detProb);
+      LsrChecker sch = LsrChecker(lsr_prob);
+      double lp_score = ch.getScore(dr.lp_sol);
+      double sr_score = sch.getScore(kd_sol);
+      double dr_score = ch.getScore(dr.ilp_sol);
+      fmt::print("SR pctError:{}\n", pctError(sr_score, lp_score));
+      fmt::print("DR pctError:{} with DR time: {:.4Lf}ms\n", pctError(dr_score, lp_score), dr.exe_ilp);
+    }
+  }
+}
+
+/******************************************/
+
+void S2(){
+  DetExp exp = DetExp("S2");
+  exp.o = 6;
+  exp.q = 0;
+  DetSql det_sql = exp.generate();
+  exp.seed = 1;
+  exp.E = 50;
+  int tau = 100000;
+  double dia = DBL_MAX;
+  string partition_name = fmt::format("s{}_dinf", tau);
+  PgManager pg = PgManager();
+  pg.dropTable("[1P]_" + exp.getTableName() + "_" + partition_name); 
+  pg.dropTable("[1G]_" + exp.getTableName() + "_" + partition_name); 
+  KDTree kt;
+  kt.partitionTable(exp.getTableName(), partition_name, exp.getCols(), tau, dia);
+  LsrProb lsr_prob = LsrProb(det_sql, partition_name, exp.seed);
+  double l = 0;
+  double r = 15;
+  while (abs(r-l) > 1e-6){
+    double mid = (r+l)/2;
+    cout << l << " " << mid << " " << r << endl;
+    lsr_prob.generateBounds(exp.E, exp.a, mid);
+    SketchRefine sr = SketchRefine(lsr_prob);
+    map<long long, long long> sol;
+    bool is_success = sr.sketchAndRefine(sol);
+    if (is_success){
+      l = mid;
+    } else{
+      r = mid;
+    }
+  }
+  pg.dropTable("[1P]_" + exp.getTableName() + "_" + partition_name); 
+  pg.dropTable("[1G]_" + exp.getTableName() + "_" + partition_name); 
+  cout << (l+r)/2 << endl;
+}
+
+/******************************************/
+
+void S3(){
+  DetExp exp = DetExp("S3");
+  exp.o = 6;
+  exp.q = 0;
+  DetSql det_sql = exp.generate();
+  exp.seed = 1;
+  exp.E = 50;
+  for (double H = 3; H < 11; H += 2){
+    exp.H = H;
+    for (int tau = 100; tau < 65000; tau += 650){
+      double dia = DBL_MAX;
+      string partition_name = fmt::format("s{}_dinf", tau);
+      PgManager pg = PgManager();
+      pg.dropTable("[1P]_" + exp.getTableName() + "_" + partition_name); 
+      pg.dropTable("[1G]_" + exp.getTableName() + "_" + partition_name); 
+      KDTree kt;
+      kt.partitionTable(exp.getTableName(), partition_name, exp.getCols(), tau, dia);
+      LsrProb lsr_prob = LsrProb(det_sql, partition_name, exp.seed);
+      lsr_prob.generateBounds(exp.E, exp.a, exp.H);
+      SketchRefine sr = SketchRefine(lsr_prob);
+      map<long long, long long> sol;
+      bool is_success = sr.sketchAndRefine(sol);
+      if (is_success) exp.write(fmt::format("H={}", H), tau, 1);
+      else exp.write(fmt::format("H={}", H), tau, 0);
+      pg.dropTable("[1P]_" + exp.getTableName() + "_" + partition_name); 
+      pg.dropTable("[1G]_" + exp.getTableName() + "_" + partition_name);
+    }
+  }
+  // PgManager pg = PgManager();
+  // vector<string> tables = pg.listTables();
+  // for (auto t: tables){
+  //   if (endsWith(t, "dinf")){
+  //     pg.dropTable(t);
+  //   }
+  // }
+  // for (auto t: tables) cout << t << endl;
+}
+
+/******************************************/
+
 
 int main(){
   // A1();
@@ -331,5 +488,8 @@ int main(){
   // L2();
   // L3();
   // L4();
-  tmp();
+  // tmp();
+  S1();
+  // S2();
+  // S3();
 }

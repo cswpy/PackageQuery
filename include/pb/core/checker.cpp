@@ -99,6 +99,7 @@ int LsrChecker::checkLpFeasibility(map<long long, double> &sol){
   }
   pg->getSelectedTuples(out_tuples, out_ids, prob.det_sql.table_name, ids, prob.det_sql.att_cols, prob.det_sql.filter_cols, prob.det_sql.filter_intervals);
   int n = (int) out_ids.size();
+  // cout << n << " " << ids.size() << endl;
   if (n != (int) ids.size()) return BadFilter;
   int m = (int) prob.det_sql.att_cols.size();
   VectorXd Ax (m); Ax.fill(0);

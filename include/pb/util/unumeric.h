@@ -10,7 +10,7 @@ using Eigen::VectorXd;
 using std::pair;
 using std::vector;
 
-constexpr double kNumericEps = 1e-12;
+constexpr double kNumericEps = 1e-8;
 
 bool isEqual(double x, double y, double eps=kNumericEps);
 bool isLess(double x, double y, double eps=kNumericEps);

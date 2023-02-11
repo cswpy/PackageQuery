@@ -22,7 +22,7 @@ class SketchRefine {
     public:
         DetProb det_prob;
         LsrProb prob;
-        double exec_sr;
+        double exec_sr, exec_refine, exec_sketch;
         ~SketchRefine();
         SketchRefine(LsrProb &lsr_prob);
         void init();

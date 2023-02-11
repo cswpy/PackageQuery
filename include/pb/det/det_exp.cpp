@@ -7,16 +7,17 @@
 
 using namespace pb;
 
-vector<double> DetExp::H3 = {1, 7, 13};
 vector<double> DetExp::H8 = {1, 3, 5, 7, 9, 11, 13, 15};
-vector<double> DetExp::E2 = {10, 1000};
+vector<double> DetExp::E2 = {20, 1000};
 vector<double> DetExp::M6 = {8, 16, 32, 64, 128, 300};
 vector<double> DetExp::F5 = {0.1, 0.3, 0.5, 0.7, 0.9};
+vector<double> DetExp::g3 = {0.001, 0.01, 0.1};
 
-vector<int> DetExp::C6 = {1, 4, 8, 16, 32, 80};
+vector<int> DetExp::C7 = {1, 2, 4, 8, 16, 32, 80};
+vector<int> DetExp::o6 = {4, 5, 6, 7, 8, 9};
 vector<int> DetExp::o4 = {6, 7, 8, 9};
 
-vector<long long> DetExp::N5 = {10000, 100000, 1000000, 10000000, 100000000};
+vector<long long> DetExp::S3 = {100000, 1000000, 10000000};
 
 vector<string> DetExp::datasets = {
   "tpch", 
@@ -53,6 +54,11 @@ vector<long long> DetExp::us = {
   1
 };
 
+vector<string> DetExp::filtered_cols = {
+  "price",
+  "k"
+};
+
 DetExp::~DetExp(){
   out.close();
   backup.open(backup_path, std::ios::out);
@@ -73,14 +79,16 @@ DetExp::DetExp(string out_file, bool verbose): verbose(verbose){
 void DetExp::reset(){
   // Default values
   E = 50;
-  a = 0;
+  a = 0.3;
   H = 7;
   F = 0.5;
-  g = 0.01;
   M = kMainMemorySize;
+  /****/
+  g = kGroupRatio;
   S = kLpSize;
+  /****/
   C = kPCore;
-  o = 7;
+  o = 8;
   q = 0;
   seed = 1;
   partition_name = "E0";
@@ -106,16 +114,30 @@ DetSql DetExp::generate(){
   return det_sql;
 }
 
-void DetExp::partition(){
-  DynamicLowVariance dlv = DynamicLowVariance(kPCore, g, kMainMemorySize);
+double DetExp::partition(bool is_lazy){
+  DynamicLowVariance dlv = DynamicLowVariance(C, g, M, S);
   string table_name = getTableName();
-  if (!dlv.existPartition(table_name, partition_name)){
+  if (is_lazy){
+    if (!dlv.existPartition(table_name, partition_name)){
+      dlv.partition(table_name, partition_name);
+    }
+  } else{
+    dlv.dropPartition(table_name, partition_name);
     dlv.partition(table_name, partition_name);
   }
+  return dlv.exe;
 }
 
 void DetExp::write(string id, double x, double y){
-  string s = fmt::format("{},{:.2Lf},{:.{}Lf}\n", id, x, y, kPrecision);
+  string s = fmt::format("{},{:.{}Lf},{:.{}Lf}\n", id, x, kPrecision, y, kPrecision);
+  lines.push_back(s);
+  if (verbose) cout << s;
+  out << s;
+  out.flush();
+}
+
+void DetExp::write(string label, double v){
+  string s = fmt::format("{},{:.{}Lf}\n", label, v, kPrecision);
   lines.push_back(s);
   if (verbose) cout << s;
   out << s;

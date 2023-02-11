@@ -4,10 +4,13 @@
 #include "pb/util/upostgres.h"
 #include "libpq-fe.h"
 
+static const double kGroupRatio = 0.01;
+
 class DynamicLowVariance{
 private:
   int core;
   double group_ratio, main_memory;
+  long long tps;
   string _sql;
   PgManager *pg;
   PGconn *_conn;
@@ -22,7 +25,7 @@ private:
   long long doPartition(string table_name, string suffix, const vector<string> &cols);
 public:
   ~DynamicLowVariance();
-  DynamicLowVariance(int core, double group_ratio=0.01, double main_memory=kMainMemorySize);
+  DynamicLowVariance(int core, double group_ratio=kGroupRatio, double main_memory=kMainMemorySize, long long tps=kLpSize);
   void dropAllPartitions();
   void dropTempTables();
   bool existPartition(string table_name, string partition_name);

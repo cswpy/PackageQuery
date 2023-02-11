@@ -2,6 +2,8 @@
 #include "pb/core/gurobi_solver.h"
 #include "pb/core/checker.h"
 
+#define VERBOSE 0
+
 PartialPackage::~PartialPackage() {}
 // #TODO: does the order of column is addressed here? i.e. if A has different column order than bl & bu, could we still solve it?
 void PartialPackage::init(PGconn *conn, DetProb &sketch_det_prob, map<long long, long long> &sketch_sol, unordered_set<long long> &sketch_gids)
@@ -58,24 +60,30 @@ bool PartialPackage::refine(map<long long, long long> &sol)
     // RMatrixXd effective_A = refine_det_prob.A(Eigen::all, group_indices);
     // auto mean = effective_A.colwise().sum() / effective_A.cols();
     long E = sketch_det_prob.ids.size(); // Package size
+    
+    #if VERBOSE
     fmt::print("Total package size: {}\n", E);
+    #endif
+
     int m = g_cols.size() + 1; // Account for cl & cu
     int num_group_refined_phase1 = 0;
     int num_iter = 1;
 
     while (sketch_gids.size() > 0)
     {
+        // cout << "Sketch size " << sketch_gids.size() << endl;
         // As long as there are unrefined groups, start refining from the first one
         long long refine_group_start_idx = 0, refine_group_end_idx;
         int num_group_refined_iter = 0;
     
         while (refine_group_start_idx < E)
         {
+            // cout << "OKc " << refine_group_start_idx << " " << E << endl; 
             long long refine_gid = sketch_det_prob.ids[refine_group_start_idx];
             // If this group is already refined, skip
             if (sketch_gids.find(refine_gid) == sketch_gids.end())
             {
-                refine_group_start_idx = refine_group_end_idx;
+                refine_group_start_idx ++;
                 continue;
             }
             long long num_repr_tuple = sketch_sol.at(refine_gid);
@@ -99,7 +107,7 @@ bool PartialPackage::refine(map<long long, long long> &sol)
             RMatrixXd sketch_tmp_A = sketch_det_prob.A(Eigen::all, seq_v);
             // cout << "sketch_det_prob_A size: " << sketch_det_prob.A.rows() << " by " << sketch_det_prob.A.cols() << endl;
             // cout << "tmp_A size: " << sketch_tmp_A.rows() << " by " << sketch_tmp_A.cols() << endl;
-            
+            // cout << "OKd\n"; 
             auto sum = sketch_tmp_A.rowwise().sum();
 
             //cout << "SUM: \n" << sum << endl;
@@ -131,6 +139,7 @@ bool PartialPackage::refine(map<long long, long long> &sol)
                 if (m > 0) refine_det_prob.A(m - 1, i) = 1.0; // Only change for cl & cu when there is bl & bu
             }
             PQclear(_res);
+            // cout << "OKe\n"; 
 
             refine_det_prob.u.fill((double)lsr_prob.det_sql.u); // Each tuple cannot exceed u times
             refine_det_prob.truncate();
@@ -144,7 +153,9 @@ bool PartialPackage::refine(map<long long, long long> &sol)
 
             // Solve refine for each group
             GurobiSolver gs = GurobiSolver(refine_det_prob, true);
+            // cout << "Start refine" << endl;
             gs.solveIlp();
+            // cout << "Finish refine" << endl;
             // cout << "Refine status:" << gs.ilp_status << ": " << solMessage(gs.ilp_status) << endl;
 
             Checker ch = Checker(refine_det_prob);
@@ -155,7 +166,10 @@ bool PartialPackage::refine(map<long long, long long> &sol)
                 // cout << "bl:\n" << refine_det_prob.bl << "\nbu:\n" << refine_det_prob.bu << endl;
                 // cout << "u: " << refine_det_prob.u << endl << endl;
                 // cout << "A:\n" << refine_det_prob.A << endl;
+                #if VERBOSE
                 fmt::print("Refine failed for group {} in iteration {}\n", refine_gid, num_iter);
+                #endif
+
                 refine_group_start_idx = refine_group_end_idx;
                 continue;
             }
@@ -164,6 +178,8 @@ bool PartialPackage::refine(map<long long, long long> &sol)
                 num_group_refined_iter++;
                 assert(sketch_gids.erase(refine_gid) > 0);
             }
+
+            // cout << "OKa\n"; 
 
             // Replace the repr tuples with the actual tuples
             int tmp = refine_group_start_idx;
@@ -181,22 +197,29 @@ bool PartialPackage::refine(map<long long, long long> &sol)
                     tmp += 1;
                 }
             }
+            // cout << "OKb\n"; 
             num_group_refined_phase1 += 1;
             refine_group_start_idx = refine_group_end_idx;
         }
 
         if (num_group_refined_iter == 0)
         {
+            #if VERBOSE
             fmt::print("[Failed] No group could be refined in iteration {}\n", num_iter);
+            #endif
+
             return false;
         }else {
+            #if VERBOSE
             fmt::print("Refined {} groups during iteration {}\n", num_group_refined_iter, num_iter);
+            #endif
         }
         // Update the sketch_det_prob to actual tuples refined in this round
         sketch_det_prob.A = temp_A;
         num_iter++;
     }
 
+    // cout << "OK3\n"; 
     for (auto id : sketch_det_prob.ids)
     {
         auto pair = sol.emplace(id, 0);
@@ -207,16 +230,22 @@ bool PartialPackage::refine(map<long long, long long> &sol)
     int feasStatus = lsr_ch.checkIlpFeasibility(sol);
     if (feasStatus == 1)
     {
+        #if VERBOSE
         fmt::print("[Suceed] Phase 1 feasible, finished refining for {} groups, with {} tuples in the package\n", num_group_refined_phase1, sketch_det_prob.ids.size());
+        #endif
+
         return true;
     }
 
+    #if VERBOSE
     fmt::print("Phase 1 failed, feasibility status: {}, trying to re-refine\n", feasMessage(feasStatus));
+    #endif
 
     // Phase 2: Going though each group again for replacement
     long long refine_group_start_idx = 0, refine_group_end_idx;
     while (refine_group_start_idx < E)
     {
+        // cout << "RGSI " << refine_group_start_idx << " E " << E << "\n"; 
         // long long refine_gid = sketch_det_prob.ids[refine_group_start_idx];
         long long re_refine_gid = initial_ids[refine_group_start_idx];
         long long num_repr_tuple = sketch_sol[re_refine_gid];
@@ -294,7 +323,7 @@ bool PartialPackage::refine(map<long long, long long> &sol)
                 for (int j = 0; j < m; j++)
                 {
                     sketch_det_prob.A(j, tmp) = refine_det_prob.A(j, i);
-                    cout << refine_det_prob.A(j, i) << " ";
+                    // cout << refine_det_prob.A(j, i) << " ";
                 }
                 // long long old_tid = sketch_det_prob.ids[tmp];
                 // long long new_tid = refine_det_prob.ids[i];
@@ -307,7 +336,9 @@ bool PartialPackage::refine(map<long long, long long> &sol)
             }
         }
         // Solution updated, return
+        #if VERBOSE
         fmt::print("[Suceed] Phase 2 suceeded, re-refined group {} with size {}, feasMessage: {}\n", re_refine_gid, num_repr_tuple,feasMessage(feasStatus));
+        #endif
         //fmt::print("Refining for gid: {}, size {}\n", refine_gid, num_repr_tuple);
 
         return true;
@@ -315,6 +346,9 @@ bool PartialPackage::refine(map<long long, long long> &sol)
     }
 
     // Exited the loop means that no re-refining can be done on any group
+    #if VERBOSE
     fmt::print("[Failed] Phase 2 failed, no re-refining can be done.\n");
+    #endif
+    
     return false;
 }

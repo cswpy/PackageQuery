@@ -70,7 +70,7 @@ void dlv_binary_test(){
 }
 
 void dlv_graph_test(){
-  DetExp exp = DetExp("DLV");
+  DetExp exp = DetExp("DLV2");
   int N = 100000;
   VectorXd samples;
   double mean = 0;
@@ -88,29 +88,43 @@ void dlv_graph_test(){
     whole.add(samples[i]);
   }
   double sigmas = whole.getBiasedVar();
-  // double dif = samples[N-1] - samples[0];
-  double right = 1; // Popoviciu inequality
-  double inc = 0.001;
-  for (double beta = 0; beta < right; beta += inc){
-    int cnt = 1;
-    ScalarMeanVar smv = ScalarMeanVar();
-    ScalarMeanVar smv_var = ScalarMeanVar();
-    for (int i = 0; i < N; i ++){
-      ScalarMeanVar pre_smv = smv;
-      smv.add(samples[i]);
-      if (smv.getBiasedVar() > beta){
-        smv_var.add(pre_smv.getBiasedVar());
-        smv.reset();
+  double upper = 0.25*(whole.getMax() - whole.getMin())*(whole.getMax() - whole.getMin());
+  double lower = 0;
+  int cur_count = N;
+
+  while (cur_count > 1){
+    double left = lower;
+    double right = upper;
+    double my_cnt, my_vRAC, my_vRWC;
+    while (abs(right-left)>1e-6){
+      double mid = (left+right)/2;
+      long long cnt = 1;
+      ScalarMeanVar smv = ScalarMeanVar();
+      ScalarMeanVar smv_var = ScalarMeanVar();
+      for (int i = 0; i < N; i ++){
+        ScalarMeanVar pre_smv = smv;
         smv.add(samples[i]);
-        cnt ++;
+        if (smv.getBiasedVar() > mid){
+          smv_var.add(pre_smv.getBiasedVar());
+          smv.reset();
+          smv.add(samples[i]);
+          cnt ++;
+        }
       }
+
+      if (cnt < cur_count){
+        right = mid;
+        smv_var.add(smv.getBiasedVar());
+        my_vRAC = smv_var.getMax()/sigmas;
+        my_vRWC = cnt*cnt*smv_var.getMax()/sigmas;
+        my_cnt = cnt;
+      } else left = mid;
     }
-    smv_var.add(smv.getBiasedVar());
-    double vRAC = cnt*cnt*smv_var.getMean()/sigmas;
-    double vRWC = cnt*cnt*smv_var.getMax()/sigmas;
-    exp.write("p", beta, cnt);
-    exp.write("rac", beta, vRAC);
-    exp.write("rwc", beta, vRWC);
+    double mid = (left+right)/2;
+    exp.write("p", mid, my_cnt);
+    exp.write("rac", mid, my_vRAC);
+    exp.write("rwc", mid, my_vRWC);
+    cur_count = my_cnt;
   }
 }
 
@@ -161,6 +175,106 @@ double f (double beta){
   cout << cnt << " " << smv_var.getMax() << endl;
   double vRWC = cnt*cnt*smv_var.getMax()/sigmas;
   return vRWC;
+}
+
+void dlv_iterative_test(){
+  DetExp exp = DetExp("DLV3");
+  int N = 100000;
+  VectorXd samples;
+  double mean = 0;
+  double var = 100;
+  double a = mean - sqrt(3*var);
+  double b = mean + sqrt(3*var);
+  UNUSED(a);
+  UNUSED(b);
+  Normal dist = Normal(mean, var);
+  // Uniform dist = Uniform(a, b);
+  dist.sample(samples, N);
+  sort(samples.begin(), samples.end());
+  ScalarMeanVar whole;
+  for (int i = 0; i < (int) samples.size(); i ++){
+    whole.add(samples[i]);
+  }
+  double sigmas = whole.getBiasedVar();
+  double upper = 0.25*(whole.getMax() - whole.getMin())*(whole.getMax() - whole.getMin());
+  double lower = 0;
+  int cur_count = N;
+
+  while (cur_count > 1){
+    double left = lower;
+    double right = upper;
+    double my_cnt, my_vRAC, my_vRWC;
+    while (abs(right-left)>1e-6){
+      double mid = (left+right)/2;
+      long long cnt = 1;
+      ScalarMeanVar smv = ScalarMeanVar();
+      ScalarMeanVar smv_var = ScalarMeanVar();
+      for (int i = 0; i < N; i ++){
+        ScalarMeanVar pre_smv = smv;
+        smv.add(samples[i]);
+        if (smv.getBiasedVar() > mid){
+          smv_var.add(pre_smv.getBiasedVar());
+          smv.reset();
+          smv.add(samples[i]);
+          cnt ++;
+        }
+      }
+
+      if (cnt < cur_count){
+        right = mid;
+        smv_var.add(smv.getBiasedVar());
+        my_vRAC = smv_var.getMax()/sigmas;
+        my_vRWC = cnt*cnt*smv_var.getMean()/sigmas;
+        my_cnt = cnt;
+      } else left = mid;
+    }
+
+    priority_queue<pair<double, pair<int, int>>> pq;
+    pq.push({0, {0, N-1}});
+
+    double g_ratio = 0.1;
+
+    while (pq.size() < my_cnt){
+      auto p = pq.top().second;
+      pq.pop();
+      int l = p.first;
+      int r = p.second;
+      int n = r-l+1;
+      ScalarMeanVar smv = ScalarMeanVar();
+      for (int i = l; i <= r; i ++){
+        smv.add(samples(i));
+      }
+      double beta = smv.getBiasedVar() * g_ratio * g_ratio * 13.5;
+      smv.reset();
+      int start = l;
+      for (int i = l; i <= r; i ++){
+        double total_var = smv.getM2();
+        smv.add(samples(i));
+        if (smv.getBiasedVar() > beta){
+          pq.push({total_var, {start, i-1}});
+          start = i;
+          smv.reset();
+          smv.add(samples(i));
+        }
+      }
+      pq.push({smv.getM2(), {start, r}});
+    }
+    int this_cnt = pq.size();
+    ScalarMeanVar smv_var = ScalarMeanVar();
+    while (pq.size() > 0){
+      auto p = pq.top().second;
+      int n = p.second - p.first + 1;
+      smv_var.add(pq.top().first/n);
+      pq.pop();
+    }
+
+    my_vRAC = this_cnt*this_cnt*smv_var.getMean()/sigmas;
+    double mid = (left+right)/2;
+    exp.write("p", mid, my_cnt);
+    exp.write("rac", mid, my_vRAC);
+    exp.write("rwc", mid, my_vRWC);
+    cur_count = my_cnt;
+  }
 }
 
 void dlv_opt(){
@@ -216,5 +330,6 @@ void dlv_opt(){
 
 int main(){
   // dlv_graph_test();
-  dlv_opt();
+  dlv_iterative_test();
+  // dlv_opt();
 }

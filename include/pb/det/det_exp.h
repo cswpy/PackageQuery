@@ -44,9 +44,9 @@ public:
   string partition_name;
 
   // Ranges
-  static vector<double> H3, H8, E2, M6, F5;
-  static vector<int> C6, o4;
-  static vector<long long> N5;
+  static vector<double> H8, E2, M6, F5, g3;
+  static vector<int> C7, o6, o4;
+  static vector<long long> S3;
 
   // Queries
   static vector<string> datasets;
@@ -56,6 +56,7 @@ public:
   static vector<vector<int>> arr_att_senses;
   static vector<bool> has_count_constraints;
   static vector<long long> us;
+  static vector<string> filtered_cols;
   
 public:
   ~DetExp();
@@ -64,6 +65,7 @@ public:
   string getTableName();
   vector<string> getCols();
   DetSql generate();
-  void partition();
+  double partition(bool is_lazy=true);
   void write(string id, double x, double y);
+  void write(string label, double v);
 };
