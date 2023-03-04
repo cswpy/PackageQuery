@@ -22,6 +22,7 @@ using std::pair;
 using Eigen::VectorXd;
 
 static const char* space = " \t\n\r\f\v";
+static const int kFloatPrecision = 5;
 
 string infAlias(double val, int precision);
 string join(vector<string> names, string delim);
@@ -40,6 +41,7 @@ int getLayerIndex(string table_name);
 bool startsWith(string full, string sub);
 bool endsWith(string full, string sub);
 bool isIn(vector<string> arr, string s);
+string formatFloat(double v, int precision=kFloatPrecision);
 
 void allocate(char **vals, int index, const char *s);
 void free(char** vals, int length);

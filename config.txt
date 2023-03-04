@@ -17,5 +17,6 @@ lp_size = 100000
 precision = 15
 global_seed = 42
 outlier_percentage = 0.9
+time_limit = 600
 # Id column is based-1
 id_column = id

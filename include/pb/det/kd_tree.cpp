@@ -10,7 +10,7 @@
 KDTree::~KDTree() = default;
 
 KDTree::KDTree(): parent(nullptr), left_child(nullptr), right_child(nullptr) {
-
+    exec_kd = 0;
 }
 
 KDTree::KDTree(int dimension, int size_req, double diameter_req): num_dim(dimension), size_req(size_req), diameter_req(diameter_req) {

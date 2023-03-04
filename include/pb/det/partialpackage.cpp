@@ -154,7 +154,7 @@ bool PartialPackage::refine(map<long long, long long> &sol)
             // Solve refine for each group
             GurobiSolver gs = GurobiSolver(refine_det_prob, true);
             // cout << "Start refine" << endl;
-            gs.solveIlp();
+            gs.solveIlp(1e-4, kTimeLimit/10);
             // cout << "Finish refine" << endl;
             // cout << "Refine status:" << gs.ilp_status << ": " << solMessage(gs.ilp_status) << endl;
 
@@ -295,7 +295,7 @@ bool PartialPackage::refine(map<long long, long long> &sol)
 
         // Solve refine for each group
         GurobiSolver gs = GurobiSolver(refine_det_prob);
-        gs.solveIlp();
+        gs.solveIlp(1e-4, kTimeLimit/10);
         // cout << "Refine status:" << gs.ilp_status << ": " << solMessage(gs.ilp_status) << endl;
         Checker ch = Checker(refine_det_prob);
         int feasStatus = ch.checkIlpFeasibility(gs.ilp_sol);

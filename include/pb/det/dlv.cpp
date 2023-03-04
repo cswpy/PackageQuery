@@ -12,6 +12,7 @@ using namespace pb;
 const double kSizeBias = 0.5;
 const double kVarScale = 13.5;
 const double kBucketCompensate = 2.0;
+const double kPctTolerance = 0.1;
 const int kTempReserveSize = 1000;
 
 #define at(row, col) (m*(col)+(row))
@@ -31,7 +32,7 @@ DynamicLowVariance::~DynamicLowVariance(){
   delete pg;
 }
 
-DynamicLowVariance::DynamicLowVariance(int core, double group_ratio, double main_memory, long long tps): core(core), group_ratio(group_ratio), main_memory(main_memory), tps(tps){
+DynamicLowVariance::DynamicLowVariance(int core, double group_ratio, double main_memory, long long tps): core(core), original_group_ratio(group_ratio), main_memory(main_memory), tps(tps){
   INIT_CLOCK(pro);
   init();
 }
@@ -61,11 +62,11 @@ void DynamicLowVariance::init(){
 
   _sql = fmt::format(""
     "CREATE TABLE IF NOT EXISTS \"{}\"("
-    "	table_name VARCHAR(63) NOT NULL,"
-    "	partition_name VARCHAR(31) NOT NULL,"
+    "	table_name VARCHAR(127) NOT NULL,"
+    "	partition_name VARCHAR(127) NOT NULL,"
     "	cols TEXT[],"
     "	group_ratio DOUBLE PRECISION,"
-    "	lp_size BIGINT,"
+    "	tps BIGINT,"
     " main_memory_used DOUBLE PRECISION,"
     " core_used INTEGER,"
     " layer_count INTEGER,"
@@ -121,6 +122,20 @@ void DynamicLowVariance::dropPartition(string table_name, string partition_name)
   }
 }
 
+unordered_map<string, vector<string>> DynamicLowVariance::getPartitions(){
+  unordered_map<string, vector<string>> ps;
+  _sql = fmt::format("SELECT table_name, partition_name FROM \"{}\";", kPartitionTable);
+  _res = PQexec(_conn, _sql.c_str());
+  for (int i = 0; i < (int) PQntuples(_res); i ++){
+    string table_name (PQgetvalue(_res, i, 0));
+    string partition_name (PQgetvalue(_res, i, 1));
+    if (ps.find(table_name) == ps.end()) ps[table_name] = vector<string>();
+    ps[table_name].push_back(partition_name);
+  }
+  PQclear(_res);
+  return ps;
+}
+
 void DynamicLowVariance::partition(string table_name, string partition_name){
   vector<string> cols = pg->getNumericCols(table_name);
   partition(table_name, partition_name, cols);
@@ -129,19 +144,25 @@ void DynamicLowVariance::partition(string table_name, string partition_name){
 void DynamicLowVariance::partition(string table_name, string partition_name, const vector<string> &cols){
   std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
   dropPartition(table_name, partition_name);
-  long long size = doPartition(table_name, partition_name, cols);
+  long long size = pg->getSize(table_name);
+  double target_group_ratio = tps / (double) size;
+  double group_ratio = min(original_group_ratio, target_group_ratio);
+  // cout << size << " " << group_ratio << endl;
+  size = doPartition(table_name, partition_name, cols, group_ratio);
   if (!size) return;
   string g_name = nextGName(table_name + "_" + partition_name);
   int layer_count = 0;
   while (size){
-    // cout << "OKg" << endl;
-    size = doPartition(g_name, "", cols);
+    // cout << "OKg" << " " << size << endl;
+    target_group_ratio = tps / (double) size;
+    group_ratio = min(original_group_ratio, target_group_ratio);
+    size = doPartition(g_name, "", cols, group_ratio);
     g_name = nextGName(g_name);
     layer_count ++;
   }
 
   _sql = fmt::format(""
-    "INSERT INTO \"{}\"(table_name, partition_name, cols, group_ratio, lp_size, main_memory_used, core_used, layer_count) "
+    "INSERT INTO \"{}\"(table_name, partition_name, cols, group_ratio, tps, main_memory_used, core_used, layer_count) "
     "VALUES ('{}', '{}', {}, {}, {}, {}, {}, {});",
     kPartitionTable, table_name, partition_name, pgJoin(cols), group_ratio, tps, main_memory, core, layer_count);
   _res = PQexec(_conn, _sql.c_str());
@@ -149,12 +170,12 @@ void DynamicLowVariance::partition(string table_name, string partition_name, con
   exe = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start).count() / 1000000.0;
 }
 
-long long DynamicLowVariance::doPartition(string table_name, string suffix, const vector<string> &cols){
+long long DynamicLowVariance::doPartition(string table_name, string suffix, const vector<string> &cols, double group_ratio){
   // cout << "OKa" << endl;
   Stat *stat = pg->readStats(table_name);
   // cout << "OKb" << endl;
   long long size = stat->size;
-  if (size <= tps) return 0;
+  if (size <= tps * (1.0 + kPctTolerance)) return 0;
 
   // cout << "OK1" << endl;
   int m = (int) cols.size();

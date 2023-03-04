@@ -67,7 +67,8 @@ PgManager::PgManager(){
 long long PgManager::getSize(string table_name){
   _sql = fmt::format("SELECT {} FROM \"{}\" ORDER BY {} DESC LIMIT 1;", kId, table_name, kId);
   _res = PQexec(_conn, _sql.c_str());
-  long long size = atoll(PQgetvalue(_res, 0, 0));
+  long long size = 0;
+  if (PQntuples(_res) > 0) size = atoll(PQgetvalue(_res, 0, 0));
   PQclear(_res);
   return size;
 }

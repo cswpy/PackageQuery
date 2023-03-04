@@ -5,6 +5,9 @@
 
 const int kSleepPeriod = 25; // In ms
 
+const double kMinGapOpt = 1e-4;
+const double kMinGap = 1e-1;
+
 void LayeredSketchRefine::init(){
   pg = new PgManager();
   _conn = PQconnectdb(pg->conninfo.c_str());
@@ -12,10 +15,11 @@ void LayeredSketchRefine::init(){
   _res = NULL;
   status = NotFound;
   INIT_CLOCK(pro);
+  exe_gb = exe_dual = exe_sort = 0;
 }
 
 DLVPartition* LayeredSketchRefine::getDLVPartition(LsrProb* prob){
-  _sql = fmt::format("SELECT cols, group_ratio, lp_size, layer_count FROM {} WHERE table_name='{}' AND partition_name='{}';", kPartitionTable, prob->det_sql.table_name, prob->partition_name);
+  _sql = fmt::format("SELECT cols, group_ratio, tps, layer_count FROM {} WHERE table_name='{}' AND partition_name='{}';", kPartitionTable, prob->det_sql.table_name, prob->partition_name);
   _res = PQexec(_conn, _sql.c_str());
   if (PQntuples(_res)){
     // cout << "OKPRE\n"; 
@@ -95,12 +99,41 @@ void LayeredSketchRefine::formulateDetProb(int core, LsrProb &prob, DetProb &det
   det_prob.truncate();
 }
 
-LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, bool is_safe){
+LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, long long lp_size, bool is_safe): lp_size(lp_size){
   init();
   std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
   partition = getDLVPartition(&prob);
+  // Total ilp time
+  double ilp_time = kTimeLimit;
   // cout << "OKWTF1\n";
   if (!partition){
+    if (prob.det_sql.table_size <= lp_size){
+      DetProb det_prob = DetProb(prob.det_sql, -1, kGlobalSeed);
+      det_prob.copyBounds(prob.bl, prob.bu, prob.cl, prob.cu);
+
+      DualReducer dr = DualReducer(core, det_prob, is_safe, kMinGapOpt, kTimeLimit);
+      exe_gb += dr.exe_gb;
+      exe_dual += dr.exe_lp;
+      exe_sort += dr.exe_ilp - dr.exe_lp - dr.exe_gb;
+      exe_lp = dr.exe_lp;
+      exe_ilp = dr.exe_ilp;
+      status = dr.status;
+      if (status == Found){
+        ilp_score = dr.ilp_score;
+        lp_score = dr.lp_score;
+        for (int i = 0; i < (int) det_prob.c.size(); i ++){
+          if (isGreater(dr.ilp_sol(i), 0)){
+            ilp_sol[det_prob.ids[i]] = (long long) dr.ilp_sol(i);
+          }
+          if (isGreater(dr.lp_sol(i), 0)){
+            lp_sol[det_prob.ids[i]] = dr.lp_sol(i);
+          }
+        }
+      }
+      exe_ilp = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start).count() / 1000000.0;
+      exe_lp = exe_ilp - (dr.exe_ilp - dr.exe_lp);
+      return;
+    }
     status = NoPartitionFound;
     return;
   }
@@ -138,7 +171,7 @@ LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, bool is_safe){
       PGconn *conn = PQconnectdb(pg->conninfo.c_str());
       assert(PQstatus(conn) == CONNECTION_OK);
       PGresult *res = NULL;
-      DLVPartition *loc_partition = new DLVPartition(&prob, partition->cols, partition->group_ratio, partition->lp_size, partition->layer_count);
+      DLVPartition *loc_partition = new DLVPartition(&prob, partition->cols, partition->group_ratio, partition->tps, partition->layer_count);
       
       int local_start_index = 0;
       vector<long long> local_ids;
@@ -260,10 +293,17 @@ LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, bool is_safe){
   formulateDetProb(core, prob, det_prob, current_gtable, last_layer_ids);
   // Phase-2: Iteratively go to next layer
   for (int layer = partition->layer_count; layer >= 1; layer --){
+    // // Make sure that we augment less tuples for the original layer
+    // if (layer == 1) lp_size = kOptLpSize;
+
     int n = (int) det_prob.c.size();
     // Phase-2a: Sketch
-    DualReducer dr = DualReducer(core, det_prob, is_safe);
-    if (dr.status != Found){
+    DualReducer dr = DualReducer(core, det_prob, false, kMinGap, kTimeLimit/(partition->layer_count+1));
+    exe_gb += dr.exe_gb;
+    exe_dual += dr.exe_lp;
+    exe_sort += dr.exe_ilp - dr.exe_lp - dr.exe_gb;
+    ilp_time -= dr.exe_ilp;
+    if (dr.status != Found && dr.status != HalfFeasible){
       status = dr.status;
       return;
     }
@@ -275,14 +315,14 @@ LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, bool is_safe){
     int active_count = 0;
     #pragma omp parallel num_threads(core)
     {
-      DLVPartition *loc_partition = new DLVPartition(&prob, partition->cols, partition->group_ratio, partition->lp_size, partition->layer_count);
-      vector<long long> loc_ids; loc_ids.reserve(loc_partition->lp_size);
+      DLVPartition *loc_partition = new DLVPartition(&prob, partition->cols, partition->group_ratio, partition->tps, partition->layer_count);
+      vector<long long> loc_ids; loc_ids.reserve(lp_size);
       #pragma omp for
       for (int i = 0; i < n; i ++){
         // Condition for sketch
         if (dr.lp_sol(i) > 0 || dr.ilp_sol(i) > 0){
           long long group_id = det_prob.ids[i];
-          if (total_size <= partition->lp_size){
+          if (total_size <= lp_size){
             long long size = loc_partition->getGroupComp(loc_ids, layer, group_id, limit_size_per_group);
             #pragma omp atomic
             total_size += size;
@@ -297,7 +337,7 @@ LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, bool is_safe){
       // Phase-2b: Shade
       bool is_active = false;
       while (true){
-        if (total_size > partition->lp_size) break;
+        if (total_size > lp_size) break;
         long long group_id = -1;
         #pragma omp critical (c3)
         {
@@ -322,7 +362,7 @@ LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, bool is_safe){
           unordered_set<long long> group_ids;
           loc_partition->getNeighboringGroups(group_ids, layer, group_id);
           for (const auto& gid : group_ids){
-            if (total_size <= partition->lp_size){
+            if (total_size <= lp_size){
               bool is_adding = false;
               #pragma omp critical (c4)
               {
@@ -397,7 +437,10 @@ LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, bool is_safe){
     }
   }
   // Phase-3: Final solution
-  DualReducer dr = DualReducer(core, det_prob, is_safe);
+  DualReducer dr = DualReducer(core, det_prob, is_safe, kMinGapOpt, ilp_time);
+  exe_gb += dr.exe_gb;
+  exe_dual += dr.exe_lp;
+  exe_sort += dr.exe_ilp - dr.exe_lp - dr.exe_gb;
   if (dr.status != Found){
     status = dr.status;
     return;

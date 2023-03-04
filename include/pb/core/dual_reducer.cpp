@@ -5,10 +5,9 @@
 
 #include "pb/util/udebug.h"
 
-int DualReducer::kIlpSize = 5000;
-double DualReducer::kEpsilon = 1e-10;
-double DualReducer::kTimeLimit = 10.0;
-double DualReducer::kMipGap = 1e-4;
+static const int kIlpSize = 5000;
+static const double kEpsilon = 1e-8;
+static const double kSafeMipGap = DBL_MAX;
 enum StayStatus {NotStay, LikelyStay, Stay};
 
 DualReducer::~DualReducer(){
@@ -75,23 +74,26 @@ DetProb* DualReducer::filtering(VectorXi &reduced_index, int core, const DetProb
   return reduced_prob;
 }
 
-DualReducer::DualReducer(int core, const DetProb &prob, bool is_safe){
+DualReducer::DualReducer(int core, const DetProb &prob, bool is_safe, double min_gap, double time_limit){
   std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
   int n = (int) prob.c.size();
   int m = (int) prob.bl.size();
   ilp_sol.resize(n); lp_sol.resize(n);
-  ilp_score = lp_score = exe_ilp = exe_lp = 0;
+  ilp_score = lp_score = exe_ilp = exe_lp = exe_gb = 0;
   status = NotFound;
   if (n < kIlpSize){
     // Gurobi
     GurobiSolver gs = GurobiSolver(prob);
-    gs.solveIlp(kMipGap, kTimeLimit);
+    gs.solveLp();
+    exe_lp = gs.exe_lp;
+    lp_sol = gs.lp_sol;
+    lp_score = gs.lp_score;
+    gs.solveIlp(min_gap, time_limit);
+    exe_gb += gs.exe_ilp;
     status = gs.ilp_status;
     if (gs.ilp_status == Found){
-      for (int i = 0; i < gs.ilp_sol.size(); i ++){
-        ilp_sol(i) = gs.ilp_sol(i);
-        ilp_score += gs.ilp_sol(i) * prob.c(i);
-      }
+      ilp_sol = gs.ilp_sol;
+      ilp_score = gs.ilp_score;
     }
   } else{
     Dual dual = Dual(core, prob);
@@ -222,8 +224,8 @@ DualReducer::DualReducer(int core, const DetProb &prob, bool is_safe){
       VectorXi reduced_index (stay_count);
       DetProb *reduced_prob = filtering(reduced_index, core, prob, dual.sol, stay_count, stay_mode, stay);
       GurobiSolver gs = GurobiSolver(*reduced_prob);
-      if (is_safe) gs.solveIlp();
-      else gs.solveIlp(kMipGap, kTimeLimit);
+      gs.solveIlp(min_gap, time_limit);
+      exe_gb += gs.exe_ilp;
       status = gs.ilp_status;
       if (gs.ilp_status == Found){
         for (int i = 0; i < gs.ilp_sol.size(); i ++){
@@ -231,7 +233,7 @@ DualReducer::DualReducer(int core, const DetProb &prob, bool is_safe){
           ilp_score += gs.ilp_sol(i) * reduced_prob->c(i);
         }
         delete reduced_prob;
-      } else if (is_safe){
+      } else if (is_safe && gs.ilp_status != Timeout){
         int current_size = kIlpSize;
         while (true){
           delete reduced_prob;
@@ -247,7 +249,8 @@ DualReducer::DualReducer(int core, const DetProb &prob, bool is_safe){
           }
           reduced_prob = filtering(reduced_index, core, prob, dual.sol, stay_count, stay_mode, stay);
           GurobiSolver _gs = GurobiSolver(*reduced_prob);
-          _gs.solveIlp();
+          _gs.solveIlp(kSafeMipGap, time_limit);
+          exe_gb += _gs.exe_ilp;
           status = _gs.ilp_status;
           if (_gs.ilp_status == Found){
             for (int i = 0; i < _gs.ilp_sol.size(); i ++){
@@ -256,11 +259,16 @@ DualReducer::DualReducer(int core, const DetProb &prob, bool is_safe){
             }
             delete reduced_prob;
             break;
-          } else if (current_size == n){
+          } else if (current_size == n || _gs.ilp_status == Timeout){
             delete reduced_prob;
             break;
           }
         }
+      } else{
+        // Not safe, LP found but no ILP found 
+        status = HalfFeasible;
+        ilp_sol = lp_sol;
+        ilp_score = lp_score;
       }
     } else{
       status = dual.status;

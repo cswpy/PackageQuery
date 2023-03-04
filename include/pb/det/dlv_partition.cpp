@@ -10,8 +10,8 @@ DLVPartition::~DLVPartition(){
   PQfinish(_conn);
 }
 
-DLVPartition::DLVPartition(const LsrProb *prob, vector<string> cols, double group_ratio, long long lp_size, int layer_count, bool is_unique)
-  : prob(prob), cols(cols), group_ratio(group_ratio), lp_size(lp_size), layer_count(layer_count){
+DLVPartition::DLVPartition(const LsrProb *prob, vector<string> cols, double group_ratio, long long tps, int layer_count, bool is_unique)
+  : prob(prob), cols(cols), group_ratio(group_ratio), tps(tps), layer_count(layer_count){
   pg = new PgManager();
   INIT_CLOCK(pro);
   _conn = PQconnectdb(pg->conninfo.c_str());

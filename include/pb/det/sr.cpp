@@ -152,7 +152,7 @@ bool SketchRefine::sketchAndRefine(map<long long, long long> &sol) {
     // Sketching initial package from representative tuples
     GurobiSolver gs = GurobiSolver(det_prob, true);
     // cout << "Start solving sketch" << endl;
-    gs.solveIlp();
+    gs.solveIlp(1e-4, kTimeLimit);
     // cout << "Finish sketching\n";
 
     // Replacing representative tuples with actual tuples

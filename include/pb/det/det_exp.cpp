@@ -4,14 +4,18 @@
 #include "pb/util/uconfig.h"
 #include "pb/det/synthetic.h"
 #include "pb/det/dlv.h"
+#include "pb/det/kd_tree.h"
 
 using namespace pb;
 
+const double kTauRatio = 0.001;
+
 vector<double> DetExp::H8 = {1, 3, 5, 7, 9, 11, 13, 15};
+vector<double> DetExp::H4 = {1, 3, 5, 7};
 vector<double> DetExp::E2 = {20, 1000};
 vector<double> DetExp::M6 = {8, 16, 32, 64, 128, 300};
 vector<double> DetExp::F5 = {0.1, 0.3, 0.5, 0.7, 0.9};
-vector<double> DetExp::g3 = {0.001, 0.01, 0.1};
+vector<double> DetExp::g2 = {0.001, 0.01};
 
 vector<int> DetExp::C7 = {1, 2, 4, 8, 16, 32, 80};
 vector<int> DetExp::o6 = {4, 5, 6, 7, 8, 9};
@@ -56,7 +60,11 @@ vector<long long> DetExp::us = {
 
 vector<string> DetExp::filtered_cols = {
   "price",
-  "k"
+  "tmass_prox"
+};
+
+vector<double> DetExp::Es = {
+  50.0, 1000.0
 };
 
 DetExp::~DetExp(){
@@ -79,7 +87,7 @@ DetExp::DetExp(string out_file, bool verbose): verbose(verbose){
 void DetExp::reset(){
   // Default values
   E = 50;
-  a = 0.3;
+  a = 0;
   H = 7;
   F = 0.5;
   M = kMainMemorySize;
@@ -90,8 +98,9 @@ void DetExp::reset(){
   C = kPCore;
   o = 8;
   q = 0;
+  tps = kTps;
+  tau_ratio = kTauRatio;
   seed = 1;
-  partition_name = "E0";
 }
 
 string DetExp::getTableName(){
@@ -104,28 +113,62 @@ vector<string> DetExp::getCols(){
   return cols;
 }
 
-DetSql DetExp::generate(){
+DetSql DetExp::generate(bool is_lazy){
   string table_name = getTableName();
-  if (!pg->existTable(table_name)){
-    Synthetic syn = Synthetic();
+  Synthetic syn = Synthetic();
+  if (is_lazy){
+    if (!pg->existTable(table_name)){
+      syn.createSubtable(datasets[q], o, getCols(), seed);
+    }
+  } else{
+    pg->dropTable(table_name);
     syn.createSubtable(datasets[q], o, getCols(), seed);
   }
+
   DetSql det_sql = DetSql(table_name, obj_cols[q], is_maximizes[q], arr_att_cols[q], arr_att_senses[q], has_count_constraints[q], us[q]);
   return det_sql;
 }
 
-double DetExp::partition(bool is_lazy){
-  DynamicLowVariance dlv = DynamicLowVariance(C, g, M, S);
+double DetExp::dlvPartition(bool is_lazy){
+  DynamicLowVariance dlv = DynamicLowVariance(C, g, M, tps);
   string table_name = getTableName();
   if (is_lazy){
-    if (!dlv.existPartition(table_name, partition_name)){
-      dlv.partition(table_name, partition_name);
+    if (!dlv.existPartition(table_name, getDlvPartitionName())){
+      dlv.dropPartition(table_name, getDlvPartitionName());
+      dlv.partition(table_name, getDlvPartitionName());
     }
   } else{
-    dlv.dropPartition(table_name, partition_name);
-    dlv.partition(table_name, partition_name);
+    dlv.dropPartition(table_name, getDlvPartitionName());
+    dlv.partition(table_name, getDlvPartitionName());
   }
   return dlv.exe;
+}
+
+double DetExp::kdPartition(bool is_lazy){
+  KDTree kt;
+  string ptable = fmt::format("[1P]_{}_{}", getTableName(), getKdPartitionName());
+  string gtable = fmt::format("[1G]_{}_{}", getTableName(), getKdPartitionName());
+  double tau = kTauRatio * pg->getSize(getTableName());
+  if (is_lazy){
+    if (!pg->existTable(ptable) || !pg->existTable(gtable)){
+      pg->dropTable(ptable);
+      pg->dropTable(gtable);
+      kt.partitionTable(getTableName(), getKdPartitionName(), getCols(), tau, DBL_MAX);
+    }
+  } else{
+    pg->dropTable(ptable);
+    pg->dropTable(gtable);
+    kt.partitionTable(getTableName(), getKdPartitionName(), getCols(), tau, DBL_MAX);
+  }
+  return kt.exec_kd;
+}
+
+string DetExp::getDlvPartitionName(){
+  return fmt::format("dlv_C{}_g{}_M{}_tps{}", C, formatFloat(g), formatFloat(M, 1), tps);
+}
+
+string DetExp::getKdPartitionName(){
+  return fmt::format("kd_tau{}", formatFloat(tau_ratio));
 }
 
 void DetExp::write(string id, double x, double y){

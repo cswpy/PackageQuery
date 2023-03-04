@@ -60,6 +60,7 @@ static int _ = readConfigs(configs);
   static long long kLpSize = stoll(configs["lp_size"]);
   static double kOutlierPercentage = stod(configs["outlier_percentage"]);
   static double kMainMemorySize = stod(configs["main_memory_size"]);
+  static double kTimeLimit = stod(configs["time_limit"]);
 
   static string kPgDatabase = configs["database"];
   static string kPgUser = configs["user"];
@@ -85,6 +86,7 @@ static int _ = readConfigs(configs);
   static const long long kLpSize = stoll(configs["lp_size"]);
   static const double kOutlierPercentage = stod(configs["outlier_percentage"]);
   static const double kMainMemorySize = stod(configs["main_memory_size"]);
+  static const double kTimeLimit = stod(configs["time_limit"]);
 
   static const string kPgDatabase = configs["database"];
   static const string kPgUser = configs["user"];

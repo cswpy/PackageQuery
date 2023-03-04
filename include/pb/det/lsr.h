@@ -25,8 +25,9 @@ private:
 public:
   map<long long, long long> ilp_sol;
   map<long long, double> lp_sol;
-  double ilp_score, exe_ilp, lp_score, exe_lp;
+  double ilp_score, exe_ilp, lp_score, exe_lp, exe_gb, exe_dual, exe_sort;
   int status;
+  long long lp_size;
   #if DEBUG
     Profiler pro;
   #endif
@@ -36,5 +37,5 @@ private:
   DLVPartition* getDLVPartition(LsrProb *prob);
 public:
   ~LayeredSketchRefine();
-  LayeredSketchRefine(int core, LsrProb &prob, bool is_safe=false);
+  LayeredSketchRefine(int core, LsrProb &prob, long long lp_size=kLpSize, bool is_safe=true);
 };

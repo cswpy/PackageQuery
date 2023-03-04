@@ -19,7 +19,8 @@ static vector<string> sol_messages = {
   "TIMEOUT",
   "NO PARTITION FOUND",
   "INCOMPATIBLE PARTITION",
-  "NUMERICAL UNSTABILITY"
+  "NUMERICAL UNSTABILITY",
+  "LP FOUND BUT NO ILP FOUND"
 };
 
 static vector<string> feas_messages = {

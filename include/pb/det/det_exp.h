@@ -30,7 +30,11 @@ public:
   double g;
   // Main memory used in partition in GB
   double M;
-  // Targeted size of LP in partition
+  // Tau ratio for KD Tree
+  double tau_ratio;
+  // TPS for DLV
+  long long tps;
+  // Targeted size of LP in LSR
   long long S;
   // Number of cores used
   int C;
@@ -40,11 +44,9 @@ public:
   int q;
   // Seed
   int seed;
-  // Partition name;
-  string partition_name;
 
   // Ranges
-  static vector<double> H8, E2, M6, F5, g3;
+  static vector<double> H8, H4, E2, M6, F5, g2;
   static vector<int> C7, o6, o4;
   static vector<long long> S3;
 
@@ -57,6 +59,7 @@ public:
   static vector<bool> has_count_constraints;
   static vector<long long> us;
   static vector<string> filtered_cols;
+  static vector<double> Es;
   
 public:
   ~DetExp();
@@ -64,8 +67,11 @@ public:
   void reset();
   string getTableName();
   vector<string> getCols();
-  DetSql generate();
-  double partition(bool is_lazy=true);
+  DetSql generate(bool is_lazy=true);
+  double dlvPartition(bool is_lazy=true);
+  double kdPartition(bool is_lazy=true);
+  string getKdPartitionName();
+  string getDlvPartitionName();
   void write(string id, double x, double y);
   void write(string label, double v);
 };
