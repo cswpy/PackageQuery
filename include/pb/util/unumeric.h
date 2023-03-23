@@ -35,6 +35,7 @@ vector<double> linearCombination(vector<double> &v);
 // double normalCdf(double u, double v, double x);
 
 double pctError(double x, double ground);
+double intGap(double x, double ground);
 
 template <typename T>
 double sign(T value) {

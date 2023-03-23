@@ -12,6 +12,10 @@ using namespace pb;
 
 string Synthetic::table_name = "test_data";
 
+string getSubtableName(string table_name, double order, int seed){
+  return fmt::format("{}_{}_{}", table_name, formatFloat(order), seed);
+}
+
 Synthetic::~Synthetic(){
   delete pg;
 }
@@ -30,7 +34,7 @@ void Synthetic::init(){
 
 void Synthetic::createSubtable(string table_name, double order, vector<string> cols, int seed){
   pro.clock(1);
-  string subtable_name = table_name + "_" + to_string((int) round(order)) + "_" + to_string(seed);
+  string subtable_name = getSubtableName(table_name, order, seed);
   {
     string sql;
     PGconn* conn = PQconnectdb(pg->conninfo.c_str());

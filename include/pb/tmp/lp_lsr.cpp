@@ -1,4 +1,4 @@
-#include "lsr.h"
+#include "lp_lsr.h"
 
 #include "pb/core/dual_reducer.h"
 #include "pb/core/checker.h"
@@ -8,7 +8,7 @@ const int kSleepPeriod = 25; // In ms
 const double kMinGapOpt = 1e-4;
 const double kMinGap = 1e-1;
 
-void LayeredSketchRefine::init(){
+void LPLayeredSketchRefine::init(){
   pg = new PgManager();
   _conn = PQconnectdb(pg->conninfo.c_str());
   assert(PQstatus(_conn) == CONNECTION_OK);
@@ -18,7 +18,7 @@ void LayeredSketchRefine::init(){
   exe_gb = exe_dual = 0;
 }
 
-DLVPartition* LayeredSketchRefine::getDLVPartition(LsrProb* prob){
+DLVPartition* LPLayeredSketchRefine::getDLVPartition(LsrProb* prob){
   _sql = fmt::format("SELECT cols, group_ratio, tps, layer_count FROM {} WHERE table_name='{}' AND partition_name='{}';", kPartitionTable, prob->det_sql.table_name, prob->partition_name);
   _res = PQexec(_conn, _sql.c_str());
   if (PQntuples(_res)){
@@ -32,13 +32,13 @@ DLVPartition* LayeredSketchRefine::getDLVPartition(LsrProb* prob){
   return NULL; 
 }
 
-LayeredSketchRefine::~LayeredSketchRefine(){
+LPLayeredSketchRefine::~LPLayeredSketchRefine(){
   PQfinish(_conn);
   if (partition) delete partition;
   delete pg;
 }
 
-void LayeredSketchRefine::formulateDetProb(int core, LsrProb &prob, DetProb &det_prob, string current_gtable, const vector<long long> &ids){
+void LPLayeredSketchRefine::formulateDetProb(int core, LsrProb &prob, DetProb &det_prob, string current_gtable, const vector<long long> &ids){
   int m = prob.det_sql.att_cols.size() + 1;
   int n = (int) ids.size();
   det_prob.resize(m, n);
@@ -99,7 +99,7 @@ void LayeredSketchRefine::formulateDetProb(int core, LsrProb &prob, DetProb &det
   det_prob.truncate();
 }
 
-LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, long long lp_size, bool is_safe): lp_size(lp_size){
+LPLayeredSketchRefine::LPLayeredSketchRefine(int core, LsrProb &prob, long long lp_size, bool is_safe): lp_size(lp_size){
   init();
   std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
   partition = getDLVPartition(&prob);

@@ -7,6 +7,11 @@
 #include "pb/det/sr.h"
 #include "pb/det/kd_tree.h"
 
+#include "pb/tmp/random_dual_reducer.h"
+#include "pb/tmp/random_lsr.h"
+#include "pb/tmp/test_dual_reducer.h"
+#include "pb/tmp/lp_lsr.h"
+
 #include "pb/core/checker.h"
 #include "pb/core/dual.h"
 #include "pb/core/dual_reducer.h"
@@ -35,58 +40,207 @@ void Z1(){
   string exp_name = "Z1";
   DetExp exp = DetExp(exp_name);
   exp.o = 7;
-  exp.q = 1;
-  int R = 10;
+  int R = 5;
   int cnt = 0;
-  for (auto g : exp.g2){
-    exp.g = g;
-    if (g < 0.01) continue;
-    for (auto S : exp.S3){
-      // if (cnt <= 4) continue;
-      // if (S <= 100000) continue;
-      exp.S = S;
-      for (int i = 1; i <= R; i ++){
-        cnt ++;
-        if (S <= 1000000) continue;
-        // if (cnt <= 2) continue;
-        // if (i <= 1) continue;
-        // if (S == 100000) continue;
-        // if (S == 1000000 && i <= 3) continue;
-        string label = fmt::format("LSR*_i{}_g{}_s{}", i, formatFloat(g), exp.S);
-        exp.seed = i;
-        cout << "det_sql generate\n";
-        DetSql det_sql = exp.generate();
-        cout << "dlv partition\n";
-        double p_exe = exp.dlvPartition(false);
-        exp.write(label + "_ptime", p_exe);
-        cout << "lsr_prob generate\n";
-        LsrProb lsr_prob = LsrProb(det_sql, exp.getDlvPartitionName(), exp.seed);
-        cout << "det_prob generate\n";
-        DetProb det_prob = DetProb(det_sql, -1, exp.seed);
-        for (auto H : exp.H8){
-          exp.H = H;
-          cout << "lsr_bound_generate\n";
-          lsr_prob.generateBounds(exp.Es[exp.q], exp.a, exp.H);
-          cout << "det_prob_copy_bound\n";
-          det_prob.copyBounds(lsr_prob.bl, lsr_prob.bu, lsr_prob.cl, lsr_prob.cu);
-          cout << "lsr\n";
-          LayeredSketchRefine lsr = LayeredSketchRefine(exp.C, lsr_prob, exp.S, true);
-          cout << label << " " << solMessage(lsr.status) << endl;
-          if (lsr.status == Found){
-            cout << "dual\n";
-            Dual dual = Dual(exp.C, det_prob);
-            // LsrChecker ch = LsrChecker(lsr_prob);
-            // cout << feasMessage(ch.checkIlpFeasibility(lsr.ilp_sol)) << " " << feasMessage(ch.checkLpFeasibility(lsr.lp_sol)) << endl;
-            // assert(ch.checkLpFeasibility(lsr.lp_sol) == Feasibility);
-            // assert(ch.checkIlpFeasibility(lsr.ilp_sol) == Feasibility);
-            exp.write(label + "_time", H, lsr.exe_ilp);
-            exp.write(label + "_err", H, pctError(lsr.ilp_score, dual.score));
+  for (int q = 0; q < 2; q ++){
+    exp.q = q;
+    if (q == 0) continue;
+    for (auto g : exp.g2){
+      exp.g = g;
+      // if (g < 0.01) continue;
+      for (auto S : exp.S3){
+        // if (cnt <= 4) continue;
+        // if (S <= 100000) continue;
+        exp.S = S;
+        for (int i = 1; i <= R; i ++){
+          cout << "SEED " << i << endl;
+          cnt ++;
+          // if (S <= 1000000) continue;
+          // if (cnt <= 2) continue;
+          // if (i <= 1) continue;
+          // if (S == 100000) continue;
+          // if (S == 1000000 && i <= 3) continue;
+          string label = fmt::format("{}_LSR_g{}_s{}", exp.datasets[exp.q], formatFloat(g), exp.S);
+          exp.seed = i;
+          cout << "det_sql generate\n";
+          DetSql det_sql = exp.generate();
+          cout << "dlv partition\n";
+          exp.dlvPartition();
+          // exp.write(label + "_ptime", p_exe);
+          cout << "lsr_prob generate\n";
+          LsrProb lsr_prob = LsrProb(det_sql, exp.getDlvPartitionName(), exp.seed);
+          cout << "det_prob generate\n";
+          DetProb det_prob = DetProb(det_sql, -1, exp.seed);
+          for (auto H : exp.H8){
+            exp.H = H;
+            exp.E = exp.Es[exp.q];
+            cout << "lsr_bound_generate\n";
+            lsr_prob.generateBounds(exp.E, exp.a, exp.H);
+            cout << "det_prob_copy_bound\n";
+            det_prob.copyBounds(lsr_prob.bl, lsr_prob.bu, lsr_prob.cl, lsr_prob.cu);
+            cout << "lsr\n";
+            LayeredSketchRefine lsr = LayeredSketchRefine(exp.C, lsr_prob, exp.S, true);
+            cout << label << " " << solMessage(lsr.status) << endl;
+            if (lsr.status == Found){
+              cout << "dual\n";
+              Dual dual = Dual(exp.C, det_prob);
+              // LsrChecker ch = LsrChecker(lsr_prob);
+              // cout << feasMessage(ch.checkIlpFeasibility(lsr.ilp_sol)) << " " << feasMessage(ch.checkLpFeasibility(lsr.lp_sol)) << endl;
+              // assert(ch.checkLpFeasibility(lsr.lp_sol) == Feasibility);
+              // assert(ch.checkIlpFeasibility(lsr.ilp_sol) == Feasibility);
+              exp.write(label + "_time", H, lsr.exe_ilp);
+              exp.write(label + "_ilp", H, lsr.ilp_score);
+              exp.write(label + "_ground", H, dual.score);
+              exp.write(label + "_igap", H, intGap(lsr.ilp_score, dual.score));
+            }
           }
         }
       }
     }
   }
 }
+
+/******************************************/
+void Z2(){
+  string exp_name = "Z2";
+  DetExp exp = DetExp(exp_name);
+  exp.o = 6;
+  int R = 10;
+  for (int q = 0; q < 2; q ++){
+    exp.q = q;
+    // if (q == 0) continue;
+    for (int i = 1; i <= R; i ++){
+      exp.seed = i;
+      // if (i <= 1) continue;
+      DetSql det_sql = exp.generate();
+      for (auto H : exp.H8){
+        cout << "SEED " << i << endl;
+        DetProb det_prob = DetProb(det_sql, -1, exp.seed);
+        exp.H = H;
+        // if (H <= 9) continue;
+        exp.E = exp.Es[exp.q];
+        // if (H == 1) continue;
+        det_prob.generateBounds(exp.E, exp.a, exp.H);
+        cout << "To tdr" << endl;
+        DualReducer tdr = DualReducer(exp.C, det_prob, true);
+        // GurobiSolver dgs = GurobiSolver(det_prob);
+        // dgs.solveLp();
+        // cout << solMessage(dgs.lp_status) << " " << solMessage(tdr.status) << endl;
+        double ground = tdr.lp_score;
+        if (tdr.status == Found){
+          exp.write(exp.datasets[exp.q] + "_DR_P", exp.H, 1);
+          exp.write(exp.datasets[exp.q] + "_DR_ilp_score", H, tdr.ilp_score);
+          exp.write(exp.datasets[exp.q] + "_DR_ground", H, ground);
+          exp.write(exp.datasets[exp.q] + "_DR_igap", H, intGap(tdr.ilp_score, ground));
+          // exp.write("TDR", tdr.ilp_score, ground);
+        } else{
+          exp.write(exp.datasets[exp.q] + "_DR_N", exp.H, 1);
+        }
+        cout << "To rdr" << endl;
+        RandomDualReducer rdr = RandomDualReducer(exp.C, det_prob, true, tdr.failure_count);
+        if (rdr.status == Found){
+          exp.write(exp.datasets[exp.q] + "_RDR_P", exp.H, 1);
+          exp.write(exp.datasets[exp.q] + "_RDR_ilp_score", H, rdr.ilp_score);
+          exp.write(exp.datasets[exp.q] + "_RDR_ground", H, ground);
+          exp.write(exp.datasets[exp.q] + "_RDR_igap", H, intGap(rdr.ilp_score, ground));
+          // exp.write("RDR", rdr.ilp_score, ground);
+        } else{
+          exp.write(exp.datasets[exp.q] + "_RDR_N", exp.H, 1);
+        }
+        // return;
+      }
+    }
+  }
+}
+
+/******************************************/
+void Z3(){
+  string exp_name = "Z3";
+  DetExp exp = DetExp(exp_name);
+  exp.o = 7;
+  int R = 5;
+  for (int q = 0; q < 2; q ++){
+    exp.q = q;
+    exp.E = exp.Es[exp.q];
+    // if (q == 0) continue;
+    for (int i = 1; i <= R; i ++){
+      cout << "SEED " << i << endl;
+      exp.seed = i;
+      DetSql det_sql = exp.generate();
+      exp.dlvPartition();
+      cout << "Done partitioning!" << endl;
+      LsrProb lsr_prob = LsrProb(det_sql, exp.getDlvPartitionName(), exp.seed);
+      // if (i <= 1) continue;
+      for (auto H : exp.H8){ 
+        exp.H = H;
+        lsr_prob.generateBounds(exp.E, exp.a, exp.H);
+        cout << "To lsr" << endl;
+        LayeredSketchRefine lsr = LayeredSketchRefine(exp.C, lsr_prob, exp.S, true);
+        double ground = lsr.lp_score;
+        cout << "To rlsr" << endl;
+        RandomLayeredSketchRefine lplsr = RandomLayeredSketchRefine(exp.C, lsr_prob, exp.S, true);
+        if (lsr.status == Found){
+          exp.write(exp.datasets[exp.q] + "_LSR_P", H, 1);
+          exp.write(exp.datasets[exp.q] + "_LSR_ilp", H, lsr.ilp_score);
+          exp.write(exp.datasets[exp.q] + "_LSR_ground", H, ground);
+          exp.write(exp.datasets[exp.q] + "_LSR_igap", H, intGap(lsr.ilp_score, ground));
+        }
+        if (lplsr.status == Found){
+          exp.write(exp.datasets[exp.q] + "_RLSR_P", H, 1);
+          exp.write(exp.datasets[exp.q] + "_RLSR_ilp", H, lplsr.ilp_score);
+          exp.write(exp.datasets[exp.q] + "_RLSR_ground", H, ground);
+          exp.write(exp.datasets[exp.q] + "_RLSR_igap", H, intGap(lplsr.ilp_score, ground));
+        }
+      }
+    }
+  }
+}
+
+/******************************************/
+void Z4(){
+  string exp_name = "Z4";
+  DetExp exp = DetExp(exp_name);
+  exp.o = 7;
+  int R = 5;
+  for (int q = 0; q < 2; q ++){
+    exp.q = q;
+    exp.E = exp.Es[exp.q];
+    if (q == 0) continue;
+    for (int i = 1; i <= R; i ++){
+      // if (i <= 1) continue;
+      cout << "SEED " << i << endl;
+      exp.seed = i;
+      DetSql det_sql = exp.generate();
+      exp.dlvPartition();
+      cout << "Done partitioning!" << endl;
+      LsrProb lsr_prob = LsrProb(det_sql, exp.getDlvPartitionName(), exp.seed);
+      // if (i <= 1) continue;
+      for (auto H : exp.H8){ 
+        // if (H <= 13) continue;
+        exp.H = H;
+        lsr_prob.generateBounds(exp.E, exp.a, exp.H);
+        cout << "To lsr" << endl;
+        LayeredSketchRefine lsr = LayeredSketchRefine(exp.C, lsr_prob, exp.S, true);
+        double ground = lsr.lp_score;
+        cout << "To rlsr" << endl;
+        LPLayeredSketchRefine rlsr = LPLayeredSketchRefine(exp.C, lsr_prob, exp.S, true);
+        if (lsr.status == Found){
+          exp.write(exp.datasets[exp.q] + "_LSR_P", H, 1);
+          exp.write(exp.datasets[exp.q] + "_LSR_ilp", H, lsr.ilp_score);
+          exp.write(exp.datasets[exp.q] + "_LSR_ground", H, ground);
+          exp.write(exp.datasets[exp.q] + "_LSR_igap", H, intGap(lsr.ilp_score, ground));
+        }
+        if (rlsr.status == Found){
+          exp.write(exp.datasets[exp.q] + "_LPLSR_P", H, 1);
+          exp.write(exp.datasets[exp.q] + "_LPLSR_ilp", H, rlsr.ilp_score);
+          exp.write(exp.datasets[exp.q] + "_LPLSR_ground", H, ground);
+          exp.write(exp.datasets[exp.q] + "_LPLSR_igap", H, intGap(rlsr.ilp_score, ground));
+        }
+      }
+    }
+  }
+}
+
 /******************************************/
 // void A1(){
 //   string exp_name = "A1";
@@ -239,7 +393,7 @@ void A3(){
   string exp_name = "A3";
   DetExp exp = DetExp(exp_name);
   exp.o = 6;
-  int R = 10;
+  int R = 20;
   // double N = pow(10, exp.o);
   for (int q = 0; q < 2; q ++){
     // if (q == 0) continue;
@@ -259,7 +413,7 @@ void A3(){
         // if (i == 14 && H <= 13) continue;
         exp.H = H;
         exp.E = exp.Es[exp.q];
-        string label = fmt::format("{}_{}", exp.datasets[exp.q], exp.E);
+        string label = fmt::format("{}", exp.datasets[exp.q]);
         LsrProb lsr_prob = LsrProb(det_sql, "", exp.seed);
         lsr_prob.generateBounds(exp.E, exp.a, exp.H);
         DetProb det_prob = DetProb(det_sql, -1, exp.seed);
@@ -275,7 +429,6 @@ void A3(){
         LsrChecker ch = LsrChecker(lsr_prob);
         Checker det_ch = Checker(det_prob);
         double ground = 0;
-        bool is_positive = false;
         // GurobiSolver gs_lp = GurobiSolver(det_prob);
         // gs_lp.solveLp();
         // cout << "GS LP finished\n";
@@ -293,30 +446,34 @@ void A3(){
         cout << "Start dual\n";
         Dual dual = Dual(exp.C, det_prob);
         ground = dual.score;
-        cout << "Start gs\n"; 
-        GurobiSolver gs = GurobiSolver(det_prob);
-        gs.solveIlp();
-        if (gs.ilp_status == Found){
-          is_positive = true;
-          exp.write("GR_err_" + label, exp.H, pctError(gs.ilp_score, ground));
-        } else {
-          is_positive = false;
-        }
+        // gs.solveIlp();
+        // if (gs.ilp_status == Found){
+        //   is_positive = true;
+        //   exp.write("GR_err_" + label, exp.H, pctError(gs.ilp_score, ground));
+        // } else {
+        //   is_positive = false;
+        // }
 
         if (is_success && ch.checkIlpFeasibility(sr_sol)==Feasibility){
           double sr_score = ch.getScore(sr_sol);
-          exp.write("SR_TP_" + label, exp.H, 1);
-          exp.write("SR_err_" + label, exp.H, pctError(sr_score, ground));
-        } else{
-          if (is_positive) exp.write("SR_FN_" + label, exp.H, 1);
-          else exp.write("SR_TN_" + label, exp.H, 1);
+          exp.write(label + "_SR_P", exp.H, 1.0);
+          exp.write(label + "_SR_ilp", exp.H, sr_score);
+          exp.write(label + "_SR_ground", exp.H, ground);
+          exp.write(label + "_SR_igap", exp.H, intGap(sr_score, ground));
         }
+        
         if (lsr.status == Found){
-          exp.write("LSR_TP_" + label, exp.H, 1);
-          exp.write("LSR_err_" + label, exp.H, pctError(lsr.ilp_score, ground));
-        } else{
-          if (is_positive) exp.write("LSR_FN_" + label, exp.H, 1);
-          else exp.write("LSR_TN_" + label, exp.H, 1);
+          exp.write(label + "_LSR_P", exp.H, 1.0);
+          exp.write(label + "_LSR_ilp", exp.H, lsr.ilp_score);
+          exp.write(label + "_LSR_ground", exp.H, ground);
+          exp.write(label + "_LSR_igap", exp.H, intGap(lsr.ilp_score, ground));
+          exp.write(label + "_GDR_P", exp.H, 1.0);
+        } else {
+          // cout << "Start gs\n"; 
+          // GurobiSolver gs = GurobiSolver(det_prob);
+          // if (gs.hasIlpSolution()){
+          //   exp.write(label + "_GDR_P", exp.H, 1.0);
+          // }
         }
       }
     }
@@ -362,7 +519,7 @@ void A3(){
 void L1(){
   string exp_name = "L1";
   DetExp exp = DetExp(exp_name);
-  int R = 3;
+  int R;
   for (int o : exp.o4){
     exp.o = o;
     double N = pow(10.0, o);
@@ -381,8 +538,7 @@ void L1(){
         exp.write("LSR_read", N, lsr.pro.time(0));
         exp.write("LSR_dual", N, lsr.exe_dual);
         exp.write("LSR_gb", N, lsr.exe_gb);
-        exp.write("LSR_sort", N, lsr.exe_sort);
-        exp.write("LSR_misc", N, lsr.exe_ilp-lsr.exe_sort-lsr.exe_gb-lsr.exe_dual-lsr.pro.time(0));
+        exp.write("LSR_misc", N, lsr.exe_ilp-lsr.exe_gb-lsr.exe_dual-lsr.pro.time(0));
         exp.write("LSR_total", N, lsr.exe_ilp);
       }
     }
@@ -434,7 +590,8 @@ void A4(){
   DetExp exp = DetExp(exp_name);
   PgManager pg = PgManager();
   for (int q = 0; q < 2; q ++){
-    if (q == 0) continue;
+    // if (q == 0) continue;
+    if (q == 1) continue;
     exp.q = q;
     exp.E = exp.Es[exp.q];
     for (auto H : exp.H4){
@@ -443,8 +600,8 @@ void A4(){
         if (o == 9 && q == 1) continue;
         int R = 5;
         if (o == 9) R = 3;
-        if (q == 0 && H <= 1) continue;
-        if (q == 0 && H <= 3 && o <= 8) continue;
+        // if (q == 0 && H <= 1) continue;
+        // if (q == 0 && H <= 3 && o <= 8) continue;
         // if (q == 0 && H == 7 && o <= 6) continue;
         exp.o = o;
         int seed_count = 0;
@@ -456,12 +613,12 @@ void A4(){
 
           if (o <= 8){
             cout << "Start kd " + label << endl;
-            exp.kdPartition(true);
+            exp.kdPartition();
           }
 
           ////////
           cout << "Start dlv "  + label << endl;
-          exp.dlvPartition(true);
+          exp.dlvPartition();
           ////////
 
           cout << "lsr_prob\n";
@@ -496,13 +653,17 @@ void A4(){
               GurobiSolver gs = GurobiSolver(det_prob);
               gs.solveIlp(1e-4, kTimeLimit);
               if (gs.ilp_status == Found){
-                exp.write("GDR_time_" + label, N, gs.exe_ilp);
-                exp.write("GDR_pcterror_" + label, N, pctError(gs.ilp_score, ground));
+                exp.write(label + "_GDR_time" , N, gs.exe_ilp);
+                exp.write(label + "_GDR_ilp", N, gs.ilp_score);
+                exp.write(label + "_GDR_ground", N, ground);
+                exp.write(label + "_GDR_igap", N, intGap(gs.ilp_score, ground));
               }
             }
 
-            exp.write("LSR_time_" + label, N, lsr.exe_ilp);
-            exp.write("LSR_pcterror_" + label, N, pctError(lsr.ilp_score, ground));
+            exp.write(label + "_LSR_time", N, lsr.exe_ilp);
+            exp.write(label + "_LSR_ilp", N, lsr.ilp_score);
+            exp.write(label + "_LSR_ground", N, ground);
+            exp.write(label + "_LSR_igap", N, intGap(lsr.ilp_score, ground));
 
             if (o <= 8){
               cout << "Start sr " + label << endl;
@@ -514,8 +675,10 @@ void A4(){
               cout << "Sr finished " + label << endl; 
               if (is_success && ch.checkIlpFeasibility(sr_sol)==Feasibility){
                 double sr_score = ch.getScore(sr_sol);
-                exp.write("SR_time_" + label, N, sr.exec_sr);
-                exp.write("SR_pcterror_" + label, N, pctError(sr_score, ground));
+                exp.write(label + "_SR_time", N, sr.exec_sr);
+                exp.write(label + "_SR_ilp", N, sr_score);
+                exp.write(label + "_SR_ground", N, ground);
+                exp.write(label + "_SR_igap", N, intGap(sr_score, ground));
               }
             }
 
@@ -529,14 +692,21 @@ void A4(){
 }
 /******************************************/
 void test(){
+  PgManager pg = PgManager();
   // DynamicLowVariance dlv = DynamicLowVariance();
   // auto ps = dlv.getPartitions();
   // for (auto pi : ps){
   //   string table_name = pi.first;
   //   auto partition_names = pi.second;
+  //   if (table_name.find("ssds") != string::npos){
+  //     for (auto n : partition_names){
+  //       cout << table_name << " " << n << endl;
+  //     }
+  //   }
   //   for (auto partition_name : partition_names){
   //     dlv.dropPartition(table_name, partition_name);
   //   }
+  //   pg.dropTable(table_name); 
   // }
 
   // PgManager pg = PgManager();
@@ -547,10 +717,11 @@ void test(){
   //   }
   // }
 
-  PgManager pg = PgManager();
+  // PgManager pg = PgManager();
   auto tables = pg.listTables();
   for (string table : tables){
-    if (pg.getSize(table) < 0.13e9) pg.dropTable(table);
+    if (table.find("ssds_") != string::npos) pg.dropTable(table);
+    // if (table.find("ssds") != string::npos && table.find("kd") != string::npos) pg.dropTable(table);
   }
 
   // Inverse hardness test
@@ -567,14 +738,17 @@ void test(){
 /******************************************/
 
 int main() {
-  // Z1();
+  Z1();
+  // Z2();
+  // Z3();
+  // Z4();
   // A1();
   // A2();
   // A3();
   // A4();
   // P1();
   // P2();
-  L1();
+  // L1();
   // L2();
   // test();
   return 0;

@@ -2,20 +2,19 @@
 #include "pb/core/parallel_pq.h"
 #include "pb/util/unumeric.h"
 #include "pb/lib/common.h"
-#include "dual_reducer.h"
+#include "random_dual_reducer.h"
 
 #include "pb/util/udebug.h"
 
 static const int kIlpSize = 5000;
 static const double kEpsilon = 1e-8;
 static const double kSafeMipGap = DBL_MAX;
-static const double kFastTimeLimit = 5.0;
 enum StayStatus {NotStay, LikelyStay, Stay};
 
-DualReducer::~DualReducer(){
+RandomDualReducer::~RandomDualReducer(){
 }
 
-DetProb* DualReducer::filtering(VectorXi &reduced_index, int core, const DetProb &prob, VectorXd &dual_sol, int stay_count, int stay_mode, vector<int> &stay){
+DetProb* RandomDualReducer::filtering(VectorXi &reduced_index, int core, const DetProb &prob, VectorXd &dual_sol, int stay_count, int stay_mode, vector<int> &stay){
   int n = (int) prob.c.size();
   int m = (int) prob.bl.size();  
   reduced_index.resize(stay_count);
@@ -47,6 +46,7 @@ DetProb* DualReducer::filtering(VectorXi &reduced_index, int core, const DetProb
     {
       local_start_index = start_stay_count;
       start_stay_count += local_stay_count;
+      // cout << local_start_index << " " << start_stay_count << endl;
     }
     if (local_stay_count) memcpy(&(reduced_index(local_start_index)), &(local_stay_index(0)), local_stay_count*sizeof(int));
     // for (int i = local_start_index; i < local_start_index + local_stay_count; i ++){
@@ -76,8 +76,7 @@ DetProb* DualReducer::filtering(VectorXi &reduced_index, int core, const DetProb
   return reduced_prob;
 }
 
-DualReducer::DualReducer(int core, const DetProb &prob, bool is_safe, double min_gap, double time_limit){
-  // cout << "WTF " << time_limit << " " << kTimeLimit << "\n";
+RandomDualReducer::RandomDualReducer(int core, const DetProb &prob, bool is_safe, int max_failure, double min_gap, double time_limit){
   failure_count = 0;
   std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
   int n = (int) prob.c.size();
@@ -100,8 +99,8 @@ DualReducer::DualReducer(int core, const DetProb &prob, bool is_safe, double min
       ilp_score = gs.ilp_score;
     }
   } else{
+    // cout << "OK1\n";
     Dual dual = Dual(core, prob);
-    // cout << "KO1\n";
     if (dual.status == Found){
       memcpy(&(lp_sol(0)), &(dual.sol(0)), n*sizeof(double));
       lp_score = dual.score;
@@ -115,57 +114,43 @@ DualReducer::DualReducer(int core, const DetProb &prob, bool is_safe, double min
           stay_count ++;
         }
       }
-      // cout << "KO2\n";
-      double E = lp_sol.sum();
-      DetProb newProb = prob;
-      newProb.u.fill(E/kIlpSize);
-      Dual scaled_dual = Dual(core, newProb);
-      vector<pair<double, int>> scores;
-      // cout << "KO3\n";
-      #pragma omp parallel num_threads(core)
-      {
-        #pragma omp for
-        for (int i = 0; i < n; i ++){
-          if (isGreater(lp_sol(i), prob.l(i))){
-            if (stay[i] != Stay){
-              stay[i] = Stay;
-              #pragma omp atomic
-              stay_count ++;
-            }
-          }
-          if (isGreater(scaled_dual.sol(i), prob.l(i))){
-            if (stay[i] != Stay){
-              #pragma omp critical (c1)
-              {
-                scores.push_back({prob.c(i), i});
-              }
-            }
+      for (int i = 0; i < n; i ++){
+        if (isGreater(dual.sol(i), prob.l(i))){
+          if (stay[i] != Stay){
+            stay[i] = Stay;
+            stay_count ++;
           }
         }
       }
-      sort(scores.begin(), scores.end());
-      for (int i = 0; i < min(kIlpSize, (int) scores.size()); i ++){
-        stay[scores[i].second] = Stay;
-        stay_count ++;
+      vector<int> inds (n);
+      iota(inds.begin(), inds.end(), 0);
+      std::random_shuffle(inds.begin(), inds.end());
+      for (int i = 0; i < n; i ++){
+        if (stay[inds[i]] != Stay){
+          stay[inds[i]] = Stay;
+          stay_count ++;
+          if (stay_count == kIlpSize) break;
+        }
       }
-      // cout << "HERE " << stay_count << endl;
       // Filtering
       VectorXi reduced_index (stay_count);
       DetProb *reduced_prob = filtering(reduced_index, core, prob, dual.sol, stay_count, stay_mode, stay);
+      // cout << "OK3\n";
       GurobiSolver gs = GurobiSolver(*reduced_prob);
-      gs.solveIlp(min_gap, kFastTimeLimit);
-      // cout << "KO3a\n";
+      gs.solveIlp(min_gap, 5.0);
       exe_gb += gs.exe_ilp;
       status = gs.ilp_status;
+      // cout << "OK4\n";
       if (gs.ilp_status == Found){
-        // cout << "KO4\n";
         for (int i = 0; i < gs.ilp_sol.size(); i ++){
+          // cout << i << " " << gs.ilp_sol.size() << " " << reduced_index.size() << " " << reduced_prob->c.size() << endl;
+          // cout << "HERE " << ilp_sol.size() << " " << reduced_index(i) << endl;
           ilp_sol(reduced_index(i)) = gs.ilp_sol(i);
           ilp_score += gs.ilp_sol(i) * reduced_prob->c(i);
         }
-        // cout << "KO5\n";
+        // cout << "OK5\n";
         delete reduced_prob;
-      } else if (is_safe){
+      } else if (is_safe && gs.ilp_status != Timeout){
         int current_size = kIlpSize;
         vector<int> inds (n);
         iota(inds.begin(), inds.end(), 0);
@@ -173,6 +158,12 @@ DualReducer::DualReducer(int core, const DetProb &prob, bool is_safe, double min
         int current_ind = -1;
         while (true){
           failure_count ++;
+          if (max_failure >= 0){
+            if (failure_count > max_failure){
+              delete reduced_prob;
+              break;
+            }
+          }
           delete reduced_prob;
           current_size = min(current_size*2, n);
           while (current_ind < n){
@@ -202,8 +193,7 @@ DualReducer::DualReducer(int core, const DetProb &prob, bool is_safe, double min
             break;
           }
         }
-      }
-      else{
+      } else{
         // Not safe, LP found but no ILP found 
         status = HalfFeasible;
         ilp_sol = lp_sol;

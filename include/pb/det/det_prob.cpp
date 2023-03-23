@@ -10,7 +10,19 @@ DetProb::~DetProb(){
 DetProb::DetProb(){
 }
 
-void DetProb::operator=(const DetProb& dp) {
+void DetProb::operator=(const DetProb& dp){
+  this->det_sql = dp.det_sql;
+  this->A = dp.A;
+  this->bl = dp.bl;
+  this->bu = dp.bu;
+  this->c = dp.c;
+  this->l = dp.l;
+  this->u = dp.u;
+  this->ids = dp.ids;
+  this->det_bound = dp.det_bound;
+}
+
+DetProb::DetProb(const DetProb& dp){
   this->det_sql = dp.det_sql;
   this->A = dp.A;
   this->bl = dp.bl;

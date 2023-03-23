@@ -39,7 +39,7 @@ public:
   // Number of cores used
   int C;
   // Order of table
-  int o;
+  double o;
   // Query index
   int q;
   // Seed

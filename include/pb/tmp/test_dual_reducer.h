@@ -6,10 +6,8 @@
 
 using namespace pb;
 
-static const double kMipGap = 1e-4;
-
 // All the time is in ms
-class DualReducer{
+class TestDualReducer{
 public:
   VectorXd ilp_sol, lp_sol;
   double ilp_score, lp_score, exe_ilp, exe_lp, exe_gb;
@@ -17,7 +15,6 @@ public:
 private:
   DetProb* filtering(VectorXi &reduced_index, int core, const DetProb &prob, VectorXd &dual_sol, int stay_count, int stay_mode, vector<int> &stay);
 public:
-  ~DualReducer();
-  DualReducer(int core, const DetProb &prob, bool is_safe=false, double mip_gap=kMipGap, double time_limit=kTimeLimit);
-  // DualReducer(int core, const DetProb &prob, VectorXd oracle);
+  ~TestDualReducer();
+  TestDualReducer(int core, const DetProb &prob, bool is_safe=false, double mip_gap=1e-4, double time_limit=kTimeLimit);
 };

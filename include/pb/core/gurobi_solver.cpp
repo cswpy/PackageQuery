@@ -46,6 +46,7 @@ void GurobiSolver::writeModel(string file_name){
 }
 
 void GurobiSolver::solveIlp(double mipGap, double time_limit){
+  // cout << "START GS " << n << " " << time_limit << endl;
   if (time_limit > 0){
     assert(!GRBsetdblparam(GRBgetenv(model), GRB_DBL_PAR_TIMELIMIT, time_limit));
   }
@@ -53,6 +54,7 @@ void GurobiSolver::solveIlp(double mipGap, double time_limit){
   exe_ilp = exeTime([](GRBmodel *model){
     assert(!GRBoptimize(model));
   }, model) + exe_init;
+  // cout << "END GS " << n << " " << time_limit << endl;
   assert(!GRBgetintattr(model, GRB_INT_ATTR_STATUS, &ilp_status));
   if (ilp_status == GRB_OPTIMAL){
     ilp_status = Found;
@@ -61,7 +63,16 @@ void GurobiSolver::solveIlp(double mipGap, double time_limit){
     ilp_score = getScore(ilp_sol);
   } else if (ilp_status == GRB_INFEASIBLE) ilp_status = Infeasible;
   else if (ilp_status == GRB_UNBOUNDED) ilp_status = Unbounded;
-  else if (ilp_status == GRB_TIME_LIMIT) ilp_status = Timeout;
+  else if (ilp_status == GRB_TIME_LIMIT){
+    int sol_count;
+    assert(!GRBgetintattr(model, GRB_INT_ATTR_SOLCOUNT, &sol_count));
+    if (sol_count){
+      ilp_status = Found;
+      ilp_sol.resize(n);
+      assert(!GRBgetdblattrarray(model, GRB_DBL_ATTR_X, 0, n, &ilp_sol(0)));
+      ilp_score = getScore(ilp_sol);
+    } else ilp_status = Timeout;
+  }
 }
 
 void GurobiSolver::solveLp(){

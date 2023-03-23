@@ -13,11 +13,10 @@ class DualReducer{
 public:
   VectorXd ilp_sol, lp_sol;
   double ilp_score, lp_score, exe_ilp, exe_lp, exe_gb;
-  int status;
+  int status, failure_count;
 private:
   DetProb* filtering(VectorXi &reduced_index, int core, const DetProb &prob, VectorXd &dual_sol, int stay_count, int stay_mode, vector<int> &stay);
 public:
   ~DualReducer();
   DualReducer(int core, const DetProb &prob, bool is_safe=false, double mip_gap=kMipGap, double time_limit=kTimeLimit);
-  // DualReducer(int core, const DetProb &prob, VectorXd oracle);
 };

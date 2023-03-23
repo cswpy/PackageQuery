@@ -89,6 +89,8 @@ file(GLOB all_SRCS
   "${PROJECT_SOURCE_DIR}/include/pb/lib/*.h"
   "${PROJECT_SOURCE_DIR}/include/pb/lib/*.hpp"
   "${PROJECT_SOURCE_DIR}/include/pb/lib/*.cpp"
+  "${PROJECT_SOURCE_DIR}/include/pb/tmp/*.hpp"
+  "${PROJECT_SOURCE_DIR}/include/pb/tmp/*.cpp"
 )
 
 #OpenMP for Windows

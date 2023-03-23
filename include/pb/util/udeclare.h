@@ -74,7 +74,9 @@ namespace pb{
   using std::push_heap;
   using std::pop_heap;
   using std::make_shared;
+  using std::fill;
   using std::shuffle;
+  using std::random_shuffle;
 
   using Eigen::VectorXd;
   using Eigen::VectorXi;
@@ -83,6 +85,7 @@ namespace pb{
   using std::random_device;
   using std::default_random_engine;
   using std::uniform_real_distribution;
+  using std::uniform_int_distribution;
   using std::normal_distribution;
   using std::lognormal_distribution;
   using std::seed_seq;

@@ -64,7 +64,7 @@ vector<string> DetExp::filtered_cols = {
 };
 
 vector<double> DetExp::Es = {
-  50.0, 1000.0
+  30.0, 30.0
 };
 
 DetExp::~DetExp(){
@@ -104,7 +104,7 @@ void DetExp::reset(){
 }
 
 string DetExp::getTableName(){
-  return fmt::format("{}_{}_{}", datasets[q], o, seed);
+  return getSubtableName(datasets[q], o, seed);
 }
 
 vector<string> DetExp::getCols(){

@@ -8,6 +8,8 @@
 #include <iostream>
 #include <cfloat>
 #include <unordered_map>
+#include <stdio.h>
+#include <time.h>
 #include <map>
 
 #include "pb/util/umisc.h"
@@ -134,3 +136,4 @@ public:
 };
 
 double currentRAM();
+const string currentDateTime();

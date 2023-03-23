@@ -92,6 +92,13 @@ double pctError(double x, double ground){
   return (ground - x) / fabs(ground) * 100.0;
 }
 
+double intGap(double x, double ground){
+  // Assume x, ground have same sign
+  double fx = fabs(x)+1e-1;
+  double fg = fabs(ground)+1e-1;
+  return std::max(fx/fg, fg/fx);
+}
+
 MeanVar::MeanVar(){
 }
 
