@@ -44,7 +44,7 @@ void Z1(){
   int cnt = 0;
   for (int q = 0; q < 2; q ++){
     exp.q = q;
-    if (q == 0) continue;
+    // if (q == 0) continue;
     for (auto g : exp.g2){
       exp.g = g;
       // if (g < 0.01) continue;
@@ -162,7 +162,7 @@ void Z3(){
   for (int q = 0; q < 2; q ++){
     exp.q = q;
     exp.E = exp.Es[exp.q];
-    // if (q == 0) continue;
+    if (q == 0) continue;
     for (int i = 1; i <= R; i ++){
       cout << "SEED " << i << endl;
       exp.seed = i;
@@ -172,6 +172,7 @@ void Z3(){
       LsrProb lsr_prob = LsrProb(det_sql, exp.getDlvPartitionName(), exp.seed);
       // if (i <= 1) continue;
       for (auto H : exp.H8){ 
+        if (H >= 15) continue;
         exp.H = H;
         lsr_prob.generateBounds(exp.E, exp.a, exp.H);
         cout << "To lsr" << endl;
@@ -242,41 +243,40 @@ void Z4(){
 }
 
 /******************************************/
-// void A1(){
-//   string exp_name = "A1";
-//   DetExp exp = DetExp(exp_name);
-//   exp.o = 8;
-//   int R = 1;
-//   DetSql det_sql = exp.generate();
-//   DetProb prob = DetProb(det_sql, -1, exp.seed);
-//   for (auto C : exp.C7){
-//     exp.C = C;
-//     for (int i = 0; i < R; i ++){
-//       prob.generateBounds(exp.E, exp.a, exp.H);
-//       DualReducer dr = DualReducer(exp.C, prob);
-//       exp.write("D", exp.C, dr.exe_lp);
-//       exp.write("DR", exp.C, dr.exe_ilp);
-//     }
-//   }
-//   for (auto C : exp.C7){
-//     exp.C = C;
-//     exp.partition_name = fmt::format("{}_C{}", exp_name, exp.C);
-//     LsrProb lsr_prob = LsrProb(det_sql, exp.partition_name, exp.seed);
-//     double p_exe = exp.partition(false);
-//     exp.write("DLV", exp.C, p_exe);
-//     for (int i = 0; i < R; i ++){
-//       lsr_prob.generateBounds(exp.E, exp.a, exp.H);
-//       LayeredSketchRefine lsr = LayeredSketchRefine(exp.C, lsr_prob);
-//       // cout << solMessage(lsr.status) << endl;
-//       if (lsr.status == Found){
-//         LsrChecker ch = LsrChecker(lsr_prob);
-//         assert(ch.checkLpFeasibility(lsr.lp_sol) == Feasibility);
-//         assert(ch.checkIlpFeasibility(lsr.ilp_sol) == Feasibility);
-//         exp.write("LSR", exp.C, lsr.exe_ilp);
-//       }
-//     }
-//   }
-// }
+void A1(){
+  string exp_name = "A1";
+  DetExp exp = DetExp(exp_name);
+  exp.o = 8;
+  int R = 5;
+  DetSql det_sql = exp.generate();
+  DetProb prob = DetProb(det_sql, -1, exp.seed);
+  for (auto C : exp.C7){
+    exp.C = C;
+    for (int i = 1; i <= R; i ++){
+      prob.generateBounds(exp.Es[exp.q], exp.a, exp.H);
+      DualReducer dr = DualReducer(exp.C, prob);
+      exp.write("D", exp.C, dr.exe_lp);
+      exp.write("DR", exp.C, dr.exe_ilp);
+    }
+  }
+  for (auto C : exp.C7){
+    exp.C = C;
+    LsrProb lsr_prob = LsrProb(det_sql, exp.getDlvPartitionName(), exp.seed);
+    double p_exe = exp.dlvPartition(false);
+    exp.write("DLV", exp.C, p_exe);
+    for (int i = 1; i <= R; i ++){
+      lsr_prob.generateBounds(exp.Es[exp.q], exp.a, exp.H);
+      LayeredSketchRefine lsr = LayeredSketchRefine(exp.C, lsr_prob);
+      // cout << solMessage(lsr.status) << endl;
+      if (lsr.status == Found){
+        LsrChecker ch = LsrChecker(lsr_prob);
+        assert(ch.checkLpFeasibility(lsr.lp_sol) == Feasibility);
+        assert(ch.checkIlpFeasibility(lsr.ilp_sol) == Feasibility);
+        exp.write("LSR", exp.C, lsr.exe_ilp);
+      }
+    }
+  }
+}
 // /******************************************/
 // void A2(){
 //   string exp_name = "A2";
@@ -519,27 +519,27 @@ void A3(){
 void L1(){
   string exp_name = "L1";
   DetExp exp = DetExp(exp_name);
-  int R;
-  for (int o : exp.o4){
-    exp.o = o;
-    double N = pow(10.0, o);
-    exp.H = 7;
-    if (o <= 8) R = 5;
-    else R = 3;
-    for (int i = 0; i < R; i ++){
-      exp.seed = i+1;
+  int R = 5;
+  exp.o = 8;
+  for (int q = 0; q < 2; q ++){
+    exp.q = q;
+    exp.E = exp.Es[exp.q];
+    for (int i = 1; i <= R; i ++){
+      exp.seed = i;
       exp.dlvPartition();
       DetSql det_sql = exp.generate();
       LsrProb lsr_prob = LsrProb(det_sql, exp.getDlvPartitionName(), exp.seed);
-      lsr_prob.generateBounds(exp.E, exp.a, exp.H);
-      LayeredSketchRefine lsr = LayeredSketchRefine(exp.C, lsr_prob);
-      if (lsr.status == Found){
-        lsr.pro.print();
-        exp.write("LSR_read", N, lsr.pro.time(0));
-        exp.write("LSR_dual", N, lsr.exe_dual);
-        exp.write("LSR_gb", N, lsr.exe_gb);
-        exp.write("LSR_misc", N, lsr.exe_ilp-lsr.exe_gb-lsr.exe_dual-lsr.pro.time(0));
-        exp.write("LSR_total", N, lsr.exe_ilp);
+      for (auto H : exp.H8){
+        lsr_prob.generateBounds(exp.E, exp.a, exp.H);
+        LayeredSketchRefine lsr = LayeredSketchRefine(exp.C, lsr_prob);
+        if (lsr.status == Found){
+          lsr.pro.print();
+          exp.write(exp.datasets[exp.q] + "_LSR_read", H, lsr.pro.time(0));
+          exp.write(exp.datasets[exp.q] + "_LSR_dual", H, lsr.exe_dual);
+          exp.write(exp.datasets[exp.q] + "_LSR_gb", H, lsr.exe_gb);
+          exp.write(exp.datasets[exp.q] + "_LSR_misc", H, lsr.exe_ilp-lsr.exe_gb-lsr.exe_dual-lsr.pro.time(0));
+          exp.write(exp.datasets[exp.q] + "_LSR_total", H, lsr.exe_ilp);
+        }
       }
     }
   }
@@ -590,8 +590,8 @@ void A4(){
   DetExp exp = DetExp(exp_name);
   PgManager pg = PgManager();
   for (int q = 0; q < 2; q ++){
-    // if (q == 0) continue;
-    if (q == 1) continue;
+    if (q == 0) continue;
+    // if (q == 1) continue;
     exp.q = q;
     exp.E = exp.Es[exp.q];
     for (auto H : exp.H4){
@@ -691,6 +691,26 @@ void A4(){
   }
 }
 /******************************************/
+void A5(){
+  string exp_name = "A5";
+  DetExp exp = DetExp(exp_name);
+  int R = 5;
+  for (int o = 7; o <= 8; o ++){
+    exp.o = o;
+    for (int i = 1; i <= R; i ++){
+      exp.seed = i;
+      DetSql det_sql = exp.generate();
+      DetProb prob = DetProb(det_sql, -1, exp.seed);
+      prob.generateBounds(exp.Es[exp.q], exp.a, exp.H);
+      Dual dual = Dual(exp.C, prob);
+      exp.write("D", exp.o, dual.exe_solve);
+      GurobiSolver gs = GurobiSolver(prob);
+      gs.solveLp();
+      exp.write("GD", exp.o, gs.exe_lp);
+    }
+  }
+}
+/******************************************/
 void test(){
   PgManager pg = PgManager();
   // DynamicLowVariance dlv = DynamicLowVariance();
@@ -738,7 +758,7 @@ void test(){
 /******************************************/
 
 int main() {
-  Z1();
+  // Z1();
   // Z2();
   // Z3();
   // Z4();
@@ -746,6 +766,7 @@ int main() {
   // A2();
   // A3();
   // A4();
+  A5();
   // P1();
   // P2();
   // L1();
