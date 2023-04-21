@@ -147,6 +147,8 @@ bool SketchRefine::sketchAndRefine(map<long long, long long> &sol) {
     det_prob.copyBounds(prob.bl, prob.bu, prob.cl, prob.cu);
     det_prob.truncate();
 
+    // det_prob.display();
+
     // Sketching initial package from representative tuples
     GurobiSolver gs = GurobiSolver(det_prob, true);
     gs.solveIlp();
@@ -174,7 +176,11 @@ bool SketchRefine::sketchAndRefine(map<long long, long long> &sol) {
     Checker ch = Checker(det_prob);
     int feasStatus = ch.checkIlpFeasibility(sketch_sol);
     fmt::print("Sketch solution status: {}\n",feasMessage(feasStatus) );
-    if (feasStatus != 1) return false;
+    
+    // If Sketch fails, verify that Gurobi cannot solve on representative tuples
+    if (feasStatus != 1) {
+        return false;
+    }
     // Effectively, only changes variables whose dimension includes n
     m = effective_A.rows();
     n = effective_A.cols();

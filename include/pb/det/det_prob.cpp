@@ -243,3 +243,16 @@ void DetProb::copyBounds(VectorXd &bl, VectorXd &bu, double cl, double cu){
   DetProb::bl(att_count) = cl;
   DetProb::bu(att_count) = cu;
 }
+
+void DetProb::display(){
+  IOFormat printVecFmt(Eigen::FullPrecision, 0, ", ", "\n", " << ");
+  cout << "----------------- DetProb Configurations -----------------" << endl;
+  cout << "------ DetProb.u (allowed occurrence of each tuple) ------" << endl;
+  cout << this->u.format(printVecFmt) << endl;
+  cout << "--------- DetProb.bl & bu (bound of constraints) ---------" << endl;
+  cout << this->bl.format(printVecFmt) << endl;
+  cout << this->bu.format(printVecFmt) << endl; 
+  cout << "--------- DetProb.A (m columns/constraints by n ) ---------" << endl;
+  cout << this->A << endl;
+  cout << "-----------------------------------------------------------" << endl;
+}

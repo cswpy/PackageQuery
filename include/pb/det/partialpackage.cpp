@@ -75,7 +75,7 @@ bool PartialPackage::refine(map<long long, long long> &sol)
             // If this group is already refined, skip
             if (sketch_gids.find(refine_gid) == sketch_gids.end())
             {
-                refine_group_start_idx = refine_group_end_idx;
+                refine_group_start_idx += 1;
                 continue;
             }
             long long num_repr_tuple = sketch_sol.at(refine_gid);

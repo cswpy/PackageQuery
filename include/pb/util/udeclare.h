@@ -79,6 +79,7 @@ namespace pb{
   using Eigen::VectorXd;
   using Eigen::VectorXi;
   using Eigen::MatrixXd;
+  using Eigen::IOFormat;
 
   using std::random_device;
   using std::default_random_engine;

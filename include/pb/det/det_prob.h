@@ -32,4 +32,5 @@ public:
   void truncate();
   void setSeed(int seed);
   void copyBounds(VectorXd &bl, VectorXd &bu, double cl, double cu);
+  void display();
 };
