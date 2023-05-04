@@ -3,6 +3,8 @@
 #include "pb/util/upostgres.h"
 #include "pb/util/udebug.h"
 
+string getSubtableName(string table_name, double order, int seed);
+
 class Synthetic{
 public:
   static string table_name;

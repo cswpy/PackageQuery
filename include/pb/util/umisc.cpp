@@ -3,6 +3,7 @@
 #include <math.h>
 #include <omp.h>
 #include <regex>
+#include <algorithm>
 #include <cfloat>
 #include <string>
 #include "fmt/core.h"
@@ -149,6 +150,12 @@ bool isIn(vector<string> arr, string s){
     if (a == s) return true;
   }
   return false;
+}
+
+string formatFloat(double v, int precision){
+  string res = fmt::format("{:.{}Lf}", v, precision);
+  replace(res.begin(), res.end(), '.', 'd');
+  return res;
 }
 
 void allocate(char **vals, int index, const char *s){

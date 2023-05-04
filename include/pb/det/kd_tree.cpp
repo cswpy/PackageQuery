@@ -5,10 +5,12 @@
 
 #include "kd_tree.h"
 
+#define VERBOSE 0
+
 KDTree::~KDTree() = default;
 
 KDTree::KDTree(): parent(nullptr), left_child(nullptr), right_child(nullptr) {
-
+    exec_kd = 0;
 }
 
 KDTree::KDTree(int dimension, int size_req, double diameter_req): num_dim(dimension), size_req(size_req), diameter_req(diameter_req) {
@@ -88,6 +90,7 @@ void KDTree::getGroupCentroidAndPartition(vector<Tuple>& centroids, map<long lon
 }
 
 void KDTree::partitionTable(string data_table_name, string partition_name, vector<string> cols, int size_req, double diameter_req) {
+    if (size_req <= 1) return;
     PgManager pg = PgManager();
     //long long n_tuples = pg.getSize(table_name);
     int k = cols.size();
@@ -118,12 +121,20 @@ void KDTree::partitionTable(string data_table_name, string partition_name, vecto
     
     auto t2 = std::chrono::high_resolution_clock::now();
     auto query_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() / 1000000.0;
+    
+    #if VERBOSE
     fmt::print("Query time elapsed: {:.5Lf}ms\n", query_elapsed);
+    #endif
+
     exec_query = query_elapsed;
     buildTree(tuples.begin(), tuples.end(), (size_t)tuples.size());
     auto t3 = std::chrono::high_resolution_clock::now();
     auto build_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(t3 - t2).count() / 1000000.0;
+    
+    #if VERBOSE
     fmt::print("Finished building KDTree: {:.5Lf}ms\n", build_elapsed);
+    #endif
+
     exec_tree_building = build_elapsed;
     
     vector<Tuple> repr_tuples;
@@ -134,7 +145,11 @@ void KDTree::partitionTable(string data_table_name, string partition_name, vecto
     for(auto repr_tuple : repr_tuples) {
         cnt += mappings[repr_tuple.id].size();
     }
+    group_ratio = ((double) repr_tuples.size()) / cnt;
+    
+    #if VERBOSE
     fmt::print("Created {} groups, with a total of {} tuples\n", repr_tuples.size(), cnt);
+    #endif
 
     string cid_column_name = "gid";
     string tid_column_name = "tid";
@@ -222,7 +237,11 @@ void KDTree::partitionTable(string data_table_name, string partition_name, vecto
 
     auto t4 = std::chrono::high_resolution_clock::now();
     auto update_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(t4 - t3).count() / 1000000.0;
+    
+    #if VERBOSE
     fmt::print("Finished storing partitions: {:.5Lf}ms\n", update_elapsed);
+    #endif
+
     exec_storage = update_elapsed;
 
     // Verifying the correctness of partitions

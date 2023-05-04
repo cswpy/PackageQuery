@@ -61,7 +61,7 @@ link_directories( ${PYTHON_LIBRARIES})
 # set(MAIN_NAME "main_sketchrefine")
 
 # TEST
-set(MAIN_NAME "test_all")
+set(MAIN_NAME "test_final")
 # set(MAIN_NAME "test_det_bound")
 # set(MAIN_NAME "test_dlv")
 
@@ -89,6 +89,8 @@ file(GLOB all_SRCS
   "${PROJECT_SOURCE_DIR}/include/pb/lib/*.h"
   "${PROJECT_SOURCE_DIR}/include/pb/lib/*.hpp"
   "${PROJECT_SOURCE_DIR}/include/pb/lib/*.cpp"
+  "${PROJECT_SOURCE_DIR}/include/pb/tmp/*.hpp"
+  "${PROJECT_SOURCE_DIR}/include/pb/tmp/*.cpp"
 )
 
 #OpenMP for Windows

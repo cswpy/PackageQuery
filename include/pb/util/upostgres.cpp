@@ -67,7 +67,8 @@ PgManager::PgManager(){
 long long PgManager::getSize(string table_name){
   _sql = fmt::format("SELECT {} FROM \"{}\" ORDER BY {} DESC LIMIT 1;", kId, table_name, kId);
   _res = PQexec(_conn, _sql.c_str());
-  long long size = atoll(PQgetvalue(_res, 0, 0));
+  long long size = 0;
+  if (PQntuples(_res) > 0) size = atoll(PQgetvalue(_res, 0, 0));
   PQclear(_res);
   return size;
 }
@@ -225,10 +226,12 @@ void PgManager::getSelectedTuples(RMatrixXd &out_tuples, vector<long long> &out_
   for (int i = 0; i < (int) ids.size(); i ++) str_ids[i] = to_string(ids[i]);
   string id_names = join(str_ids, ",");
   string filter_conds = getFilterConds(filter_cols, filter_intervals, kPrecision);
-  _sql = fmt::format("SELECT {},{} FROM \"{}\" WHERE {} IN ({}) AND {};", kId, col_names, table_name, kId, id_names, filter_conds);
+  _sql = fmt::format("SELECT {},{} FROM \"{}\" as g WHERE {} IN ({}) AND {};", kId, col_names, table_name, kId, id_names, filter_conds);
+  // cout << _sql << endl;
   _res = PQexec(_conn, _sql.c_str());
   int n = PQntuples(_res);
   int m = (int) cols.size();
+  // cout << n << " " << m << " HEREE\n";
   out_tuples.resize(m, n);
   out_ids.resize(n);
   for (int i = 0; i < n; i ++){
@@ -243,7 +246,7 @@ void PgManager::getSelectedTuples(RMatrixXd &out_tuples, vector<long long> &out_
 void PgManager::getConsecutiveTuples(RMatrixXd &out_tuples, vector<long long> &out_ids, string table_name, long long start_id, long long end_id, vector<string> cols, vector<string> filter_cols, vector<pair<double, double>> filter_intervals){
   string col_names = join(cols, ",");
   string filter_conds = getFilterConds(filter_cols, filter_intervals, kPrecision);
-  _sql = fmt::format("SELECT {},{} FROM \"{}\" WHERE {} BETWEEN {} AND {} AND {};", kId, col_names, table_name, kId, start_id, end_id, filter_conds);
+  _sql = fmt::format("SELECT {},{} FROM \"{}\" as g WHERE {} BETWEEN {} AND {} AND {};", kId, col_names, table_name, kId, start_id, end_id, filter_conds);
   _res = PQexec(_conn, _sql.c_str());
   int n = PQntuples(_res);
   int m = (int) cols.size();

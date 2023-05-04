@@ -13,9 +13,10 @@ max_multicolumn_indexes = 32
 # Main memory in GB
 main_memory_size = 300
 # lp_size >= core^2
-lp_size = 100000 
+lp_size = 100000
 precision = 15
 global_seed = 42
 outlier_percentage = 0.9
+time_limit = 600
 # Id column is based-1
 id_column = id

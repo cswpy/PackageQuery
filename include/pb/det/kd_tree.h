@@ -23,7 +23,7 @@ struct TupleComparator {
 class KDTree {
     public:
         int gid, num_dim, size_req, split_axis;
-        double diameter_req, exec_kd, exec_query, exec_tree_building, exec_storage;
+        double group_ratio, diameter_req, exec_kd, exec_query, exec_tree_building, exec_storage;
         shared_ptr<KDTree> parent, left_child, right_child;
         Tuple median;
         vector<long long> ids;

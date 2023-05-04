@@ -19,6 +19,7 @@ DetSql::DetSql(string table_name, string obj_col, bool is_maximize, vector<strin
     : table_name(table_name), obj_col(obj_col), is_maximize(is_maximize), att_cols(att_cols), att_senses(att_senses), u(u), has_count_constraint(has_count_constraint)
 {
   pg = new PgManager();
+  table_size = pg->getSize(table_name);
   table_cols = pg->listColumns(table_name);
   assert(isIn(table_cols, obj_col));
   for (string col : att_cols)

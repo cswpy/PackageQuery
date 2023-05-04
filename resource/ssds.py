@@ -108,7 +108,8 @@ def generating_data(global_size, global_index):
                             col_indices[i] = j
             else:
                 vals = [float(tokens[j]) for j in col_indices]
-                data.append(vals)
+                if min(vals) >= 0:
+                    data.append(vals)
             size += 1
         f.close()
         start_index = -1
@@ -135,7 +136,7 @@ for p in ps:
     p.join()
 
 
-# In[7]:
+# In[ ]:
 
 
 print("Starts indexing ssds")

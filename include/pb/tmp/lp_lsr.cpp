@@ -1,4 +1,4 @@
-#include "lsr.h"
+#include "lp_lsr.h"
 
 #include "pb/core/dual_reducer.h"
 #include "pb/core/checker.h"
@@ -8,7 +8,7 @@ const int kSleepPeriod = 25; // In ms
 const double kMinGapOpt = 1e-4;
 const double kMinGap = 1e-1;
 
-void LayeredSketchRefine::init(){
+void LPLayeredSketchRefine::init(){
   pg = new PgManager();
   _conn = PQconnectdb(pg->conninfo.c_str());
   assert(PQstatus(_conn) == CONNECTION_OK);
@@ -18,7 +18,7 @@ void LayeredSketchRefine::init(){
   exe_gb = exe_dual = 0;
 }
 
-DLVPartition* LayeredSketchRefine::getDLVPartition(LsrProb* prob){
+DLVPartition* LPLayeredSketchRefine::getDLVPartition(LsrProb* prob){
   _sql = fmt::format("SELECT cols, group_ratio, tps, layer_count FROM {} WHERE table_name='{}' AND partition_name='{}';", kPartitionTable, prob->det_sql.table_name, prob->partition_name);
   _res = PQexec(_conn, _sql.c_str());
   if (PQntuples(_res)){
@@ -32,13 +32,13 @@ DLVPartition* LayeredSketchRefine::getDLVPartition(LsrProb* prob){
   return NULL; 
 }
 
-LayeredSketchRefine::~LayeredSketchRefine(){
+LPLayeredSketchRefine::~LPLayeredSketchRefine(){
   PQfinish(_conn);
   if (partition) delete partition;
   delete pg;
 }
 
-void LayeredSketchRefine::formulateDetProb(int core, LsrProb &prob, DetProb &det_prob, string current_gtable, const vector<long long> &ids){
+void LPLayeredSketchRefine::formulateDetProb(int core, LsrProb &prob, DetProb &det_prob, string current_gtable, const vector<long long> &ids){
   int m = prob.det_sql.att_cols.size() + 1;
   int n = (int) ids.size();
   det_prob.resize(m, n);
@@ -99,7 +99,7 @@ void LayeredSketchRefine::formulateDetProb(int core, LsrProb &prob, DetProb &det
   det_prob.truncate();
 }
 
-LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, long long lp_size, bool is_safe): lp_size(lp_size){
+LPLayeredSketchRefine::LPLayeredSketchRefine(int core, LsrProb &prob, long long lp_size, bool is_safe): lp_size(lp_size){
   init();
   std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
   partition = getDLVPartition(&prob);
@@ -301,12 +301,20 @@ LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, long long lp_s
       status = dual.status;
       return;
     }
-    priority_queue<pair<double, long long>> pq;
-    unordered_set<long long> group_ids_set;
+    
     vector<long long> ids;
+    double E = 0;
+    for (int i = 0; i < n; i ++){
+      E += dual.sol(i);
+    }
+    double target_size = lp_size * partition->group_ratio * 2;
+    DetProb new_prob = det_prob;
+    new_prob.u.fill(E / target_size);
+    Dual scaled_dual = Dual(core, new_prob);
+
+    unordered_set<long long> group_ids_set;
     long long total_size = 0;
     long long global_start_index = 0;
-    int active_count = 0;
     #pragma omp parallel num_threads(core)
     {
       DLVPartition *loc_partition = new DLVPartition(&prob, partition->cols, partition->group_ratio, partition->tps, partition->layer_count);
@@ -314,76 +322,13 @@ LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, long long lp_s
       #pragma omp for
       for (int i = 0; i < n; i ++){
         // Condition for sketch
-        if (isGreater(dual.sol(i), 0)){
+        if (isGreater(scaled_dual.sol(i), 0)){
           long long group_id = det_prob.ids[i];
           if (total_size <= lp_size){
             long long size = loc_partition->getGroupComp(loc_ids, layer, group_id, limit_size_per_group);
             #pragma omp atomic
             total_size += size;
-            #pragma omp critical (c2)
-            {
-              pq.emplace(det_prob.c(i), group_id);
-              group_ids_set.insert(group_id);
-            }
           }
-        }
-      }
-      // Phase-2b: Shade
-      bool is_active = false;
-      while (true){
-        if (total_size > lp_size) break;
-        long long group_id = -1;
-        #pragma omp critical (c3)
-        {
-          if (pq.size()){
-            group_id = pq.top().second;
-            pq.pop();
-            if (!is_active){
-              active_count ++;
-              // cout << "CURRENT ACTIVE: " << active_count << endl;
-              is_active = true;
-            }
-          } else if (is_active){
-            active_count --;
-            is_active = false;
-          }
-        }
-        if (group_id < 0){
-          // is_active = false
-          std::this_thread::sleep_for(std::chrono::milliseconds(kSleepPeriod));
-          if (!active_count) break;
-        } else{
-          unordered_set<long long> group_ids;
-          loc_partition->getNeighboringGroups(group_ids, layer, group_id);
-          for (const auto& gid : group_ids){
-            if (total_size <= lp_size){
-              bool is_adding = false;
-              #pragma omp critical (c4)
-              {
-                if (group_ids_set.find(gid) == group_ids_set.end()){
-                  is_adding = true;
-                  group_ids_set.insert(gid);
-                }
-              }
-              if (is_adding){
-                double worth = loc_partition->getGroupWorthness(layer, gid);
-                long long actual_size = loc_partition->getGroupComp(loc_ids, layer, gid, limit_size_per_group);
-                #pragma omp atomic
-                total_size += actual_size;
-                #pragma omp critical (c3)
-                {
-                  pq.emplace(worth, gid);
-                }
-              }
-            }
-          }
-          // Debug
-          // #pragma omp critical
-          // {
-          //   cout << "ORIGIN: " << group_id << endl;
-          //   for (const auto &elem : group_ids) cout << elem << " ";
-          //   cout << endl;
-          // }
         }
       }
 

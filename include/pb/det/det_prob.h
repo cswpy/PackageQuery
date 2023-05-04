@@ -21,6 +21,7 @@ public:
 public:
   ~DetProb();
   DetProb();
+  DetProb(const DetProb& dp);
   void operator=(const DetProb& dp);
   DetProb(int m, int n);
   DetProb(DetSql &det_sql, long long n, int seed=-1);

@@ -4,19 +4,24 @@
 #include "pb/util/uconfig.h"
 #include "pb/det/synthetic.h"
 #include "pb/det/dlv.h"
+#include "pb/det/kd_tree.h"
 
 using namespace pb;
 
-vector<double> DetExp::H3 = {1, 7, 13};
+const double kTauRatio = 0.001;
+
 vector<double> DetExp::H8 = {1, 3, 5, 7, 9, 11, 13, 15};
-vector<double> DetExp::E2 = {10, 1000};
+vector<double> DetExp::H4 = {1, 3, 5, 7};
+vector<double> DetExp::E2 = {20, 1000};
 vector<double> DetExp::M6 = {8, 16, 32, 64, 128, 300};
 vector<double> DetExp::F5 = {0.1, 0.3, 0.5, 0.7, 0.9};
+vector<double> DetExp::g2 = {0.001, 0.01};
 
-vector<int> DetExp::C6 = {1, 4, 8, 16, 32, 80};
+vector<int> DetExp::C7 = {1, 2, 4, 8, 16, 32, 80};
+vector<int> DetExp::o6 = {4, 5, 6, 7, 8, 9};
 vector<int> DetExp::o4 = {6, 7, 8, 9};
 
-vector<long long> DetExp::N5 = {10000, 100000, 1000000, 10000000, 100000000};
+vector<long long> DetExp::S3 = {100000, 1000000, 10000000};
 
 vector<string> DetExp::datasets = {
   "tpch", 
@@ -53,6 +58,15 @@ vector<long long> DetExp::us = {
   1
 };
 
+vector<string> DetExp::filtered_cols = {
+  "price",
+  "tmass_prox"
+};
+
+vector<double> DetExp::Es = {
+  30.0, 30.0
+};
+
 DetExp::~DetExp(){
   out.close();
   backup.open(backup_path, std::ios::out);
@@ -76,18 +90,21 @@ void DetExp::reset(){
   a = 0;
   H = 7;
   F = 0.5;
-  g = 0.01;
   M = kMainMemorySize;
+  /****/
+  g = kGroupRatio;
   S = kLpSize;
+  /****/
   C = kPCore;
-  o = 7;
+  o = 8;
   q = 0;
+  tps = kTps;
+  tau_ratio = kTauRatio;
   seed = 1;
-  partition_name = "E0";
 }
 
 string DetExp::getTableName(){
-  return fmt::format("{}_{}_{}", datasets[q], o, seed);
+  return getSubtableName(datasets[q], o, seed);
 }
 
 vector<string> DetExp::getCols(){
@@ -96,26 +113,74 @@ vector<string> DetExp::getCols(){
   return cols;
 }
 
-DetSql DetExp::generate(){
+DetSql DetExp::generate(bool is_lazy){
   string table_name = getTableName();
-  if (!pg->existTable(table_name)){
-    Synthetic syn = Synthetic();
+  Synthetic syn = Synthetic();
+  if (is_lazy){
+    if (!pg->existTable(table_name)){
+      syn.createSubtable(datasets[q], o, getCols(), seed);
+    }
+  } else{
+    pg->dropTable(table_name);
     syn.createSubtable(datasets[q], o, getCols(), seed);
   }
+
   DetSql det_sql = DetSql(table_name, obj_cols[q], is_maximizes[q], arr_att_cols[q], arr_att_senses[q], has_count_constraints[q], us[q]);
   return det_sql;
 }
 
-void DetExp::partition(){
-  DynamicLowVariance dlv = DynamicLowVariance(kPCore, g, kMainMemorySize);
+double DetExp::dlvPartition(bool is_lazy){
+  DynamicLowVariance dlv = DynamicLowVariance(C, g, M, tps);
   string table_name = getTableName();
-  if (!dlv.existPartition(table_name, partition_name)){
-    dlv.partition(table_name, partition_name);
+  if (is_lazy){
+    if (!dlv.existPartition(table_name, getDlvPartitionName())){
+      dlv.dropPartition(table_name, getDlvPartitionName());
+      dlv.partition(table_name, getDlvPartitionName());
+    }
+  } else{
+    dlv.dropPartition(table_name, getDlvPartitionName());
+    dlv.partition(table_name, getDlvPartitionName());
   }
+  return dlv.exe;
+}
+
+double DetExp::kdPartition(bool is_lazy){
+  KDTree kt;
+  string ptable = fmt::format("[1P]_{}_{}", getTableName(), getKdPartitionName());
+  string gtable = fmt::format("[1G]_{}_{}", getTableName(), getKdPartitionName());
+  double tau = kTauRatio * pg->getSize(getTableName());
+  if (is_lazy){
+    if (!pg->existTable(ptable) || !pg->existTable(gtable)){
+      pg->dropTable(ptable);
+      pg->dropTable(gtable);
+      kt.partitionTable(getTableName(), getKdPartitionName(), getCols(), tau, DBL_MAX);
+    }
+  } else{
+    pg->dropTable(ptable);
+    pg->dropTable(gtable);
+    kt.partitionTable(getTableName(), getKdPartitionName(), getCols(), tau, DBL_MAX);
+  }
+  return kt.exec_kd;
+}
+
+string DetExp::getDlvPartitionName(){
+  return fmt::format("dlv_C{}_g{}_M{}_tps{}", C, formatFloat(g), formatFloat(M, 1), tps);
+}
+
+string DetExp::getKdPartitionName(){
+  return fmt::format("kd_tau{}", formatFloat(tau_ratio));
 }
 
 void DetExp::write(string id, double x, double y){
-  string s = fmt::format("{},{:.2Lf},{:.{}Lf}\n", id, x, y, kPrecision);
+  string s = fmt::format("{},{:.{}Lf},{:.{}Lf}\n", id, x, kPrecision, y, kPrecision);
+  lines.push_back(s);
+  if (verbose) cout << s;
+  out << s;
+  out.flush();
+}
+
+void DetExp::write(string label, double v){
+  string s = fmt::format("{},{:.{}Lf}\n", label, v, kPrecision);
   lines.push_back(s);
   if (verbose) cout << s;
   out << s;

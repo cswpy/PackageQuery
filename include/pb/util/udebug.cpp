@@ -18,7 +18,9 @@ static vector<string> sol_messages = {
   "DUAL UNBOUNDED",
   "TIMEOUT",
   "NO PARTITION FOUND",
-  "INCOMPATIBLE PARTITION"
+  "INCOMPATIBLE PARTITION",
+  "NUMERICAL UNSTABILITY",
+  "LP FOUND BUT NO ILP FOUND"
 };
 
 static vector<string> feas_messages = {
@@ -196,3 +198,14 @@ void Profiler::add(Profiler &profiler, int core){
     return result;
   }
 #endif
+
+const string currentDateTime(){
+  time_t     now = time(0);
+  struct tm  tstruct;
+  char       buf[80];
+  tstruct = *localtime(&now);
+  // Visit http://en.cppreference.com/w/cpp/chrono/c/strftime
+  // for more information about date/time format
+  strftime(buf, sizeof(buf), "%Y-%m-%d.%X", &tstruct);
+  return buf;
+}

@@ -18,7 +18,7 @@ public:
   vector<string> att_cols;
   vector<int> att_senses;
   // Assuming upper bounded by u and lower bounded by 0 for all tuples.
-  long long u;
+  long long u, table_size;
   bool has_count_constraint;
 
   vector<string> filter_cols;

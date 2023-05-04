@@ -14,7 +14,7 @@
 using namespace pb;
 
 // All the time is in ms
-class LayeredSketchRefine{
+class RandomLayeredSketchRefine{
 private:
   // We need to keep pg as pointer to PgManager since we want to implement customized destructor of LSR and DLV
   PgManager *pg;
@@ -36,6 +36,6 @@ private:
   void formulateDetProb(int core, LsrProb &prob, DetProb &det_prob, string current_gtable, const vector<long long> &ids);
   DLVPartition* getDLVPartition(LsrProb *prob);
 public:
-  ~LayeredSketchRefine();
-  LayeredSketchRefine(int core, LsrProb &prob, long long lp_size=kLpSize, bool is_safe=true);
+  ~RandomLayeredSketchRefine();
+  RandomLayeredSketchRefine(int core, LsrProb &prob, long long lp_size=kLpSize, bool is_safe=true);
 };

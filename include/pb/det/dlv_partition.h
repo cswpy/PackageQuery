@@ -21,7 +21,7 @@ private:
 public:
   vector<string> cols, query_cols;
   double group_ratio;
-  long long lp_size;
+  long long tps;
   int layer_count;
   bool is_filtering;
   #if DEBUG
@@ -31,7 +31,7 @@ private:
   void getNeighboringGroupsRecurse(unordered_set<long long> &group_ids, vector<double> &values, int layer, int index, vector<pair<double, double>> &intervals);
 public:
   ~DLVPartition();
-  DLVPartition(const LsrProb *prob, vector<string> cols, double group_ratio, long long lp_size, int layer_count);
+  DLVPartition(const LsrProb *prob, vector<string> cols, double group_ratio, long long tps, int layer_count, bool is_unique=false);
   string getPName(int layer);
   string getGName(int layer);
   string getInitialGName(int layer);

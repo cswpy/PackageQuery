@@ -1,4 +1,6 @@
 #include "pb/core/dual.h"
+#include "pb/core/gurobi_solver.h"
+#include "pb/core/checker.h"
 #include "pb/lib/map_sort.h"
 #include "pb/util/unumeric.h"
 #include "pb/util/udebug.h"
@@ -402,6 +404,7 @@ Dual::Dual(int core, const DetProb &prob){
       // cout << "A1" << endl;
       slope_partition.fill(init_size);
       slope_sums.resize(init_size);
+      // double ss = 0;
       #pragma omp parallel num_threads(core)
       {
         // pro.clock(10);
@@ -415,6 +418,8 @@ Dual::Dual(int core, const DetProb &prob){
           }
           sum_slope += getSlope(prob.u, prob.l, bu, bl, alpha_r, init[i].second);
           slope_sums(i) = sum_slope;
+          // #pragma omp atomic
+          // ss += getSlope(prob.u, prob.l, bu, bl, alpha_r, init[i].second);
         }
         #pragma omp master
         {
@@ -442,6 +447,8 @@ Dual::Dual(int core, const DetProb &prob){
           // print(slope_sums);
           //cout << "C " << iteration_count << " " << init_size << endl;
           if (isLess(slope_sums(init_size-1), fabs(max_delta), kE_ap)){
+            // cout << ss << endl;
+            // cout << fabs(max_delta) << " " << slope_sums(init_size-1) << endl;
             status = DualUnbounded;
           } else{
             q_index = (int) (upper_bound(slope_sums.begin(), slope_sums.end(), fabs(max_delta)) - slope_sums.begin());
@@ -600,6 +607,24 @@ Dual::Dual(int core, const DetProb &prob){
     delete[] init; init = nullptr;
   }
   if (init) delete[] init;
+
+  bool require_gurobi = false;
+  if (status == Found){
+    Checker ch = Checker(prob);
+    VectorXd ch_sol = sol;
+    ch_sol.conservativeResize(n);
+    if (ch.checkLpFeasibility(ch_sol) != Feasibility){
+      require_gurobi = true;
+    }
+  }
+  if (require_gurobi){
+    // Numerical issue is huge
+    GurobiSolver gs = GurobiSolver(prob);
+    gs.solveLp();
+    status = gs.lp_status;
+    sol = gs.lp_sol;
+    score = gs.lp_score;
+  }
   // pro.print();
   exe_solve = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start).count() / 1000000.0;
 }

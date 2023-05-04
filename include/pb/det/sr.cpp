@@ -8,6 +8,8 @@
 #include "pb/util/upostgres.h"
 #include "pb/util/unumeric.h"
 
+#define VERBOSE 0
+
 SketchRefine::~SketchRefine()
 {
     PQfinish(_conn);
@@ -151,7 +153,9 @@ bool SketchRefine::sketchAndRefine(map<long long, long long> &sol) {
 
     // Sketching initial package from representative tuples
     GurobiSolver gs = GurobiSolver(det_prob, true);
-    gs.solveIlp();
+    // cout << "Start solving sketch" << endl;
+    gs.solveIlp(1e-4, kTimeLimit);
+    // cout << "Finish sketching\n";
 
     // Replacing representative tuples with actual tuples
     map<long long, long long> sketch_sol;
@@ -163,6 +167,7 @@ bool SketchRefine::sketchAndRefine(map<long long, long long> &sol) {
     for (int i = 0; i < gs.ilp_sol.size(); i++)
     {
         if (gs.ilp_sol(i) != 0)
+        // if (!isEqual(gs.ilp_sol(i), 0))
         {
             sketch_sol.insert(pair<long long, long long>(det_prob.ids[i], gs.ilp_sol(i)));
             //group_indices.push_back(i);
@@ -171,16 +176,17 @@ bool SketchRefine::sketchAndRefine(map<long long, long long> &sol) {
             temp_ids.insert(temp_ids.end(), (int)gs.ilp_sol(i), det_prob.ids[i]);
         }
     }
+    // cout << "OK1\n";
     RMatrixXd effective_A = det_prob.A(Eigen::all, sol_index_seq);
     VectorXd effective_c = det_prob.c(sol_index_seq);
     Checker ch = Checker(det_prob);
     int feasStatus = ch.checkIlpFeasibility(sketch_sol);
+
+    #if VERBOSE
     fmt::print("Sketch solution status: {}\n",feasMessage(feasStatus) );
+    #endif
     
-    // If Sketch fails, verify that Gurobi cannot solve on representative tuples
-    if (feasStatus != 1) {
-        return false;
-    }
+    if (feasStatus != 1) return false;
     // Effectively, only changes variables whose dimension includes n
     m = effective_A.rows();
     n = effective_A.cols();
@@ -194,14 +200,22 @@ bool SketchRefine::sketchAndRefine(map<long long, long long> &sol) {
     det_prob_trimmed.truncate();
 
     auto t1 = std::chrono::high_resolution_clock::now();
-    auto sketch_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count() / 1000000.0;
-    fmt::print("Finished sketching solutions: {:.5Lf}ms\n", sketch_elapsed);
+    exec_sketch = std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count() / 1000000.0;
+    
+    #if VERBOSE
+    fmt::print("Finished sketching solutions: {:.5Lf}ms\n", exec_sketch);
+    #endif
+    // cout << "OK2\n";
     PartialPackage pp = PartialPackage(prob);
     pp.init(_conn, det_prob_trimmed, sketch_sol, sketch_gids);
     bool status = pp.refine(sol);
     auto t2 = std::chrono::high_resolution_clock::now();
-    auto refine_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() / 1000000.0;
-    fmt::print("Finished refining groups: {:.5Lf}ms\n\n", refine_elapsed);
+    exec_refine = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() / 1000000.0;
+    // cout << "OK3\n";
+    #if VERBOSE
+    fmt::print("Finished refining groups: {:.5Lf}ms\n\n", exec_refine);
+    #endif
+
     exec_sr = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t0).count() / 1000000.0;
     return status;
 }

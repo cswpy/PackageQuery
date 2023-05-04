@@ -10,8 +10,8 @@ DLVPartition::~DLVPartition(){
   PQfinish(_conn);
 }
 
-DLVPartition::DLVPartition(const LsrProb *prob, vector<string> cols, double group_ratio, long long lp_size, int layer_count)
-  : prob(prob), cols(cols), group_ratio(group_ratio), lp_size(lp_size), layer_count(layer_count){
+DLVPartition::DLVPartition(const LsrProb *prob, vector<string> cols, double group_ratio, long long tps, int layer_count, bool is_unique)
+  : prob(prob), cols(cols), group_ratio(group_ratio), tps(tps), layer_count(layer_count){
   pg = new PgManager();
   INIT_CLOCK(pro);
   _conn = PQconnectdb(pg->conninfo.c_str());
@@ -23,6 +23,11 @@ DLVPartition::DLVPartition(const LsrProb *prob, vector<string> cols, double grou
   query_cols = prob->det_sql.att_cols;
   if (!isIn(query_cols, prob->det_sql.obj_col)) query_cols.push_back(prob->det_sql.obj_col);
 
+  vector<string> att_names (query_cols.size());
+  for (int i = 0; i < (int) query_cols.size(); i ++){
+    att_names[i] = fmt::format("{} DOUBLE PRECISION", query_cols[i]);
+  }
+
   vector<string> intervals (cols.size());
   for (int i = 0; i < (int) cols.size(); i ++) intervals[i] = "interval_" + cols[i];
   string interval_names = join(intervals, ",");
@@ -32,7 +37,18 @@ DLVPartition::DLVPartition(const LsrProb *prob, vector<string> cols, double grou
   string and_itv_conds = join(itv_conds, " AND ");
 
   for (int layer=1; layer <= layer_count; layer ++){
-    string current_gtable = getGName(layer);
+    if (is_filtering && is_unique){
+      string gname = getGName(layer);
+      pg->dropTable(gname);
+      _sql = fmt::format(""
+        "CREATE TABLE IF NOT EXISTS \"{}\"("
+        "	{} BIGINT,"
+        " {}"
+        ");", gname, kId, join(att_names, ","));
+      _res = PQexec(_conn, _sql.c_str());
+      PQclear(_res);
+    }
+    string current_gtable = getInitialGName(layer);
     _sql = fmt::format("SELECT size FROM \"{}\" WHERE id=$1::bigint;", current_gtable);
     _res = PQprepare(_conn, fmt::format("size_{}", current_gtable).c_str(), _sql.c_str(), 1, NULL);
     assert(PQresultStatus(_res) == PGRES_COMMAND_OK);
@@ -64,6 +80,7 @@ DLVPartition::DLVPartition(const LsrProb *prob, vector<string> cols, double grou
         _sql = fmt::format("SELECT p.tid FROM \"{}\" p INNER JOIN \"{}\" g ON p.tid=g.id WHERE p.gid=$1::bigint;", current_ptable, getGName(layer-1));
       }
     }
+    // cout << _sql << endl;
     _res = PQprepare(_conn, fmt::format("comp_{}", current_ptable).c_str(), _sql.c_str(), 1, NULL);
     assert(PQresultStatus(_res) == PGRES_COMMAND_OK);
     PQclear(_res);

@@ -15,7 +15,7 @@ void LayeredSketchRefine::init(){
   _res = NULL;
   status = NotFound;
   INIT_CLOCK(pro);
-  exe_gb = exe_dual = 0;
+  exe_gb = exe_dual = exe_sort = 0;
 }
 
 DLVPartition* LayeredSketchRefine::getDLVPartition(LsrProb* prob){
@@ -112,6 +112,7 @@ LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, long long lp_s
       DualReducer dr = DualReducer(core, det_prob, is_safe, kMinGapOpt, kTimeLimit);
       exe_gb += dr.exe_gb;
       exe_dual += dr.exe_lp;
+      exe_sort += dr.exe_ilp - dr.exe_lp - dr.exe_gb;
       exe_lp = dr.exe_lp;
       exe_ilp = dr.exe_ilp;
       status = dr.status;
@@ -295,10 +296,12 @@ LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, long long lp_s
 
     int n = (int) det_prob.c.size();
     // Phase-2a: Sketch
-    Dual dual = Dual(core, det_prob);
-    exe_dual += dual.exe_solve;
-    if (dual.status != Found){
-      status = dual.status;
+    DualReducer dr = DualReducer(core, det_prob, false, kMinGap, kTimeLimit/(partition->layer_count+1));
+    exe_gb += dr.exe_gb;
+    exe_dual += dr.exe_lp;
+    exe_sort += dr.exe_ilp - dr.exe_lp - dr.exe_gb;
+    if (dr.status != Found && dr.status != HalfFeasible){
+      status = dr.status;
       return;
     }
     priority_queue<pair<double, long long>> pq;
@@ -314,7 +317,7 @@ LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, long long lp_s
       #pragma omp for
       for (int i = 0; i < n; i ++){
         // Condition for sketch
-        if (isGreater(dual.sol(i), 0)){
+        if (dr.lp_sol(i) > 0 || dr.ilp_sol(i) > 0){
           long long group_id = det_prob.ids[i];
           if (total_size <= lp_size){
             long long size = loc_partition->getGroupComp(loc_ids, layer, group_id, limit_size_per_group);
@@ -434,6 +437,7 @@ LayeredSketchRefine::LayeredSketchRefine(int core, LsrProb &prob, long long lp_s
   DualReducer dr = DualReducer(core, det_prob, is_safe, kMinGapOpt, kTimeLimit);
   exe_gb += dr.exe_gb;
   exe_dual += dr.exe_lp;
+  exe_sort += dr.exe_ilp - dr.exe_lp - dr.exe_gb;
   if (dr.status != Found){
     status = dr.status;
     return;

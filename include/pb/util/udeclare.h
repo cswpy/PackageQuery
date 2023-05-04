@@ -31,7 +31,7 @@
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> RMatrixXd;
 
 enum DetSense { LowerBounded, UpperBounded, Bounded};
-enum SolStatus { NotFound, Found, Feasible, Infeasible, Unbounded, DualUnbounded, Timeout, NoPartitionFound, IncompatiblePartition};
+enum SolStatus { NotFound, Found, Feasible, Infeasible, Unbounded, DualUnbounded, Timeout, NoPartitionFound, IncompatiblePartition, NumericalUnstability, HalfFeasible};
 enum FeasStatus { Unsolved, Feasibility, Infeasibility, LbConstraint, UbConstraint, LbVariable, UbVariable, Integrality, BadFilter};
 enum GroupStatus { Unitialized, Unlocked, Locked};
 
@@ -74,7 +74,9 @@ namespace pb{
   using std::push_heap;
   using std::pop_heap;
   using std::make_shared;
+  using std::fill;
   using std::shuffle;
+  using std::random_shuffle;
 
   using Eigen::VectorXd;
   using Eigen::VectorXi;
@@ -84,6 +86,7 @@ namespace pb{
   using std::random_device;
   using std::default_random_engine;
   using std::uniform_real_distribution;
+  using std::uniform_int_distribution;
   using std::normal_distribution;
   using std::lognormal_distribution;
   using std::seed_seq;
