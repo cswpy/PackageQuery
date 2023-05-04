@@ -91,24 +91,24 @@ void test_ssds_5() {
 void main2() {
     vector<int> att_senses = {0, 1, 2}; // Lower bounded, Upper bounded, Both bounded
     
-    // KDTree kt;
+    KDTree kt;
 
     // vector<string> cols = {"tmass_prox", "j", "h", "k"};
     // kt.partitionTable("ssds_5_1", "s500_d5", cols, 500, 5);
-    vector<string> att_cols = {"j", "h", "k"};
-    DetSql det_sql = DetSql("ssds_5_1", "tmass_prox", false, att_cols, att_senses, true, 1);
+    // vector<string> att_cols = {"j", "h", "k"};
+    // DetSql det_sql = DetSql("ssds_5_1", "tmass_prox", false, att_cols, att_senses, true, 1);
 
-    //vector<string> cols = {"price", "quantity", "discount", "tax"};
-    //kt.partitionTable("tpch_5_1", "s500_d100", cols, 500, 100);
-    // vector<string> att_cols = {"quantity", "discount", "tax"};
-    // DetSql det_sql = DetSql("tpch_5_1", "price", false, att_cols, att_senses, true, 1);
+    vector<string> cols = {"price", "quantity", "discount", "tax"};
+    kt.partitionTable("tpch_5_1", "s500", cols, 500, DBL_MAX);
+    vector<string> att_cols = {"quantity", "discount", "tax"};
+    DetSql det_sql = DetSql("tpch_5_1", "price", false, att_cols, att_senses, true, 1);
     
     //det_sql.addFilterWithRatio("j", 0.9, 0);
     //det_sql.addFilterWithRatio("k", 0.9, 2);
 
-    double E = 100; // 50 or 500 for tpc-h
-    double h = 1;
-    LsrProb lsr_prob = LsrProb(det_sql, "s500_d5", 1);
+    double E = 50; // 50 or 500 for tpc-h
+    double h = 7;
+    LsrProb lsr_prob = LsrProb(det_sql, "s500", 1);
     lsr_prob.generateBounds(E, 0, h);
     fmt::print("E: {}\tHardness: {}\tis_maximizing: {}\n\n", E, h, lsr_prob.det_sql.is_maximize);
     DetProb det_prob = DetProb(det_sql, -1, 1);
@@ -151,14 +151,14 @@ void main2() {
 }
 
 int main() {
-    DetExp exp = DetExp("kd_partition");
-    vector<int> orders = {5, 6, 7, 8};
-    vector<int> size_reqs = {500, 5000, 50000, 500000};
-    vector<int> diameter_reqs = {3, 8, 15, 30};
-    for(int i=0; i<4; i++) {
-        string table_name = fmt::format("ssds_{}_1", orders[i]);
-        test_ssds(table_name, size_reqs[i], diameter_reqs[i], orders[i], exp);
-    }
-    //main2();
+    // DetExp exp = DetExp("kd_partition");
+    // vector<int> orders = {5, 6, 7, 8};
+    // vector<int> size_reqs = {500, 5000, 50000, 500000};
+    // vector<int> diameter_reqs = {3, 8, 15, 30};
+    // for(int i=0; i<4; i++) {
+    //     string table_name = fmt::format("ssds_{}_1", orders[i]);
+    //     test_ssds(table_name, size_reqs[i], diameter_reqs[i], orders[i], exp);
+    // }
+    main2();
     //test_ssds_5();
 }
