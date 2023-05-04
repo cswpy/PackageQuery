@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <unordered_set>
 #include <string>
 #include <chrono>
 #include <utility>
@@ -17,6 +18,7 @@ inline char separator(){
 
 using std::vector;
 using std::string;
+using std::unordered_set;
 using std::to_string;
 using std::pair;
 using Eigen::VectorXd;
@@ -26,6 +28,7 @@ static const char* space = " \t\n\r\f\v";
 string infAlias(double val, int precision);
 string join(vector<string> names, string delim);
 string join(VectorXd vals, int precision);
+string join(unordered_set<string> names, string delim);
 string& trim(string& s, const char *t=space);
 string pgJoin(vector<string> names);
 string pgJoin(VectorXd vals, int precision);

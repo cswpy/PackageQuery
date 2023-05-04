@@ -39,6 +39,12 @@ string join(VectorXd vals, int precision){
   return join(str_vals, kPgDelim);
 }
 
+string join(unordered_set<string> names, string delim) {
+  vector<string> str_vals;
+  for (auto it=names.begin(); it!=names.end(); it++) str_vals.push_back(*it);
+  return join(str_vals, delim);
+}
+
 // trim from end of string (right)
 string& rtrim(string &s, const char *t){
   s.erase(s.find_last_not_of(t) + 1);
